@@ -4196,5 +4196,136 @@ function applyInviteFromUrl(){
     </div>
   </section>
 </div>
+
+<script>
+/* FINORA v42 — reconciliação de convite familiar entre dispositivos
+   Objetivo: ao aceitar/usar um convite, consolidar o integrante e o status "used"
+   no estado compartilhado; ao sincronizar, reconciliar convites pendentes pelo e-mail.
+*/
+(function(){
+  const V42 = 'FINORA_v42_family_reconcile';
+
+  function normEmail(v){ return String(v||'').trim().toLowerCase(); }
+  function safeArray(v){ return Array.isArray(v) ? v : []; }
+
+  function reconcileFamilyInviteState(){
+    try{
+      if(typeof loadFinoraInvites!=='function' || typeof loadFinoraUsers!=='function') return false;
+      const invites = safeArray(loadFinoraInvites());
+      const users = safeArray(loadFinoraUsers());
+      let changed = false;
+
+      const nextInvites = invites.map(inv=>{
+        if(!inv || inv.status==='used') return inv;
+        const email = normEmail(inv.email);
+        if(!email) return inv;
+        const member = users.find(u =>
+          normEmail(u?.email)===email &&
+          (!inv.workspaceId || !u?.workspaceId || String(u.workspaceId)===String(inv.workspaceId))
+        );
+        if(!member) return inv;
+        changed = true;
+        return {
+          ...inv,
+          status:'used',
+          usedAt: inv.usedAt || new Date().toISOString(),
+          usedBy: inv.usedBy || member.id || '',
+          acceptedByEmail: email
+        };
+      });
+
+      if(changed && typeof saveFinoraInvites==='function'){
+        saveFinoraInvites(nextInvites);
+      }
+      if(typeof renderFamilyAccess==='function' && window.currentUser){
+        try{ renderFamilyAccess(); }catch(_){}
+      }
+      return changed;
+    }catch(err){
+      console.warn('[FINORA v42] reconcile:',err);
+      return false;
+    }
+  }
+
+  async function persistFamilyStateToCloud(){
+    /* Use the app's existing cloud push as the canonical persistence path.
+       Debounced/guarded to avoid recursion if cloudPush itself triggers reconciliation. */
+    if(window.__finoraV42Pushing) return;
+    if(typeof cloudConfigured==='function' && !cloudConfigured()) return;
+    if(typeof pushCloudData!=='function' && typeof cloudPush!=='function' && typeof sendCloudData!=='function') return;
+    window.__finoraV42Pushing = true;
+    try{
+      const fn = typeof pushCloudData==='function' ? pushCloudData :
+                 typeof cloudPush==='function' ? cloudPush : sendCloudData;
+      await fn();
+    }catch(err){
+      console.warn('[FINORA v42] persist:',err);
+    }finally{
+      window.__finoraV42Pushing = false;
+    }
+  }
+
+  function reconcileAndPersist(){
+    const changed = reconcileFamilyInviteState();
+    if(changed) persistFamilyStateToCloud();
+  }
+
+  // Reconcile after startup/login and whenever this tab regains focus.
+  window.addEventListener('load',()=>setTimeout(reconcileAndPersist,900));
+  window.addEventListener('focus',()=>setTimeout(reconcileAndPersist,250));
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible') setTimeout(reconcileAndPersist,250);
+  });
+
+  // Cross-tab/local-storage reconciliation.
+  window.addEventListener('storage',()=>setTimeout(reconcileAndPersist,150));
+
+  // Wrap family rendering: every time admin opens/refreshes "Família e acessos",
+  // pending invitations are checked against actual members first.
+  const install = ()=>{
+    if(window.__finoraV42Installed) return;
+    window.__finoraV42Installed = true;
+
+    if(typeof window.renderFamilyAccess==='function'){
+      const originalRender = window.renderFamilyAccess;
+      window.renderFamilyAccess = function(){
+        try{ reconcileFamilyInviteState(); }catch(_){}
+        return originalRender.apply(this,arguments);
+      };
+    }
+
+    // Wrap registration button flow without replacing existing business rules:
+    // after successful registration/login, reconcile and persist.
+    const regBtn=document.getElementById('doRegister');
+    if(regBtn){
+      regBtn.addEventListener('click',()=>setTimeout(reconcileAndPersist,1200),true);
+    }
+    const loginBtn=document.getElementById('doLogin');
+    if(loginBtn){
+      loginBtn.addEventListener('click',()=>setTimeout(reconcileAndPersist,1000),true);
+    }
+
+    // Cloud download may bring the accepted member from another device.
+    // Reconcile shortly after cloud-action clicks.
+    document.addEventListener('click',e=>{
+      const t=e.target;
+      if(!(t instanceof Element)) return;
+      const label=(t.textContent||'').trim().toLowerCase();
+      if(label.includes('baixar dados da nuvem') ||
+         label.includes('salvar e enviar dados atuais') ||
+         label.includes('enviar dados para a nuvem')){
+        setTimeout(reconcileAndPersist,1400);
+      }
+    },true);
+  };
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install);
+  else install();
+
+  window.finoraReconcileFamilyV42 = reconcileAndPersist;
+  console.info('[FINORA] v42 family reconciliation active');
+})();
+</script>
+
 </body>
 </html>
