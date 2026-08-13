@@ -947,6 +947,22 @@ body.section-modal-open{overflow:hidden}
   .family-actions{margin-top:8px}
 }
 
+
+.cloud-modal{width:min(760px,96vw)}
+.cloud-status{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid #e0e7e3;background:#f7f9f8;border-radius:10px;margin-bottom:14px}
+.cloud-status .cloud-dot{width:10px;height:10px;border-radius:50%;background:#9aa7a0;flex:0 0 auto}
+.cloud-status.connected .cloud-dot{background:#1e9b61}
+.cloud-status.error .cloud-dot{background:#c64236}
+.cloud-status strong{display:block;font:10px Verdana,sans-serif;color:#30483c}
+.cloud-status small{display:block;font:8px Verdana,sans-serif;color:#738179;margin-top:3px}
+.cloud-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:13px}
+.cloud-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cloud-info-grid>div{border:1px solid #e3e9e5;background:#fbfcfb;border-radius:9px;padding:10px}
+.cloud-info-grid span{display:block;font:8px Verdana,sans-serif;color:#74827a;text-transform:uppercase}
+.cloud-info-grid strong{display:block;margin-top:4px;font:11px Verdana,sans-serif;color:#294538}
+.profile-grid .field.full{grid-column:1/-1}
+@media(max-width:700px){.cloud-info-grid{grid-template-columns:1fr}}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -954,6 +970,7 @@ body.section-modal-open{overflow:hidden}
   pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
   window.pdfjsLib=pdfjsLib;
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -974,6 +991,7 @@ body.section-modal-open{overflow:hidden}
     <button type="button" onclick="openSectionModal('finoraMonthlySheet')"><span class="ico">▦</span>Planilha mensal</button>
     <button type="button" onclick="openSectionModal('finoraCategories')"><span class="ico">◫</span>Visão por categoria</button>
     <button type="button" id="familyAccessNav" onclick="openSectionModal('finoraFamilyAccess')"><span class="ico">♙</span>Família e acessos</button>
+    <button type="button" onclick="openCloudModal()"><span class="ico">☁</span>Sincronização</button>
   </nav>
   <div class="finora-sidebar-reserve">
     <span>Reserva de emergência</span>
@@ -1497,6 +1515,7 @@ function save(){
     data.forEach(x=>{if(sameWorkspace(x) && !x.workspaceId)x.workspaceId=currentWorkspaceId});
   }
   localStorage.setItem(KEY,JSON.stringify(data));
+  scheduleCloudPush();
 }
 function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),1800)}
 function people(){
@@ -2319,6 +2338,7 @@ function saveFinoraCard(){
   const idx=cards.findIndex(c=>c.id===id);
   if(idx>=0)cards[idx]=row;else cards.push(row);
   saveFinoraCards(cards);
+  scheduleCloudPush();
   ['cardEditId','cardName','cardIssuer','cardLast4','cardExpiry','cardDueDay'].forEach(id=>$(id).value='');
   $('cardDefaultCategory').value='';$('cardBrand').value='auto';
   toggleCardForm(false);renderFinoraCards();fillLaunchCards();toast('Cartão salvo.');
@@ -2330,7 +2350,7 @@ function editFinoraCard(id){
 }
 function deleteFinoraCard(id){
   if(!confirm('Excluir este cartão cadastrado?'))return;
-  saveFinoraCards(loadFinoraCards().filter(c=>c.id!==id));renderFinoraCards();fillLaunchCards();
+  saveFinoraCards(loadFinoraCards().filter(c=>c.id!==id));scheduleCloudPush();renderFinoraCards();fillLaunchCards();
 }
 
 ['cardName','cardIssuer'].forEach(id=>$(id)?.addEventListener('blur',()=>{
@@ -2525,6 +2545,7 @@ function currentWorkspace(){return workspaceById(currentWorkspaceId)}
 function isAdmin(){return currentUser?.role==='admin'}
 function createFamilyInvite(){
   if(!isAdmin())return toast('Somente o administrador pode convidar familiares.');
+  ensureWorkspaceCloudToken();
   const email=$('inviteEmail').value.trim().toLowerCase();
   const name=$('inviteName').value.trim();
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return toast('Informe um e-mail válido.');
@@ -3142,6 +3163,210 @@ updateTypeLabels();
   $(id)?.addEventListener('change',renderMonthlySheet);
 });
 
+
+
+let finoraCloudPollTimer=null;
+function startCloudPolling(){
+  clearInterval(finoraCloudPollTimer);
+  if(!cloudConfigured())return;
+  finoraCloudPollTimer=setInterval(()=>{
+    if(document.visibilityState==='visible'&&!finoraCloudBusy)pullCloudState(false);
+  },20000);
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&cloudConfigured())pullCloudState(false);
+});
+
+const FINORA_CLOUD_CONFIG_KEY='finora_cloud_config_v1';
+const FINORA_CLOUD_SYNC_KEY='finora_cloud_last_sync_v1';
+let finoraCloudClient=null;
+let finoraCloudPushTimer=null;
+let finoraCloudBusy=false;
+
+function getCloudConfig(){
+  try{return JSON.parse(localStorage.getItem(FINORA_CLOUD_CONFIG_KEY)||'{}')}catch(e){return {}}
+}
+function saveCloudConfigLocal(cfg){
+  localStorage.setItem(FINORA_CLOUD_CONFIG_KEY,JSON.stringify(cfg||{}));
+  finoraCloudClient=null;
+}
+function ensureWorkspaceCloudToken(){
+  if(!currentWorkspaceId)return '';
+  const workspaces=loadFinoraWorkspaces();
+  const idx=workspaces.findIndex(w=>w.id===currentWorkspaceId);
+  if(idx<0)return '';
+  if(!workspaces[idx].cloudToken){
+    const bytes=new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    workspaces[idx].cloudToken=Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');
+    saveFinoraWorkspaces(workspaces);
+  }
+  return workspaces[idx].cloudToken;
+}
+function workspaceCloudToken(){
+  return workspaceById(currentWorkspaceId)?.cloudToken||'';
+}
+function cloudConfigured(){
+  const c=getCloudConfig();
+  return !!(c.url&&c.key&&workspaceCloudToken());
+}
+function getCloudClient(){
+  if(!cloudConfigured())return null;
+  if(!window.supabase?.createClient)return null;
+  if(finoraCloudClient)return finoraCloudClient;
+  const c=getCloudConfig();
+  finoraCloudClient=window.supabase.createClient(c.url,c.key,{
+    auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
+    global:{headers:{'x-finora-token':workspaceCloudToken()}}
+  });
+  return finoraCloudClient;
+}
+
+async function sha256Hex(text){
+  const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(text||'')));
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+function cloudStatePayload(){
+  const workspaceRows=data.filter(x=>sameWorkspace(x));
+  const cards=accountCards();
+  return {
+    schemaVersion:1,
+    workspaceId:currentWorkspaceId,
+    workspaceName:currentWorkspaceName,
+    updatedAt:new Date().toISOString(),
+    transactions:workspaceRows,
+    cards
+  };
+}
+function updateCloudUI(status=''){
+  const cfg=getCloudConfig(),ws=currentWorkspace();
+  if($('cloudSupabaseUrl'))$('cloudSupabaseUrl').value=cfg.url||'';
+  if($('cloudSupabaseKey'))$('cloudSupabaseKey').value=cfg.key||'';
+  if($('cloudWorkspaceName'))$('cloudWorkspaceName').textContent=ws?.name||currentWorkspaceName||'—';
+  if($('cloudRecordCount'))$('cloudRecordCount').textContent=data.filter(x=>sameWorkspace(x)).length;
+  if($('cloudCardCount'))$('cloudCardCount').textContent=accountCards().length;
+  if($('cloudLastSync'))$('cloudLastSync').textContent=localStorage.getItem(FINORA_CLOUD_SYNC_KEY)||'—';
+  const box=$('cloudStatusBox');
+  if(!box)return;
+  box.classList.remove('connected','error');
+  if(status==='connected'||cloudConfigured()){
+    box.classList.add('connected');
+    $('cloudStatusTitle').textContent='Nuvem configurada';
+    $('cloudStatusText').textContent='Este ambiente pode sincronizar dados entre aparelhos.';
+  }else if(status==='error'){
+    box.classList.add('error');
+    $('cloudStatusTitle').textContent='Falha na conexão';
+    $('cloudStatusText').textContent='Revise a URL, chave pública e o SQL/RLS do projeto.';
+  }else{
+    $('cloudStatusTitle').textContent='Não configurado';
+    $('cloudStatusText').textContent='Informe os dados do projeto Supabase.';
+  }
+  if($('cloudAdminFields'))$('cloudAdminFields').style.display=isAdmin()?'block':'none';
+  if($('cloudPushBtn'))$('cloudPushBtn').style.display=isAdmin()?'inline-block':'none';
+}
+function openCloudModal(){
+  updateCloudUI();
+  $('cloudModalBackdrop')?.classList.add('open');
+  document.body.classList.add('section-modal-open');
+}
+function closeCloudModal(){
+  $('cloudModalBackdrop')?.classList.remove('open');
+  document.body.classList.remove('section-modal-open');
+}
+async function testCloudConnection(){
+  try{
+    const url=$('cloudSupabaseUrl').value.trim().replace(/\/+$/,'');
+    const key=$('cloudSupabaseKey').value.trim();
+    if(!url||!key)return toast('Informe a URL e a chave pública do Supabase.');
+    saveCloudConfigLocal({url,key});
+    ensureWorkspaceCloudToken();
+    const client=getCloudClient();
+    if(!client)throw new Error('Cliente Supabase indisponível');
+    const {error}=await client.from('finora_workspace_state').select('workspace_id').eq('workspace_id',currentWorkspaceId).maybeSingle();
+    if(error && !/0 rows/i.test(error.message||''))throw error;
+    updateCloudUI('connected');toast('Conexão com a nuvem funcionando.');
+  }catch(e){
+    console.error(e);updateCloudUI('error');toast('Não foi possível conectar ao Supabase.');
+  }
+}
+async function saveCloudConfiguration(){
+  if(!isAdmin())return toast('Somente o administrador pode configurar a nuvem.');
+  const url=$('cloudSupabaseUrl').value.trim().replace(/\/+$/,'');
+  const key=$('cloudSupabaseKey').value.trim();
+  if(!url||!key)return toast('Informe a URL e a chave pública do Supabase.');
+  saveCloudConfigLocal({url,key});
+  ensureWorkspaceCloudToken();
+  await pushCloudState(true);
+  updateCloudUI();
+  startCloudPolling();
+}
+async function pushCloudState(showToast=false){
+  if(finoraCloudBusy||!cloudConfigured())return false;
+  const client=getCloudClient();if(!client)return false;
+  finoraCloudBusy=true;
+  try{
+    const row={workspace_id:currentWorkspaceId,token_hash:await sha256Hex(workspaceCloudToken()),state:cloudStatePayload(),updated_at:new Date().toISOString()};
+    const {error}=await client.from('finora_workspace_state').upsert(row,{onConflict:'workspace_id'});
+    if(error)throw error;
+    const stamp=new Date().toLocaleString('pt-BR');
+    localStorage.setItem(FINORA_CLOUD_SYNC_KEY,stamp);
+    updateCloudUI('connected');
+    if(showToast)toast('Dados enviados para a nuvem.');
+    return true;
+  }catch(e){
+    console.error('FINORA cloud push',e);
+    updateCloudUI('error');
+    if(showToast)toast('Falha ao enviar dados para a nuvem.');
+    return false;
+  }finally{finoraCloudBusy=false}
+}
+function scheduleCloudPush(){
+  if(!cloudConfigured())return;
+  clearTimeout(finoraCloudPushTimer);
+  finoraCloudPushTimer=setTimeout(()=>pushCloudState(false),450);
+}
+async function pullCloudState(showToast=false){
+  if(finoraCloudBusy||!cloudConfigured())return false;
+  const client=getCloudClient();if(!client)return false;
+  finoraCloudBusy=true;
+  try{
+    const {data:row,error}=await client.from('finora_workspace_state').select('state,updated_at').eq('workspace_id',currentWorkspaceId).maybeSingle();
+    if(error)throw error;
+    if(!row?.state){
+      if(showToast)toast('Ainda não existem dados deste ambiente na nuvem.');
+      return false;
+    }
+    const state=row.state||{};
+    const remoteTx=Array.isArray(state.transactions)?state.transactions:[];
+    const remoteCards=Array.isArray(state.cards)?state.cards:[];
+
+    // Replace only this workspace's local data, preserving unrelated local workspaces.
+    data=data.filter(x=>!sameWorkspace(x)).concat(remoteTx.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'})));
+    localStorage.setItem(KEY,JSON.stringify(data));
+
+    const allCards=loadFinoraCards().filter(c=>c.workspaceId!==currentWorkspaceId)
+      .concat(remoteCards.map(c=>({...c,workspaceId:currentWorkspaceId,account:'family'})));
+    saveFinoraCards(allCards);
+
+    const stamp=new Date(row.updated_at||Date.now()).toLocaleString('pt-BR');
+    localStorage.setItem(FINORA_CLOUD_SYNC_KEY,stamp);
+    render();
+    updateCloudUI('connected');
+    if(showToast)toast('Dados atualizados pela nuvem.');
+    return true;
+  }catch(e){
+    console.error('FINORA cloud pull',e);
+    updateCloudUI('error');
+    if(showToast)toast('Falha ao baixar dados da nuvem.');
+    return false;
+  }finally{finoraCloudBusy=false}
+}
+async function initializeCloudForWorkspace(){
+  if(!cloudConfigured())return;
+  await pullCloudState(false);
+}
+
 const FINORA_USERS_KEY='finora_users_local_v6';
 const FINORA_SESSION_KEY='finora_session_local_v6';
 const FINORA_WORKSPACES_KEY='finora_workspaces_local_v2';
@@ -3220,7 +3445,12 @@ function createPortableInvitePayload(invite){
     email:(invite.email||'').trim().toLowerCase(),
     name:invite.name||'',
     createdAt:invite.createdAt||new Date().toISOString(),
-    nonce:invite.id||String(Date.now())
+    nonce:invite.id||String(Date.now()),
+    cloud:{
+      url:getCloudConfig().url||'',
+      key:getCloudConfig().key||'',
+      token:workspaceCloudToken()||''
+    }
   };
   return 'FINORA2.'+b64UrlEncodeText(JSON.stringify(payload));
 }
@@ -3278,7 +3508,7 @@ function migrateWorkspaceData(){
   cards.forEach(c=>{if(!c.workspaceId){c.workspaceId=currentWorkspaceId;c.account='family';cc=true}});
   if(cc)saveFinoraCards(cards);
 }
-function openFinora(user){
+async function openFinora(user){
   currentUser=user;
   account='family';
   currentWorkspaceId=user.workspaceId;
@@ -3296,8 +3526,10 @@ function openFinora(user){
   ensureRecurringNextMonths();
   normalizeVariableReminders();
   resetForm();
+  if(cloudConfigured()) await pullCloudState(false);
   render();
   renderFamilyAccess();
+  updateCloudUI();
 }
 function updateWorkspaceMode(){
   const mode=$('regWorkspaceMode')?.value||'create';
@@ -3397,7 +3629,7 @@ $('doRegister').addEventListener('click',async()=>{
   users.push(user);saveFinoraUsers(users);
   localStorage.setItem(FINORA_SESSION_KEY,user.id);
   clearInviteFromLocation();
-  openFinora(user);
+  await openFinora(user);
 });
 
 $('doLogin').addEventListener('click',async()=>{
@@ -3422,7 +3654,7 @@ $('doLogin').addEventListener('click',async()=>{
   if(!user||user.hash!==await finoraHash(password))return authErr('E-mail/CPF ou senha incorretos.');
 
   localStorage.setItem(FINORA_SESSION_KEY,user.id);
-  openFinora(user);
+  await openFinora(user);
 });
 
 $('logoutBtn').addEventListener('click',()=>{
@@ -3551,14 +3783,14 @@ function applyInviteFromUrl(){
   e.style.color='#226345';
 }
 
-(function(){
+(async function(){
   migrateInvitesV40();
   cleanupPendingInvitesV39();
   updateWorkspaceMode();
   applyInviteFromUrl();
   const sid=localStorage.getItem(FINORA_SESSION_KEY);
   const user=loadFinoraUsers().find(u=>u.id===sid);
-  if(user)openFinora(user);
+  if(user)await openFinora(user);
 })();
 
 </script>
@@ -3627,6 +3859,59 @@ function applyInviteFromUrl(){
       <div class="profile-actions">
         <button type="button" class="btn btn-soft" onclick="closeProfileModal()">Cancelar</button>
         <button type="button" class="btn btn-primary" id="saveProfileBtn">Salvar alterações</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="profile-modal-backdrop" id="cloudModalBackdrop" onclick="if(event.target===this)closeCloudModal()">
+  <section class="profile-modal cloud-modal">
+    <div class="profile-modal-head">
+      <div>
+        <h2>Sincronização FINORA</h2>
+        <p>Conecte este ambiente familiar ao Supabase para compartilhar os dados entre aparelhos.</p>
+      </div>
+      <button type="button" class="finora-modal-close" onclick="closeCloudModal()" aria-label="Fechar">×</button>
+    </div>
+    <div class="profile-modal-body">
+      <div class="cloud-status" id="cloudStatusBox">
+        <span class="cloud-dot"></span>
+        <div><strong id="cloudStatusTitle">Não configurado</strong><small id="cloudStatusText">Informe os dados do projeto Supabase.</small></div>
+      </div>
+
+      <div id="cloudAdminFields">
+        <div class="profile-grid">
+          <div class="field full">
+            <label>Supabase Project URL</label>
+            <input id="cloudSupabaseUrl" placeholder="https://seuprojeto.supabase.co">
+          </div>
+          <div class="field full">
+            <label>Publishable / anon key</label>
+            <input id="cloudSupabaseKey" type="password" placeholder="sb_publishable_... ou chave anon">
+            <div class="file-note">Use apenas a chave pública/publishable. Nunca coloque a service_role no navegador.</div>
+          </div>
+        </div>
+        <div class="cloud-actions">
+          <button type="button" class="btn btn-soft" onclick="testCloudConnection()">Testar conexão</button>
+          <button type="button" class="btn btn-primary" onclick="saveCloudConfiguration()">Salvar e enviar dados atuais</button>
+        </div>
+      </div>
+
+      <div class="profile-section-title">Estado compartilhado</div>
+      <div class="cloud-info-grid">
+        <div><span>Ambiente</span><strong id="cloudWorkspaceName">—</strong></div>
+        <div><span>Última sincronização</span><strong id="cloudLastSync">—</strong></div>
+        <div><span>Registros</span><strong id="cloudRecordCount">0</strong></div>
+        <div><span>Cartões</span><strong id="cloudCardCount">0</strong></div>
+      </div>
+
+      <div class="cloud-actions">
+        <button type="button" class="btn btn-soft" onclick="pullCloudState(true)">Baixar dados da nuvem</button>
+        <button type="button" class="btn btn-soft" id="cloudPushBtn" onclick="pushCloudState(true)">Enviar dados para a nuvem</button>
+      </div>
+
+      <div class="invite-test-note">
+        <strong>Importante:</strong> antes do primeiro teste, crie o projeto no Supabase e execute o arquivo SQL que acompanha esta versão. Depois configure a URL e a chave pública aqui.
       </div>
     </div>
   </section>
