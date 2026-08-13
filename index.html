@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v46-supabase-auth">
+<meta name="finora-version" content="v47-multidispositivo-online">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -1276,7 +1276,7 @@ body.section-modal-open{overflow:hidden}
     <div class="auth-field"><label>Confirmar senha</label><input id="regPass2" type="password" placeholder="Repita a senha"></div>
     <button class="auth-submit" type="button" id="doRegister">Criar conta e entrar</button>
    </div>
-   <p class="file-note" style="margin-top:14px">Seu acesso pode ser usado no computador, celular ou tablet. A primeira entrada após esta atualização pode concluir automaticamente a migração segura da sua conta para o acesso online.</p>
+   <p class="file-note" style="margin-top:14px">Sua conta FINORA é online: use o mesmo e-mail ou CPF e a mesma senha em computadores, celulares e tablets.</p>
   </div></div>
  </div>
 </div>
@@ -3475,7 +3475,8 @@ let finoraAuthClient=null;
 
 function publicSupabaseConfig(){
   const pub=window.FINORA_PUBLIC_CONFIG||{};
-  const local=(typeof getCloudConfig==='function'?getCloudConfig():{})||{};
+  let local={};
+  try{local=JSON.parse(localStorage.getItem(FINORA_CLOUD_CONFIG_KEY)||'{}')}catch(e){}
   return {
     url:String(pub.url||local.url||'').trim().replace(/\/+$/,''),
     key:String(pub.key||local.key||'').trim()
@@ -3555,40 +3556,95 @@ async function cacheAuthProfile(profile){
   return u;
 }
 
+
+async function upsertOwnFinoraProfile(profile){
+  const client=getAuthClient();
+  if(!client)throw new Error('Supabase indisponível.');
+  const row={
+    user_id:profile.user_id,
+    name:profile.name||'Usuário',
+    email:String(profile.email||'').trim().toLowerCase(),
+    cpf_hash:profile.cpf_hash||'',
+    cpf_masked:profile.cpf_masked||'',
+    workspace_id:profile.workspace_id,
+    role:profile.role==='admin'?'admin':'member',
+    updated_at:new Date().toISOString()
+  };
+  const {error}=await client.from('finora_profiles').upsert(row,{onConflict:'user_id'});
+  if(error)throw error;
+  return row;
+}
+
+async function migrateLegacyProfileAfterAuth(localUser){
+  const client=getAuthClient();
+  if(!client||!localUser)return null;
+  const {data:sessionData}=await client.auth.getSession();
+  const authUser=sessionData?.session?.user;
+  if(!authUser)return null;
+
+  const existing=await authProfileByUserId(authUser.id);
+  if(existing)return await cacheAuthProfile(existing);
+
+  const profile=await upsertOwnFinoraProfile({
+    user_id:authUser.id,
+    name:localUser.name||authUser.user_metadata?.name||'Usuário',
+    email:authUser.email||localUser.email,
+    cpf_hash:localUser.cpfHash||'',
+    cpf_masked:localUser.cpfMasked||'',
+    workspace_id:localUser.workspaceId,
+    role:localUser.role==='admin'?'admin':'member'
+  });
+  return await cacheAuthProfile(profile);
+}
+
+async function ensureOnlineWorkspaceName(){
+  if(!currentWorkspaceId)return;
+  const client=getAuthClient();
+  if(!client)return;
+  try{
+    const {data:row}=await client.from('finora_workspace_state')
+      .select('state')
+      .eq('workspace_id',currentWorkspaceId)
+      .maybeSingle();
+    const name=row?.state?.workspaceName;
+    if(!name)return;
+    currentWorkspaceName=name;
+    const rows=loadFinoraWorkspaces();
+    const idx=rows.findIndex(w=>w.id===currentWorkspaceId);
+    if(idx>=0)rows[idx]={...rows[idx],name};
+    else rows.push({id:currentWorkspaceId,name,createdAt:new Date().toISOString()});
+    saveFinoraWorkspaces(rows);
+    if($('loggedAccount'))$('loggedAccount').textContent=name;
+    if(typeof updateFinoraMobileWorkspace==='function')updateFinoraMobileWorkspace();
+  }catch(e){console.warn('FINORA workspace name',e)}
+}
+
 async function migrateLocalLoginToSupabase(user,password){
   const client=getAuthClient();
-  if(!client||!user?.email||!password)return null;
+  if(!client||!user?.email||!password)throw new Error('Não foi possível iniciar a migração online.');
 
-  // Try login first: account may already have been migrated from another device.
-  let res=await client.auth.signInWithPassword({email:user.email,password});
-  if(!res.error&&res.data?.user){
-    const profile=await authProfileByUserId(res.data.user.id);
-    return profile?await cacheAuthProfile(profile):null;
+  // Account may already exist in Auth (for example after an earlier incomplete migration).
+  let signed=await client.auth.signInWithPassword({email:user.email,password});
+  if(!signed.error&&signed.data?.user){
+    return await migrateLegacyProfileAfterAuth(user);
   }
 
-  // First migration: create Supabase Auth account with the SAME password just entered.
+  // If the account does not exist online yet, create it using the same credentials.
   const signup=await client.auth.signUp({
     email:user.email,
     password,
     options:{data:{name:user.name||'',finora_migration:true}}
   });
   if(signup.error)throw signup.error;
-  if(!signup.data?.user)throw new Error('Não foi possível criar a conta de acesso online.');
+  if(!signup.data?.user)throw new Error('Não foi possível criar sua conta online.');
 
-  const profileRow={
-    user_id:signup.data.user.id,
-    name:user.name||'Usuário',
-    email:String(user.email||'').toLowerCase(),
-    cpf_hash:user.cpfHash||'',
-    cpf_masked:user.cpfMasked||'',
-    workspace_id:user.workspaceId,
-    role:user.role==='admin'?'admin':'member',
-    updated_at:new Date().toISOString()
-  };
-  const {error:profileError}=await client.from('finora_profiles').upsert(profileRow,{onConflict:'user_id'});
-  if(profileError)throw profileError;
+  // With e-mail confirmation disabled, signUp returns a session immediately.
+  // If a project enables confirmation again in the future, the user must confirm first.
+  if(!signup.data?.session){
+    throw new Error('Confirme seu e-mail e depois entre novamente para concluir a migração.');
+  }
 
-  return await cacheAuthProfile(profileRow);
+  return await migrateLegacyProfileAfterAuth(user);
 }
 
 async function loginWithSupabase(identifier,password){
@@ -3633,7 +3689,13 @@ async function restoreSupabaseSession(){
 
 
 function getCloudConfig(){
-  try{return JSON.parse(localStorage.getItem(FINORA_CLOUD_CONFIG_KEY)||'{}')}catch(e){return {}}
+  let local={};
+  try{local=JSON.parse(localStorage.getItem(FINORA_CLOUD_CONFIG_KEY)||'{}')}catch(e){}
+  const pub=window.FINORA_PUBLIC_CONFIG||{};
+  return {
+    url:String(local.url||pub.url||'').trim().replace(/\/+$/,''),
+    key:String(local.key||pub.key||'').trim()
+  };
 }
 function saveCloudConfigLocal(cfg){
   localStorage.setItem(FINORA_CLOUD_CONFIG_KEY,JSON.stringify(cfg||{}));
@@ -3656,19 +3718,13 @@ function workspaceCloudToken(){
   return workspaceById(currentWorkspaceId)?.cloudToken||'';
 }
 function cloudConfigured(){
-  const c=getCloudConfig();
-  return !!(c.url&&c.key&&workspaceCloudToken());
+  return !!(publicSupabaseReady()&&currentWorkspaceId&&currentUser?.cloudAuth);
 }
 function getCloudClient(){
+  // v47: financial data uses the SAME authenticated Supabase client/session.
+  // No per-browser family token is required anymore.
   if(!cloudConfigured())return null;
-  if(!window.supabase?.createClient)return null;
-  if(finoraCloudClient)return finoraCloudClient;
-  const c=getCloudConfig();
-  finoraCloudClient=window.supabase.createClient(c.url,c.key,{
-    auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
-    global:{headers:{'x-finora-token':workspaceCloudToken()}}
-  });
-  return finoraCloudClient;
+  return getAuthClient();
 }
 
 async function sha256Hex(text){
@@ -3930,7 +3986,6 @@ async function pushCloudState(showToast=false){
 
     const row={
       workspace_id:currentWorkspaceId,
-      token_hash:await sha256Hex(workspaceCloudToken()),
       state:payload,
       updated_at:new Date().toISOString()
     };
@@ -3987,6 +4042,15 @@ async function pullCloudState(showToast=false){
     }
 
     const state=row.state||{};
+    if(state.workspaceName){
+      currentWorkspaceName=state.workspaceName;
+      const wsRows=loadFinoraWorkspaces();
+      const wi=wsRows.findIndex(w=>w.id===currentWorkspaceId);
+      if(wi>=0)wsRows[wi]={...wsRows[wi],name:state.workspaceName};
+      else wsRows.push({id:currentWorkspaceId,name:state.workspaceName,createdAt:new Date().toISOString()});
+      saveFinoraWorkspaces(wsRows);
+      if($('loggedAccount'))$('loggedAccount').textContent=state.workspaceName;
+    }
     const remoteTx=Array.isArray(state.transactions)?state.transactions:[];
     const remoteCards=Array.isArray(state.cards)?state.cards:[];
     const remoteMembers=Array.isArray(state.members)?state.members:[];
@@ -4374,6 +4438,7 @@ async function openFinora(user){
   resetForm();
   if(cloudConfigured()){
     await pullCloudState(false);
+    await ensureOnlineWorkspaceName();
     // Um integrante que acabou de aceitar o convite publica imediatamente
     // seu vínculo e o status utilizado, depois de receber o estado atual.
     if(user.role==='member'){
@@ -4397,6 +4462,7 @@ $('tabRegister').addEventListener('click',()=>{authMode('register');updateWorksp
 
 $('doRegister').addEventListener('click',async()=>{
   clearAuthErr();
+
   const name=$('regName').value.trim();
   const email=$('regEmail').value.trim().toLowerCase();
   const cpf=normalizeCPF($('regCpf').value);
@@ -4408,13 +4474,13 @@ $('doRegister').addEventListener('click',async()=>{
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return authErr('Informe um e-mail válido.');
   if(p.length<6)return authErr('Use uma senha com pelo menos 6 caracteres.');
   if(p!==p2)return authErr('As senhas não coincidem.');
+  if(!publicSupabaseReady())return authErr('A configuração online da FINORA não está disponível.');
 
-  const users=loadFinoraUsers();
-  const cpfHash=await finoraHash(cpf),passwordHash=await finoraHash(p);
-  if(users.some(u=>u.email===email||u.cpfHash===cpfHash))return authErr('Este e-mail ou CPF já possui cadastro neste navegador. Se a conta já foi criada, use a aba “Entrar”.');
+  const client=getAuthClient();
+  if(!client)return authErr('Não foi possível conectar à autenticação online.');
 
-  let workspace,role;
-  const workspaces=loadFinoraWorkspaces();
+  const cpfHash=await finoraHash(cpf);
+  let workspace,role,portable=null;
 
   if(mode==='create'){
     const workspaceName=$('regWorkspaceName').value.trim();
@@ -4424,164 +4490,151 @@ $('doRegister').addEventListener('click',async()=>{
       name:workspaceName,
       createdAt:new Date().toISOString()
     };
-    workspaces.push(workspace);saveFinoraWorkspaces(workspaces);
     role='admin';
   }else{
     const rawCode=$('regInviteCode').value.trim();
-    if(!rawCode)return authErr('O convite não foi reconhecido. Abra o link recebido ou cole o código completo.');
+    if(!rawCode)return authErr('Abra o link de convite recebido ou cole o código completo.');
 
-    const portable=parsePortableInviteCode(rawCode);
-    if(!portable)return authErr('Convite inválido. Peça ao administrador para gerar um novo convite nesta versão da FINORA.');
+    portable=parsePortableInviteCode(rawCode);
+    if(!portable)return authErr('Convite inválido. Peça ao administrador para gerar um novo convite.');
+    if((portable.email||'').trim().toLowerCase()!==email)
+      return authErr(`Este convite foi enviado para ${portable.email}. Use exatamente esse e-mail.`);
 
-    if((portable.email||'').trim().toLowerCase()!==email){
-      return authErr(`Este convite foi enviado para ${portable.email}. Use exatamente esse e-mail no cadastro.`);
-    }
-
-    let workspaces=loadFinoraWorkspaces();
-    workspace=workspaces.find(w=>w.id===portable.workspaceId);
-    if(!workspace){
-      workspace={
-        id:portable.workspaceId,
-        name:portable.workspaceName||'Ambiente familiar',
-        importedFromInvite:true,
-        createdAt:new Date().toISOString()
-      };
-      workspaces.push(workspace);
-      saveFinoraWorkspaces(workspaces);
-    }
+    workspace={
+      id:portable.workspaceId,
+      name:portable.workspaceName||'Ambiente familiar',
+      importedFromInvite:true,
+      createdAt:new Date().toISOString()
+    };
     role='member';
-
-    // Import the shared cloud access carried by the administrator's invitation.
-    if(portable.cloud?.token){
-      let wsRows=loadFinoraWorkspaces();
-      const wsIdx=wsRows.findIndex(w=>w.id===portable.workspaceId);
-      if(wsIdx>=0){
-        wsRows[wsIdx].cloudToken=portable.cloud.token;
-        saveFinoraWorkspaces(wsRows);
-      }
-    }
-    if(portable.cloud?.url && portable.cloud?.key){
-      saveCloudConfigLocal({
-        url:portable.cloud.url,
-        key:portable.cloud.key
-      });
-    }
-
-    // Store a receipt locally. Acceptance no longer depends on admin localStorage.
-    let localInvites=loadFinoraInvites().filter(i=>i.protocolVersion===FINORA_INVITE_PROTOCOL_VERSION);
-    const existingReceipt=localInvites.find(i=>i.code===rawCode);
-    if(existingReceipt){
-      existingReceipt.status='used';
-      existingReceipt.usedAt=new Date().toISOString();
-      existingReceipt.usedByEmail=email;
-    }else{
-      localInvites.push({
-        id:portable.nonce||String(Date.now()),
-        protocolVersion:FINORA_INVITE_PROTOCOL_VERSION,
-        workspaceId:portable.workspaceId,
-        email:portable.email,
-        name:portable.name||'',
-        code:rawCode,
-        status:'used',
-        createdAt:portable.createdAt||new Date().toISOString(),
-        usedAt:new Date().toISOString(),
-        usedByEmail:email,
-        portable:true
-      });
-    }
-    saveFinoraInvites(localInvites);
   }
 
-  const user={
-    id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),
-    name,email,cpfHash,cpfMasked:maskCPF(cpf),hash:passwordHash,
-    workspaceId:workspace.id,role,createdAt:new Date().toISOString()
-  };
-  users.push(user);saveFinoraUsers(users);
-  localStorage.setItem(FINORA_SESSION_KEY,user.id);
-  clearInviteFromLocation();
-  await openFinora(user);
+  try{
+    const signup=await client.auth.signUp({
+      email,
+      password:p,
+      options:{data:{name,finora:true}}
+    });
+    if(signup.error)throw signup.error;
+    if(!signup.data?.user)throw new Error('Não foi possível criar a conta online.');
+    if(!signup.data?.session){
+      throw new Error('Conta criada. Confirme seu e-mail e depois use a aba “Entrar”.');
+    }
+
+    const profile=await upsertOwnFinoraProfile({
+      user_id:signup.data.user.id,
+      name,
+      email,
+      cpf_hash:cpfHash,
+      cpf_masked:maskCPF(cpf),
+      workspace_id:workspace.id,
+      role
+    });
+
+    const workspaces=loadFinoraWorkspaces();
+    const wi=workspaces.findIndex(w=>w.id===workspace.id);
+    if(wi>=0)workspaces[wi]={...workspaces[wi],...workspace};
+    else workspaces.push(workspace);
+    saveFinoraWorkspaces(workspaces);
+
+    // Keep a local receipt of the invitation for the current UI/history only.
+    if(mode==='join'&&portable){
+      let localInvites=loadFinoraInvites();
+      const rawCode=$('regInviteCode').value.trim();
+      const existing=localInvites.find(i=>i.code===rawCode);
+      if(existing){
+        existing.status='used';existing.usedAt=new Date().toISOString();existing.usedByEmail=email;
+      }else{
+        localInvites.push({
+          id:portable.nonce||String(Date.now()),
+          protocolVersion:portable.v||FINORA_INVITE_PROTOCOL_VERSION,
+          workspaceId:portable.workspaceId,
+          email:portable.email,
+          name:portable.name||'',
+          code:rawCode,
+          status:'used',
+          createdAt:portable.createdAt||new Date().toISOString(),
+          usedAt:new Date().toISOString(),
+          usedByEmail:email,
+          portable:true
+        });
+      }
+      saveFinoraInvites(localInvites);
+    }
+
+    const user=await cacheAuthProfile(profile);
+    localStorage.setItem(FINORA_SESSION_KEY,user.id);
+    clearInviteFromLocation();
+    await openFinora(user);
+
+    // First administrator creates the initial shared state.
+    if(role==='admin')await pushCloudState(false);
+
+  }catch(e){
+    console.error('FINORA online registration',e);
+    const msg=String(e?.message||'Não foi possível criar sua conta.');
+    if(/already registered|already been registered|user already exists/i.test(msg))
+      return authErr('Este e-mail já possui conta online. Use a aba “Entrar”.');
+    if(/duplicate|cpf_hash|unique/i.test(msg))
+      return authErr('Este CPF ou e-mail já está vinculado a uma conta FINORA.');
+    authErr(msg);
+  }
 });
 
 $('doLogin').addEventListener('click',async()=>{
   clearAuthErr();
+
   const identifier=$('loginIdentifier').value.trim();
   const password=$('loginPass').value;
   if(!identifier||!password)return authErr('Informe seu e-mail ou CPF e a senha.');
+  if(!publicSupabaseReady())return authErr('A configuração online da FINORA não está disponível.');
+
+  const users=loadFinoraUsers();
+  let legacyUser=null;
+
+  if(identifier.includes('@')){
+    const email=identifier.toLowerCase();
+    legacyUser=users.find(u=>String(u.email||'').toLowerCase()===email)||null;
+  }else{
+    const cpf=normalizeCPF(identifier);
+    if(cpf.length!==11)return authErr('Informe um CPF válido ou utilize seu e-mail.');
+    const cpfHash=await finoraHash(cpf);
+    legacyUser=users.find(u=>u.cpfHash===cpfHash)||null;
+  }
 
   try{
-    // 1. Em qualquer dispositivo, prioriza Supabase Auth.
-    if(publicSupabaseReady()){
+    // Normal platform login: always Supabase.
+    const cloudUser=await loginWithSupabase(identifier,password);
+    localStorage.setItem(FINORA_SESSION_KEY,cloudUser.id);
+    await openFinora(cloudUser);
+    return;
+
+  }catch(cloudError){
+    console.warn('FINORA cloud login',cloudError);
+
+    // One-time migration for accounts created in pre-v47 browsers.
+    // The local browser is used only to prove the old credentials.
+    if(legacyUser?.hash && legacyUser.hash===await finoraHash(password)){
       try{
-        const cloudUser=await loginWithSupabase(identifier,password);
-        if(cloudUser){
-          localStorage.setItem(FINORA_SESSION_KEY,cloudUser.id);
-          await openFinora(cloudUser);
-          return;
-        }
-      }catch(cloudError){
-        // 2. No navegador antigo, a conta local ainda pode existir:
-        // valida localmente e migra automaticamente para Supabase usando
-        // a mesma senha que o usuário acabou de digitar.
-        const users=loadFinoraUsers();
-        let localUser=null;
-        if(identifier.includes('@')){
-          const email=identifier.toLowerCase();
-          localUser=users.find(u=>String(u.email||'').toLowerCase()===email);
-        }else{
-          const cpf=normalizeCPF(identifier);
-          if(cpf.length===11){
-            const cpfHash=await finoraHash(cpf);
-            localUser=users.find(u=>u.cpfHash===cpfHash);
-          }
-        }
-        if(localUser&&localUser.hash===await finoraHash(password)){
-          try{
-            const migrated=await migrateLocalLoginToSupabase(localUser,password);
-            const finalUser=migrated||localUser;
-            localStorage.setItem(FINORA_SESSION_KEY,finalUser.id);
-            await openFinora(finalUser);
-            toast('Conta preparada para acesso em outros dispositivos.');
-            return;
-          }catch(migrationError){
-            console.error('FINORA migration',migrationError);
-            // O acesso local continua funcionando para não bloquear o usuário.
-            localStorage.setItem(FINORA_SESSION_KEY,localUser.id);
-            await openFinora(localUser);
-            toast('Você entrou localmente. A migração online ainda precisa ser concluída.');
-            return;
-          }
-        }
-        console.warn('FINORA cloud login',cloudError);
+        const migrated=await migrateLocalLoginToSupabase(legacyUser,password);
+        if(!migrated)throw new Error('A migração não retornou um perfil online.');
+        localStorage.setItem(FINORA_SESSION_KEY,migrated.id);
+        await openFinora(migrated);
+        toast('Conta migrada. Agora este acesso funciona em qualquer dispositivo.');
+        return;
+      }catch(migrationError){
+        console.error('FINORA legacy migration',migrationError);
+        return authErr('Não foi possível concluir a migração online: '+(migrationError?.message||'erro desconhecido'));
       }
     }
 
-    // Compatibilidade com a conta local enquanto a migração não estiver disponível.
-    const users=loadFinoraUsers();
-    if(!users.length){
-      return authErr(publicSupabaseReady()
-        ? 'Conta não encontrada ou senha incorreta.'
-        : 'A configuração de acesso online da FINORA ainda não foi publicada.');
-    }
-
-    let user=null;
-    if(identifier.includes('@')){
-      const email=identifier.toLowerCase();
-      user=users.find(u=>String(u.email||'').toLowerCase()===email);
-    }else{
-      const cpf=normalizeCPF(identifier);
-      if(cpf.length!==11)return authErr('Informe um CPF válido ou utilize seu e-mail.');
-      const cpfHash=await finoraHash(cpf);
-      user=users.find(u=>u.cpfHash===cpfHash);
-    }
-    if(!user||user.hash!==await finoraHash(password))return authErr('E-mail/CPF ou senha incorretos.');
-
-    localStorage.setItem(FINORA_SESSION_KEY,user.id);
-    await openFinora(user);
-
-  }catch(e){
-    console.error(e);
-    authErr(e?.message||'Não foi possível entrar na FINORA.');
+    // Do not open a local-only session anymore.
+    const msg=String(cloudError?.message||'');
+    if(/invalid login credentials|email not confirmed/i.test(msg))
+      return authErr('E-mail/CPF ou senha incorretos.');
+    if(/Perfil FINORA não encontrado/i.test(msg))
+      return authErr('Sua conta existe, mas o perfil FINORA ainda não foi vinculado. Acesse uma vez pelo navegador antigo para migrar.');
+    authErr(msg||'Não foi possível entrar na FINORA.');
   }
 });
 
@@ -4649,39 +4702,60 @@ $('saveProfileBtn')?.addEventListener('click',async()=>{
   if(!name)return profileErr('Informe seu nome.');
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return profileErr('Informe um e-mail válido.');
 
-  const users=loadFinoraUsers();
-  const duplicate=users.find(u=>u.id!==currentUser.id && u.email===email);
-  if(duplicate)return profileErr('Este e-mail já está sendo usado por outro usuário.');
+  const client=getAuthClient();
+  if(!client)return profileErr('Autenticação online indisponível.');
 
-  const idx=users.findIndex(u=>u.id===currentUser.id);
-  if(idx<0)return profileErr('Não foi possível localizar seu cadastro.');
+  try{
+    const currentEmail=String(currentUser.email||'').toLowerCase();
 
-  let updated={...users[idx],name,email};
+    if(newPassword||newPassword2||currentPassword){
+      if(!currentPassword)return profileErr('Informe sua senha atual.');
+      if(newPassword.length<6)return profileErr('A nova senha precisa ter pelo menos 6 caracteres.');
+      if(newPassword!==newPassword2)return profileErr('A confirmação da nova senha não confere.');
 
-  const wantsPasswordChange=currentPassword||newPassword||newPassword2;
-  if(wantsPasswordChange){
-    if(!currentPassword)return profileErr('Informe sua senha atual.');
-    if(users[idx].hash!==await finoraHash(currentPassword))return profileErr('A senha atual está incorreta.');
-    if(newPassword.length<6)return profileErr('A nova senha precisa ter pelo menos 6 caracteres.');
-    if(newPassword!==newPassword2)return profileErr('A confirmação da nova senha não confere.');
-    updated.hash=await finoraHash(newPassword);
+      const check=await client.auth.signInWithPassword({email:currentEmail,password:currentPassword});
+      if(check.error)return profileErr('A senha atual está incorreta.');
+
+      const {error:pwError}=await client.auth.updateUser({password:newPassword});
+      if(pwError)throw pwError;
+    }
+
+    if(email!==currentEmail){
+      const {error:emailError}=await client.auth.updateUser({email});
+      if(emailError)throw emailError;
+    }
+
+    const {data:sessionData}=await client.auth.getSession();
+    const uid=sessionData?.session?.user?.id||currentUser.id;
+
+    const profile=await upsertOwnFinoraProfile({
+      user_id:uid,
+      name,
+      email,
+      cpf_hash:currentUser.cpfHash||'',
+      cpf_masked:currentUser.cpfMasked||'',
+      workspace_id:currentUser.workspaceId,
+      role:currentUser.role
+    });
+
+    const updated=await cacheAuthProfile(profile);
+    currentUser=updated;
+    localStorage.setItem(FINORA_SESSION_KEY,updated.id);
+
+    $('loggedName').textContent=updated.name||'Usuário';
+    $('profileSummaryName').textContent=updated.name||'Usuário';
+    $('profileAvatar').textContent=(updated.name||'F').trim().charAt(0).toUpperCase();
+    renderFamilyAccess();fillPeople();render();
+
+    $('profileCurrentPassword').value='';
+    $('profileNewPassword').value='';
+    $('profileNewPassword2').value='';
+    profileOk('Perfil online atualizado com sucesso.');
+
+  }catch(e){
+    console.error('FINORA profile online',e);
+    profileErr(e?.message||'Não foi possível atualizar seu perfil.');
   }
-
-  users[idx]=updated;
-  saveFinoraUsers(users);
-  currentUser=updated;
-
-  $('loggedName').textContent=updated.name||'Usuário';
-  $('profileSummaryName').textContent=updated.name||'Usuário';
-  $('profileAvatar').textContent=(updated.name||'F').trim().charAt(0).toUpperCase();
-  renderFamilyAccess();
-  fillPeople();
-  render();
-
-  $('profileCurrentPassword').value='';
-  $('profileNewPassword').value='';
-  $('profileNewPassword2').value='';
-  profileOk('Perfil atualizado com sucesso.');
 });
 
 document.addEventListener('keydown',e=>{
@@ -4760,9 +4834,15 @@ function applyInviteFromUrl(){
   cleanupPendingInvitesV39();
   updateWorkspaceMode();
   applyInviteFromUrl();
-  const sid=localStorage.getItem(FINORA_SESSION_KEY);
-  const user=loadFinoraUsers().find(u=>u.id===sid);
-  if(user)await openFinora(user);
+
+  // v47: a session is valid only when Supabase Auth validates it.
+  // Legacy local users remain available solely for one-time migration on login.
+  const restored=await restoreSupabaseSession();
+  if(restored)return;
+
+  localStorage.removeItem(FINORA_SESSION_KEY);
+  $('authScreen').style.display='flex';
+  authMode(parseInviteFromLocation()?'register':'login');
 })();
 
 
@@ -4831,7 +4911,7 @@ function applyInviteFromUrl(){
 })();
 
 
-window.addEventListener('load',()=>{ setTimeout(()=>restoreSupabaseSession(),80); });
+
 
 </script>
 
