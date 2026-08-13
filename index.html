@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v47-multidispositivo-online">
+<meta name="finora-version" content="v48-family-access-fix">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -2809,32 +2809,66 @@ function createFamilyInvite(){
   toast('Convite criado. Use “Copiar link” ou “Enviar convite”.');
 }
 
-function deleteFamilyInvite(id){
+async function deleteFamilyInvite(id){
   if(!isAdmin())return toast('Somente o administrador pode excluir convites.');
   const invites=loadFinoraInvites();
   const inv=invites.find(i=>i.id===id && i.workspaceId===currentWorkspaceId);
   if(!inv)return toast('Convite não encontrado.');
   const label=inv.name||inv.email||'este convite';
   if(!confirm(`Excluir definitivamente o convite de ${label}? Isso não remove integrantes nem dados financeiros.`))return;
-  saveFinoraInvites(invites.filter(i=>i.id!==id));
-  renderFamilyAccess();
-  toast('Convite excluído.');
+
+  try{
+    const client=getAuthClient();
+    if(client){
+      const {error}=await client.rpc('finora_admin_delete_invite',{p_invite_id:id});
+      if(error)throw error;
+    }
+    saveFinoraInvites(invites.filter(i=>i.id!==id));
+    renderFamilyAccess();
+    toast('Convite excluído.');
+    await pullCloudState(false);
+  }catch(e){
+    console.error('FINORA delete invite',e);
+    toast('Não foi possível excluir o convite. Atualize a página e tente novamente.');
+  }
 }
 
-function regenerateFamilyInvite(id){
-  if(!isAdmin())return;
+async function regenerateFamilyInvite(id){
+  if(!isAdmin())return toast('Somente o administrador pode gerar convites.');
   const invites=loadFinoraInvites();
-  const old=invites.find(i=>i.id===id);if(!old)return;
+  const old=invites.find(i=>i.id===id && i.workspaceId===currentWorkspaceId);
+  if(!old)return toast('Convite não encontrado.');
+
+  const stillMember=familyMembersDirectory().some(u=>
+    u.workspaceId===currentWorkspaceId &&
+    normalizeFinoraEmail(u.email)===normalizeFinoraEmail(old.email)
+  );
+  if(stillMember){
+    return toast('Este familiar ainda é integrante. Use “Remover” primeiro e depois gere um novo convite.');
+  }
+
   const fresh={
     ...old,
     id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),
-    status:'pending',createdAt:new Date().toISOString(),usedAt:null,usedByEmail:null
+    status:'pending',
+    createdAt:new Date().toISOString(),
+    usedAt:null,
+    usedByEmail:null
   };
   fresh.code=createPortableInvitePayload(fresh);
-  invites.push(fresh);
-  saveFinoraInvites(invites);
+  fresh.url=buildInviteUrl(fresh);
+
+  // substitui o convite antigo, em vez de acumular estados conflitantes
+  const next=invites.filter(i=>i.id!==id);
+  next.push(fresh);
+  saveFinoraInvites(next);
+
+  try{
+    await pushCloudState(false);
+  }catch(e){console.warn('FINORA convite cloud',e)}
+
   renderFamilyAccess();
-  toast('Novo convite gerado.');
+  toast('Novo convite gerado. Use “Copiar link” ou “Enviar convite”.');
 }
 
 function sendFamilyInvite(id){
@@ -2875,12 +2909,49 @@ function cancelFamilyInvite(id){
   saveFinoraInvites(loadFinoraInvites().filter(i=>i.id!==id));
   renderFamilyAccess();
 }
-function removeFamilyMember(id){
-  if(!isAdmin())return;
-  if(id===currentUser.id)return toast('O administrador não pode remover o próprio acesso.');
-  if(!confirm('Remover este integrante do ambiente familiar?'))return;
-  saveFinoraUsers(loadFinoraUsers().filter(u=>u.id!==id));
-  renderFamilyAccess();
+async function removeFamilyMember(id,email){
+  if(!isAdmin())return toast('Somente o administrador pode remover integrantes.');
+  if(id===currentUser.id || normalizeFinoraEmail(email)===normalizeFinoraEmail(currentUser.email))
+    return toast('O administrador não pode remover o próprio acesso.');
+
+  const member=familyMembersDirectory().find(u=>
+    u.workspaceId===currentWorkspaceId &&
+    (u.id===id || normalizeFinoraEmail(u.email)===normalizeFinoraEmail(email))
+  );
+  const label=member?.name||email||'este integrante';
+
+  if(!confirm(`Remover o acesso de ${label} deste ambiente familiar?\n\nA pessoa deixará de acessar esta família. Os lançamentos financeiros serão preservados e os convites antigos desse e-mail serão apagados.`))return;
+
+  try{
+    const client=getAuthClient();
+    if(!client)throw new Error('Supabase indisponível.');
+
+    const {data:removed,error}=await client.rpc('finora_admin_reset_family_member',{
+      p_email:normalizeFinoraEmail(email)
+    });
+    if(error)throw error;
+    if(removed===false)throw new Error('O servidor não autorizou a remoção.');
+
+    // Limpa os espelhos locais para que o integrante não reapareça após o render.
+    saveFinoraUsers(loadFinoraUsers().filter(u=>
+      u.id!==id && normalizeFinoraEmail(u.email)!==normalizeFinoraEmail(email)
+    ));
+    saveCloudMembers(loadCloudMembers().filter(u=>
+      !(u.workspaceId===currentWorkspaceId &&
+        normalizeFinoraEmail(u.email)===normalizeFinoraEmail(email))
+    ));
+    saveFinoraInvites(loadFinoraInvites().filter(i=>
+      !(i.workspaceId===currentWorkspaceId &&
+        normalizeFinoraEmail(i.email)===normalizeFinoraEmail(email))
+    ));
+
+    await pullCloudState(false);
+    renderFamilyAccess();
+    toast('Acesso removido. Agora você pode gerar um novo convite.');
+  }catch(e){
+    console.error('FINORA remove family member',e);
+    toast('Não foi possível remover o acesso: '+(e?.message||'erro desconhecido'));
+  }
 }
 
 function inviteDisplayCode(invite){
@@ -2890,17 +2961,28 @@ function inviteDisplayCode(invite){
 }
 
 
-function clearPendingInvites(){
+async function clearPendingInvites(){
   if(!isAdmin())return toast('Somente o administrador pode limpar convites.');
   const all=loadFinoraInvites();
   const current=all.filter(i=>i.workspaceId===currentWorkspaceId);
   if(!current.length)return toast('Não há convites para limpar.');
   if(!confirm(`Excluir ${current.length} convite(s) deste ambiente? Integrantes e dados financeiros serão preservados.`))return;
-  saveFinoraInvites(all.filter(i=>i.workspaceId!==currentWorkspaceId));
-  renderFamilyAccess();
-  toast('Todos os convites deste ambiente foram excluídos.');
-}
 
+  try{
+    const client=getAuthClient();
+    if(client){
+      const {error}=await client.rpc('finora_admin_clear_invites');
+      if(error)throw error;
+    }
+    saveFinoraInvites(all.filter(i=>i.workspaceId!==currentWorkspaceId));
+    await pullCloudState(false);
+    renderFamilyAccess();
+    toast('Todos os convites deste ambiente foram excluídos.');
+  }catch(e){
+    console.error('FINORA clear invites',e);
+    toast('Não foi possível limpar os convites.');
+  }
+}
 
 function normalizeFinoraEmail(v){return String(v||'').trim().toLowerCase()}
 
@@ -2936,7 +3018,7 @@ function renderFamilyAccess(){
   $('familyMembersList').innerHTML=`<div class="simple-eyebrow" style="margin-top:8px">INTEGRANTES</div>`+
     (members.length?members.map(u=>`<div class="family-row">
       <div><strong>${esc(u.name)} ${normalizeFinoraEmail(u.email)===normalizeFinoraEmail(currentUser.email)?'(você)':''}</strong><small>${esc(u.email)} · ${u.cpfMasked||''} <span class="status-chip used">${u.role==='admin'?'Administrador':'Integrante'}</span></small></div>
-      <div class="family-actions">${admin&&u.role!=='admin'?`<button class="danger" onclick="removeFamilyMember('${u.id}')">Remover</button>`:''}</div>
+      <div class="family-actions">${admin&&u.role!=='admin'?`<button class="danger" onclick="removeFamilyMember('${u.id}','${esc(u.email)}')">Remover</button>`:''}</div>
     </div>`).join(''):'<div class="empty">Nenhum integrante.</div>');
 
   reconcileAcceptedFamilyInvites();
