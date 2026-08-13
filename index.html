@@ -889,6 +889,39 @@ body.section-modal-open{overflow:hidden}
   word-break:break-all;
 }
 
+
+/* FINORA v39 — convites compactos */
+#finoraFamilyAccess{overflow-x:hidden!important}
+.family-row{
+  grid-template-columns:minmax(0,1fr) auto!important;
+  max-width:100%!important;
+}
+.family-row>div:first-child{min-width:0!important}
+.family-row small{
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+  line-height:1.5!important;
+}
+.invite-code{
+  display:inline-block;
+  max-width:360px;
+  vertical-align:middle;
+  white-space:nowrap!important;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-family:monospace;
+}
+.family-actions{
+  flex-shrink:0!important;
+  align-items:center!important;
+}
+.family-actions button{white-space:nowrap}
+@media(max-width:760px){
+  .family-row{grid-template-columns:1fr!important}
+  .family-actions{margin-top:8px}
+  .invite-code{max-width:78vw}
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -1025,7 +1058,10 @@ body.section-modal-open{overflow:hidden}
       <h3>Família e acessos</h3>
       <p id="familyAccessSubtitle">Gerencie quem pode acessar este ambiente financeiro.</p>
     </div>
-    <span class="role-badge" id="currentRoleBadge">Administrador</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button type="button" class="simple-action" id="clearPendingInvitesBtn" onclick="clearPendingInvites()">Limpar pendentes</button>
+      <span class="role-badge" id="currentRoleBadge">Administrador</span>
+    </div>
   </div>
 
   <div id="adminInviteArea">
@@ -1035,9 +1071,9 @@ body.section-modal-open{overflow:hidden}
       <div class="field family-action-field"><button type="button" class="btn btn-primary" onclick="createFamilyInvite()">Gerar convite</button></div>
     </div>
     <div class="family-help">
-      O convite fica vinculado ao e-mail informado. O botão “Enviar convite” abre seu aplicativo de e-mail com a mensagem pronta. Nesta versão de teste, o código do convite é portátil e pode ser usado em outro celular ou computador.
+      O convite fica vinculado ao e-mail informado. Use “Enviar convite” ou “Copiar código”; o código completo não precisa ficar exposto na tela.
     </div>
-    <div class="local-invite-warning"><strong>Importante:</strong> enquanto a FINORA estiver funcionando como arquivo HTML local, usuários em outros aparelhos não compartilham o mesmo banco de dados. Para acesso familiar real em dispositivos diferentes, será necessário conectar a FINORA a um banco de dados online.</div>
+    
   </div>
 
   <div id="memberAccessInfo" style="display:none" class="family-help">
@@ -2547,10 +2583,29 @@ function removeFamilyMember(id){
   saveFinoraUsers(loadFinoraUsers().filter(u=>u.id!==id));
   renderFamilyAccess();
 }
+
+function inviteDisplayCode(invite){
+  const code=String(invite?.code||'');
+  if(code.startsWith('FINORA1.'))return 'Convite portátil · '+code.slice(0,16)+'…'+code.slice(-8);
+  return code||'—';
+}
+
+
+function clearPendingInvites(){
+  if(!isAdmin())return;
+  const all=loadFinoraInvites();
+  const pending=all.filter(i=>i.workspaceId===currentWorkspaceId&&i.status==='pending');
+  if(!pending.length)return toast('Não há convites pendentes.');
+  if(!confirm(`Excluir ${pending.length} convite${pending.length===1?'':'s'} pendente${pending.length===1?'':'s'}?`))return;
+  saveFinoraInvites(all.filter(i=>!(i.workspaceId===currentWorkspaceId&&i.status==='pending')));
+  renderFamilyAccess();
+  toast('Convites pendentes excluídos.');
+}
+
 function renderFamilyAccess(){
   if(!$('finoraFamilyAccess')||!currentUser)return;
   const admin=isAdmin();
-  $('currentRoleBadge').textContent=admin?'Administrador':'Integrante';
+  $('currentRoleBadge').textContent=admin?'Administrador':'Integrante'; if($('clearPendingInvitesBtn'))$('clearPendingInvitesBtn').style.display=admin?'inline-block':'none';
   $('adminInviteArea').style.display=admin?'block':'none';
   $('memberAccessInfo').style.display=admin?'none':'block';
   $('familyAccessSubtitle').textContent=admin?'Convide familiares e gerencie os acessos deste ambiente.':'Veja quem participa deste ambiente financeiro.';
@@ -2565,7 +2620,7 @@ function renderFamilyAccess(){
   const invites=loadFinoraInvites().filter(i=>i.workspaceId===currentWorkspaceId);
   $('familyInvitesList').innerHTML=`<div class="simple-eyebrow" style="margin-top:10px">CONVITES</div>`+
     (invites.length?invites.map(i=>`<div class="family-row">
-      <div><strong>${esc(i.name||i.email)}</strong><small>${esc(i.email)} · <span class="invite-code">${i.code}</span> <span class="status-chip ${i.status}">${i.status==='pending'?'Pendente':'Utilizado'}</span></small></div>
+      <div><strong>${esc(i.name||i.email)}</strong><small>${esc(i.email)} · <span class="invite-code" title="Use os botões ao lado para copiar ou enviar o código completo">${esc(inviteDisplayCode(i))}</span> <span class="status-chip ${i.status}">${i.status==='pending'?'Pendente':'Utilizado'}</span></small></div>
       <div class="family-actions">
         ${admin&&i.status==='pending'?`<button onclick="sendFamilyInvite('${i.id}')">Enviar convite</button><button onclick="copyFamilyInvite('${i.id}')">Copiar código</button><button class="danger" onclick="cancelFamilyInvite('${i.id}')">Cancelar</button>`:''}
         ${admin&&i.status==='used'?`<button onclick="regenerateFamilyInvite('${i.id}')">Gerar novo convite</button>`:''}
@@ -3085,6 +3140,16 @@ function loadFinoraUsers(){try{return JSON.parse(localStorage.getItem(FINORA_USE
 function saveFinoraUsers(rows){localStorage.setItem(FINORA_USERS_KEY,JSON.stringify(rows))}
 function loadFinoraWorkspaces(){try{return JSON.parse(localStorage.getItem(FINORA_WORKSPACES_KEY)||'[]')}catch(e){return []}}
 function saveFinoraWorkspaces(rows){localStorage.setItem(FINORA_WORKSPACES_KEY,JSON.stringify(rows))}
+
+const FINORA_PENDING_CLEANUP_V39='finora_pending_cleanup_v39';
+function cleanupPendingInvitesV39(){
+  if(localStorage.getItem(FINORA_PENDING_CLEANUP_V39)==='done')return;
+  const invites=loadFinoraInvites();
+  const kept=invites.filter(i=>i.status!=='pending');
+  saveFinoraInvites(kept);
+  localStorage.setItem(FINORA_PENDING_CLEANUP_V39,'done');
+}
+
 function loadFinoraInvites(){try{return JSON.parse(localStorage.getItem(FINORA_INVITES_KEY)||'[]')}catch(e){return []}}
 function saveFinoraInvites(rows){localStorage.setItem(FINORA_INVITES_KEY,JSON.stringify(rows))}
 function createInviteCode(){
@@ -3423,6 +3488,7 @@ document.addEventListener('keydown',e=>{
 });
 
 (function(){
+  cleanupPendingInvitesV39();
   updateWorkspaceMode();
   const sid=localStorage.getItem(FINORA_SESSION_KEY);
   const user=loadFinoraUsers().find(u=>u.id===sid);
