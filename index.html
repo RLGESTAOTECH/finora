@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
+<meta name="finora-version" content="v43-family-cloud">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -2674,7 +2675,7 @@ function normalizeFinoraEmail(v){return String(v||'').trim().toLowerCase()}
 /* Se um integrante já existe no ambiente, o convite correspondente não pode continuar pendente. */
 function reconcileAcceptedFamilyInvites(){
   if(!currentWorkspaceId)return false;
-  const members=loadFinoraUsers().filter(u=>u.workspaceId===currentWorkspaceId);
+  const members=familyMembersDirectory().filter(u=>u.workspaceId===currentWorkspaceId);
   if(!members.length)return false;
   const memberEmails=new Set(members.map(u=>normalizeFinoraEmail(u.email)).filter(Boolean));
   let changed=false;
@@ -2699,10 +2700,10 @@ function renderFamilyAccess(){
   $('memberAccessInfo').style.display=admin?'none':'block';
   $('familyAccessSubtitle').textContent=admin?'Convide familiares e gerencie os acessos deste ambiente.':'Veja quem participa deste ambiente financeiro.';
 
-  const members=loadFinoraUsers().filter(u=>u.workspaceId===currentWorkspaceId);
+  const members=familyMembersDirectory().filter(u=>u.workspaceId===currentWorkspaceId);
   $('familyMembersList').innerHTML=`<div class="simple-eyebrow" style="margin-top:8px">INTEGRANTES</div>`+
     (members.length?members.map(u=>`<div class="family-row">
-      <div><strong>${esc(u.name)} ${u.id===currentUser.id?'(você)':''}</strong><small>${esc(u.email)} · ${u.cpfMasked||''} <span class="status-chip used">${u.role==='admin'?'Administrador':'Integrante'}</span></small></div>
+      <div><strong>${esc(u.name)} ${normalizeFinoraEmail(u.email)===normalizeFinoraEmail(currentUser.email)?'(você)':''}</strong><small>${esc(u.email)} · ${u.cpfMasked||''} <span class="status-chip used">${u.role==='admin'?'Administrador':'Integrante'}</span></small></div>
       <div class="family-actions">${admin&&u.role!=='admin'?`<button class="danger" onclick="removeFamilyMember('${u.id}')">Remover</button>`:''}</div>
     </div>`).join(''):'<div class="empty">Nenhum integrante.</div>');
 
@@ -3267,13 +3268,21 @@ async function sha256Hex(text){
 function cloudStatePayload(){
   const workspaceRows=data.filter(x=>sameWorkspace(x));
   const cards=accountCards();
+  const members=familyMembersDirectory()
+    .filter(u=>u.workspaceId===currentWorkspaceId)
+    .map(sanitizeCloudMember);
+  const invites=loadFinoraInvites()
+    .filter(i=>i.workspaceId===currentWorkspaceId)
+    .map(sanitizeCloudInvite);
   return {
-    schemaVersion:1,
+    schemaVersion:2,
     workspaceId:currentWorkspaceId,
     workspaceName:currentWorkspaceName,
     updatedAt:new Date().toISOString(),
     transactions:workspaceRows,
-    cards
+    cards,
+    members,
+    invites
   };
 }
 function updateCloudUI(status=''){
@@ -3417,9 +3426,40 @@ async function pushCloudState(showToast=false){
   const client=getCloudClient();if(!client)return false;
   finoraCloudBusy=true;
   try{
-    const row={workspace_id:currentWorkspaceId,token_hash:await sha256Hex(workspaceCloudToken()),state:cloudStatePayload(),updated_at:new Date().toISOString()};
-    const {error}=await client.from('finora_workspace_state').upsert(row,{onConflict:'workspace_id'});
+    let payload=cloudStatePayload();
+
+    // Lê o estado atual apenas para mesclar metadados familiares.
+    // Assim, a confirmação de um convite em outro computador não apaga
+    // integrantes/convites já conhecidos pelo administrador.
+    const {data:remoteRow,error:readError}=await client
+      .from('finora_workspace_state')
+      .select('state')
+      .eq('workspace_id',currentWorkspaceId)
+      .maybeSingle();
+    if(readError)throw readError;
+
+    const remoteState=remoteRow?.state||{};
+    payload.members=mergeCloudMembers(remoteState.members||[],payload.members||[]);
+    payload.invites=mergeCloudInvites(remoteState.invites||[],payload.invites||[]);
+
+    const row={
+      workspace_id:currentWorkspaceId,
+      token_hash:await sha256Hex(workspaceCloudToken()),
+      state:payload,
+      updated_at:new Date().toISOString()
+    };
+    const {error}=await client
+      .from('finora_workspace_state')
+      .upsert(row,{onConflict:'workspace_id'});
     if(error)throw error;
+
+    // Mantém o espelho local alinhado com o que foi persistido.
+    saveCloudMembers(payload.members||[]);
+    const otherInvites=loadFinoraInvites().filter(i=>i.workspaceId!==currentWorkspaceId);
+    const localCurrent=loadFinoraInvites().filter(i=>i.workspaceId===currentWorkspaceId);
+    const mergedInvites=mergeCloudInvites(payload.invites||[],localCurrent);
+    saveFinoraInvites(otherInvites.concat(mergedInvites));
+
     const stamp=new Date().toLocaleString('pt-BR');
     localStorage.setItem(FINORA_CLOUD_SYNC_KEY,stamp);
     updateCloudUI('connected');
@@ -3442,27 +3482,56 @@ async function pullCloudState(showToast=false){
   const client=getCloudClient();if(!client)return false;
   finoraCloudBusy=true;
   try{
-    const {data:row,error}=await client.from('finora_workspace_state').select('state,updated_at').eq('workspace_id',currentWorkspaceId).maybeSingle();
+    const {data:row,error}=await client
+      .from('finora_workspace_state')
+      .select('state,updated_at')
+      .eq('workspace_id',currentWorkspaceId)
+      .maybeSingle();
     if(error)throw error;
     if(!row?.state){
       if(showToast)toast('Ainda não existem dados deste ambiente na nuvem.');
       return false;
     }
+
     const state=row.state||{};
     const remoteTx=Array.isArray(state.transactions)?state.transactions:[];
     const remoteCards=Array.isArray(state.cards)?state.cards:[];
+    const remoteMembers=Array.isArray(state.members)?state.members:[];
+    const remoteInvites=Array.isArray(state.invites)?state.invites:[];
 
-    // Replace only this workspace's local data, preserving unrelated local workspaces.
-    data=data.filter(x=>!sameWorkspace(x)).concat(remoteTx.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'})));
+    // Dados financeiros do ambiente.
+    data=data.filter(x=>!sameWorkspace(x))
+      .concat(remoteTx.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'})));
     localStorage.setItem(KEY,JSON.stringify(data));
 
     const allCards=loadFinoraCards().filter(c=>c.workspaceId!==currentWorkspaceId)
       .concat(remoteCards.map(c=>({...c,workspaceId:currentWorkspaceId,account:'family'})));
     saveFinoraCards(allCards);
 
+    // Diretório familiar compartilhado: NÃO traz hashes de senha/CPF.
+    const mergedMembers=mergeCloudMembers(
+      loadCloudMembers().filter(u=>u.workspaceId===currentWorkspaceId),
+      remoteMembers.map(u=>({...u,workspaceId:currentWorkspaceId}))
+    );
+    const otherCloudMembers=loadCloudMembers().filter(u=>u.workspaceId!==currentWorkspaceId);
+    saveCloudMembers(otherCloudMembers.concat(mergedMembers));
+
+    // Convites: "used" sempre prevalece sobre "pending".
+    const localAllInvites=loadFinoraInvites();
+    const localCurrent=localAllInvites.filter(i=>i.workspaceId===currentWorkspaceId);
+    const otherInvites=localAllInvites.filter(i=>i.workspaceId!==currentWorkspaceId);
+    const mergedInvites=mergeCloudInvites(
+      localCurrent,
+      remoteInvites.map(i=>({...i,workspaceId:currentWorkspaceId}))
+    );
+    saveFinoraInvites(otherInvites.concat(mergedInvites));
+
+    reconcileAcceptedFamilyInvites();
+
     const stamp=new Date(row.updated_at||Date.now()).toLocaleString('pt-BR');
     localStorage.setItem(FINORA_CLOUD_SYNC_KEY,stamp);
     render();
+    renderFamilyAccess();
     updateCloudUI('connected');
     if(showToast)toast('Dados atualizados pela nuvem.');
     return true;
@@ -3537,6 +3606,7 @@ const FINORA_USERS_KEY='finora_users_local_v6';
 const FINORA_SESSION_KEY='finora_session_local_v6';
 const FINORA_WORKSPACES_KEY='finora_workspaces_local_v2';
 const FINORA_INVITES_KEY='finora_invites_local_v1';
+const FINORA_CLOUD_MEMBERS_KEY='finora_cloud_members_v43';
 const FINORA_INVITE_PROTOCOL_VERSION=2;
 const FINORA_INVITE_MIGRATION_KEY='finora_invite_migration_v40';
 let currentUser=null;
@@ -3561,8 +3631,86 @@ function validCPF(v){
 function maskCPF(v){
   const c=normalizeCPF(v);return c.length===11?`***.***.***-${c.slice(-2)}`:'CPF cadastrado';
 }
+
+function loadCloudMembers(){
+  try{return JSON.parse(localStorage.getItem(FINORA_CLOUD_MEMBERS_KEY)||'[]')}
+  catch(e){return []}
+}
+function saveCloudMembers(rows){
+  localStorage.setItem(FINORA_CLOUD_MEMBERS_KEY,JSON.stringify(Array.isArray(rows)?rows:[]));
+}
+function sanitizeCloudMember(u){
+  if(!u)return null;
+  return {
+    id:u.id||'',
+    name:u.name||'Integrante',
+    email:String(u.email||'').trim().toLowerCase(),
+    cpfMasked:u.cpfMasked||'',
+    role:u.role==='admin'?'admin':'member',
+    workspaceId:u.workspaceId||currentWorkspaceId,
+    createdAt:u.createdAt||new Date().toISOString()
+  };
+}
+function mergeCloudMembers(a,b){
+  const map=new Map();
+  [...(Array.isArray(a)?a:[]),...(Array.isArray(b)?b:[])].forEach(raw=>{
+    const u=sanitizeCloudMember(raw);
+    if(!u||!u.email)return;
+    const key=(u.workspaceId||currentWorkspaceId)+'|'+u.email;
+    const prev=map.get(key);
+    map.set(key,prev?{...prev,...u,role:(prev.role==='admin'||u.role==='admin')?'admin':'member'}:u);
+  });
+  return [...map.values()];
+}
+function familyMembersDirectory(){
+  const local=loadFinoraUsers()
+    .filter(u=>u.workspaceId===currentWorkspaceId)
+    .map(sanitizeCloudMember);
+  const cloud=loadCloudMembers()
+    .filter(u=>u.workspaceId===currentWorkspaceId)
+    .map(sanitizeCloudMember);
+  return mergeCloudMembers(cloud,local);
+}
+function sanitizeCloudInvite(i){
+  if(!i)return null;
+  return {
+    id:i.id||i.nonce||'',
+    protocolVersion:i.protocolVersion||FINORA_INVITE_PROTOCOL_VERSION,
+    workspaceId:i.workspaceId||currentWorkspaceId,
+    email:String(i.email||'').trim().toLowerCase(),
+    name:i.name||'',
+    status:i.status==='used'?'used':'pending',
+    invitedBy:i.invitedBy||'',
+    createdAt:i.createdAt||new Date().toISOString(),
+    usedAt:i.usedAt||null,
+    usedByEmail:i.usedByEmail||i.acceptedByEmail||null
+  };
+}
+function mergeCloudInvites(a,b){
+  const map=new Map();
+  [...(Array.isArray(a)?a:[]),...(Array.isArray(b)?b:[])].forEach(raw=>{
+    const i=sanitizeCloudInvite(raw);
+    if(!i||!i.email)return;
+    const key=(i.workspaceId||currentWorkspaceId)+'|'+i.email;
+    const prev=map.get(key);
+    if(!prev){map.set(key,i);return}
+    const used=prev.status==='used'||i.status==='used';
+    map.set(key,{
+      ...prev,...i,
+      status:used?'used':'pending',
+      usedAt:prev.usedAt||i.usedAt||null,
+      usedByEmail:prev.usedByEmail||i.usedByEmail||null,
+      createdAt:prev.createdAt||i.createdAt
+    });
+  });
+  return [...map.values()];
+}
+
 function loadFinoraUsers(){try{return JSON.parse(localStorage.getItem(FINORA_USERS_KEY)||'[]')}catch(e){return []}}
-function saveFinoraUsers(rows){localStorage.setItem(FINORA_USERS_KEY,JSON.stringify(rows))}
+function saveFinoraUsers(rows){
+  localStorage.setItem(FINORA_USERS_KEY,JSON.stringify(rows));
+  try{scheduleCloudPush()}catch(e){}
+}
 function loadFinoraWorkspaces(){try{return JSON.parse(localStorage.getItem(FINORA_WORKSPACES_KEY)||'[]')}catch(e){return []}}
 function saveFinoraWorkspaces(rows){localStorage.setItem(FINORA_WORKSPACES_KEY,JSON.stringify(rows))}
 
@@ -3724,6 +3872,12 @@ async function openFinora(user){
   resetForm();
   if(cloudConfigured()){
     await pullCloudState(false);
+    // Um integrante que acabou de aceitar o convite publica imediatamente
+    // seu vínculo e o status utilizado, depois de receber o estado atual.
+    if(user.role==='member'){
+      reconcileAcceptedFamilyInvites();
+      await pushCloudState(false);
+    }
     startCloudPolling();
   }
   render();
@@ -4196,136 +4350,5 @@ function applyInviteFromUrl(){
     </div>
   </section>
 </div>
-
-<script>
-/* FINORA v42 — reconciliação de convite familiar entre dispositivos
-   Objetivo: ao aceitar/usar um convite, consolidar o integrante e o status "used"
-   no estado compartilhado; ao sincronizar, reconciliar convites pendentes pelo e-mail.
-*/
-(function(){
-  const V42 = 'FINORA_v42_family_reconcile';
-
-  function normEmail(v){ return String(v||'').trim().toLowerCase(); }
-  function safeArray(v){ return Array.isArray(v) ? v : []; }
-
-  function reconcileFamilyInviteState(){
-    try{
-      if(typeof loadFinoraInvites!=='function' || typeof loadFinoraUsers!=='function') return false;
-      const invites = safeArray(loadFinoraInvites());
-      const users = safeArray(loadFinoraUsers());
-      let changed = false;
-
-      const nextInvites = invites.map(inv=>{
-        if(!inv || inv.status==='used') return inv;
-        const email = normEmail(inv.email);
-        if(!email) return inv;
-        const member = users.find(u =>
-          normEmail(u?.email)===email &&
-          (!inv.workspaceId || !u?.workspaceId || String(u.workspaceId)===String(inv.workspaceId))
-        );
-        if(!member) return inv;
-        changed = true;
-        return {
-          ...inv,
-          status:'used',
-          usedAt: inv.usedAt || new Date().toISOString(),
-          usedBy: inv.usedBy || member.id || '',
-          acceptedByEmail: email
-        };
-      });
-
-      if(changed && typeof saveFinoraInvites==='function'){
-        saveFinoraInvites(nextInvites);
-      }
-      if(typeof renderFamilyAccess==='function' && window.currentUser){
-        try{ renderFamilyAccess(); }catch(_){}
-      }
-      return changed;
-    }catch(err){
-      console.warn('[FINORA v42] reconcile:',err);
-      return false;
-    }
-  }
-
-  async function persistFamilyStateToCloud(){
-    /* Use the app's existing cloud push as the canonical persistence path.
-       Debounced/guarded to avoid recursion if cloudPush itself triggers reconciliation. */
-    if(window.__finoraV42Pushing) return;
-    if(typeof cloudConfigured==='function' && !cloudConfigured()) return;
-    if(typeof pushCloudData!=='function' && typeof cloudPush!=='function' && typeof sendCloudData!=='function') return;
-    window.__finoraV42Pushing = true;
-    try{
-      const fn = typeof pushCloudData==='function' ? pushCloudData :
-                 typeof cloudPush==='function' ? cloudPush : sendCloudData;
-      await fn();
-    }catch(err){
-      console.warn('[FINORA v42] persist:',err);
-    }finally{
-      window.__finoraV42Pushing = false;
-    }
-  }
-
-  function reconcileAndPersist(){
-    const changed = reconcileFamilyInviteState();
-    if(changed) persistFamilyStateToCloud();
-  }
-
-  // Reconcile after startup/login and whenever this tab regains focus.
-  window.addEventListener('load',()=>setTimeout(reconcileAndPersist,900));
-  window.addEventListener('focus',()=>setTimeout(reconcileAndPersist,250));
-  document.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible') setTimeout(reconcileAndPersist,250);
-  });
-
-  // Cross-tab/local-storage reconciliation.
-  window.addEventListener('storage',()=>setTimeout(reconcileAndPersist,150));
-
-  // Wrap family rendering: every time admin opens/refreshes "Família e acessos",
-  // pending invitations are checked against actual members first.
-  const install = ()=>{
-    if(window.__finoraV42Installed) return;
-    window.__finoraV42Installed = true;
-
-    if(typeof window.renderFamilyAccess==='function'){
-      const originalRender = window.renderFamilyAccess;
-      window.renderFamilyAccess = function(){
-        try{ reconcileFamilyInviteState(); }catch(_){}
-        return originalRender.apply(this,arguments);
-      };
-    }
-
-    // Wrap registration button flow without replacing existing business rules:
-    // after successful registration/login, reconcile and persist.
-    const regBtn=document.getElementById('doRegister');
-    if(regBtn){
-      regBtn.addEventListener('click',()=>setTimeout(reconcileAndPersist,1200),true);
-    }
-    const loginBtn=document.getElementById('doLogin');
-    if(loginBtn){
-      loginBtn.addEventListener('click',()=>setTimeout(reconcileAndPersist,1000),true);
-    }
-
-    // Cloud download may bring the accepted member from another device.
-    // Reconcile shortly after cloud-action clicks.
-    document.addEventListener('click',e=>{
-      const t=e.target;
-      if(!(t instanceof Element)) return;
-      const label=(t.textContent||'').trim().toLowerCase();
-      if(label.includes('baixar dados da nuvem') ||
-         label.includes('salvar e enviar dados atuais') ||
-         label.includes('enviar dados para a nuvem')){
-        setTimeout(reconcileAndPersist,1400);
-      }
-    },true);
-  };
-
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install);
-  else install();
-
-  window.finoraReconcileFamilyV42 = reconcileAndPersist;
-  console.info('[FINORA] v42 family reconciliation active');
-})();
-</script>
-
 </body>
 </html>
