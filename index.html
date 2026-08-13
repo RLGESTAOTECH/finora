@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v48-family-access-fix">
+<meta name="finora-version" content="v49-delete-transactions-fix">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -1170,6 +1170,15 @@ body.section-modal-open{overflow:hidden}
   body.finora-mobile .simple-kpi{padding-left:48px!important}
   body.finora-mobile .simple-kpi:before{left:9px!important}
 }
+
+
+/* FINORA v49 — ações de lançamentos web */
+.row-actions{position:relative;z-index:3;align-items:center;flex-wrap:nowrap}
+.row-actions .iconbtn{pointer-events:auto!important;position:relative;z-index:4}
+.row-actions .btn-delete-row{border-color:#efc8c3;color:#a6372d;background:#fff8f7}
+.row-actions .btn-delete-row:hover{background:#f9e9e6}
+.row-actions .iconbtn:disabled{opacity:.55;cursor:wait}
+#simpleLaunchPanel.section-modal-active .table-wrap{position:relative;z-index:1}
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
@@ -3233,9 +3242,9 @@ function render(){
       <td class="money ${x.tipo==='entrada'?'in':'out'}">${x.valorPendente?'<span style="color:#855f22">Valor a definir</span>':`${x.tipo==='entrada'?'+':'−'} ${money(x.valor)}`}</td>
       <td>${x.attachment?`<button class="iconbtn" onclick="downloadFile('${x.id}')">Abrir</button>`:'—'}</td>
       <td><div class="row-actions">
-        ${st!=='pago'?`<button class="iconbtn" title="Marcar como pago" onclick="markPaid('${x.id}')">✓</button>`:''}
-        <button class="iconbtn" onclick="editRow('${x.id}')">Editar</button>
-        <button class="iconbtn" onclick="deleteRow('${x.id}')">Excluir</button>
+        ${st!=='pago'?`<button type="button" class="iconbtn" title="Marcar como pago" data-row-action="paid" data-row-id="${esc(x.id)}">✓</button>`:''}
+        <button type="button" class="iconbtn" data-row-action="edit" data-row-id="${esc(x.id)}">Editar</button>
+        <button type="button" class="iconbtn btn-delete-row" data-row-action="delete" data-row-id="${esc(x.id)}">Excluir</button>
       </div></td>
     </tr>`
   }).join('')}</tbody></table>`;
@@ -3347,13 +3356,44 @@ function editRow(id){
   $('fileInfo').textContent=x.attachment?`Arquivo atual: ${x.attachment.name}`:'O arquivo fica salvo somente neste navegador.';
   const _launch=$('simpleLaunchPanel');if(_launch)_launch.scrollTo({top:0,behavior:'smooth'});
 }
-function deleteRow(id){
-  if(confirm('Excluir este lançamento?')){
-    recordTransactionDeletion(id);
-    data=data.filter(x=>x.id!==id);
-    save();
+async function deleteRow(id){
+  const x=data.find(r=>String(r.id)===String(id) && sameWorkspace(r));
+  if(!x){
+    toast('Lançamento não encontrado ou já excluído.');
     render();
-    toast('Lançamento excluído.');
+    return false;
+  }
+
+  const desc=x.descricao||'este lançamento';
+  const value=money(Number(x.valor)||0);
+  if(!confirm(`Excluir "${desc}" (${value})?\n\nA exclusão será sincronizada com os outros dispositivos.`))return false;
+
+  try{
+    // Tombstone first: prevents a stale cloud poll from resurrecting the row.
+    recordTransactionDeletion(x.id);
+    data=data.filter(r=>String(r.id)!==String(x.id));
+    localStorage.setItem(KEY,JSON.stringify(data));
+
+    // Immediate visual feedback on desktop/web.
+    render();
+    toast('Excluindo e sincronizando...');
+
+    // Persist immediately instead of depending only on the debounce timer.
+    if(cloudConfigured()){
+      const ok=await pushCloudState(false);
+      if(!ok)throw new Error('A nuvem não confirmou a exclusão.');
+    }
+
+    render();
+    toast('Lançamento excluído e sincronizado.');
+    return true;
+  }catch(e){
+    console.error('FINORA delete transaction',e);
+    // Keep the tombstone/local deletion: next successful sync will finish it.
+    render();
+    toast('Lançamento removido deste aparelho. A sincronização será repetida automaticamente.');
+    scheduleCloudPush();
+    return false;
   }
 }
 function markPaid(id){
@@ -3365,6 +3405,48 @@ function markPaid(id){
     save();render();toast('Marcado como pago/recebido.');
   }
 }
+
+function installTransactionTableActions(){
+  const wrap=$('tableWrap');
+  if(!wrap || wrap.dataset.actionsInstalled==='1')return;
+  wrap.dataset.actionsInstalled='1';
+
+  wrap.addEventListener('click',async(event)=>{
+    const btn=event.target.closest('button[data-row-action]');
+    if(!btn || !wrap.contains(btn))return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const id=btn.dataset.rowId;
+    const action=btn.dataset.rowAction;
+    if(!id||!action)return;
+
+    if(btn.dataset.busy==='1')return;
+
+    if(action==='delete'){
+      btn.dataset.busy='1';
+      btn.disabled=true;
+      try{await deleteRow(id)}
+      finally{
+        // The button may have been replaced by render(); only touch if connected.
+        if(btn.isConnected){
+          btn.disabled=false;
+          delete btn.dataset.busy;
+        }
+      }
+      return;
+    }
+    if(action==='edit'){
+      editRow(id);
+      return;
+    }
+    if(action==='paid'){
+      markPaid(id);
+    }
+  },true);
+}
+
 function downloadFile(id){
   const x=data.find(r=>r.id===id);if(!x?.attachment)return;
   const a=document.createElement('a');a.href=x.attachment.data;a.download=x.attachment.name;a.click();
@@ -4909,6 +4991,13 @@ function applyInviteFromUrl(){
   e.style.background='#eaf5ee';
   e.style.color='#226345';
   return payload;
+}
+
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',installTransactionTableActions,{once:true});
+}else{
+  installTransactionTableActions();
 }
 
 (async function(){
