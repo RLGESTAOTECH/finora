@@ -922,6 +922,31 @@ body.section-modal-open{overflow:hidden}
   .invite-code{max-width:78vw}
 }
 
+
+/* FINORA v40 — jornada de convite por link */
+.invite-test-note{
+  margin:10px 0;padding:10px 12px;border-radius:9px;background:#eef6ff;border:1px solid #d2e4f5;
+  color:#315b78;font:9px Verdana,sans-serif;line-height:1.5
+}
+#finoraFamilyAccess{overflow-x:hidden!important}
+.family-row{grid-template-columns:minmax(0,1fr) auto!important}
+.family-row>div:first-child{min-width:0}
+.invite-code{
+  display:inline-block!important;
+  max-width:220px!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  vertical-align:middle
+}
+.family-actions{flex-shrink:0}
+.family-actions button{white-space:nowrap}
+#regInviteCode{font-family:monospace}
+@media(max-width:760px){
+  .family-row{grid-template-columns:1fr!important}
+  .family-actions{margin-top:8px}
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -992,8 +1017,8 @@ body.section-modal-open{overflow:hidden}
     </div>
 
     <div id="joinWorkspaceFields" style="display:none">
-      <div class="auth-field"><label>Código recebido por e-mail</label><input id="regInviteCode" autocomplete="off" placeholder="Cole aqui o código completo FINORA1..."></div>
-      <div class="auth-family-badge">O convite precisa estar vinculado ao mesmo e-mail informado neste cadastro. Use o código completo recebido do administrador. Use o código completo recebido do administrador.</div>
+      <div class="auth-field"><label>Código recebido por e-mail</label><input id="regInviteCode" autocomplete="off" placeholder="Convite preenchido automaticamente pelo link"></div>
+      <div class="auth-family-badge">Se você abriu o link enviado pelo administrador, o convite será preenchido automaticamente. Se preferir, cole o código completo. Use o código completo recebido do administrador.</div>
     </div>
 
     <div class="auth-field"><label>Senha</label><input id="regPass" type="password" placeholder="Mínimo 6 caracteres"></div>
@@ -1030,7 +1055,7 @@ body.section-modal-open{overflow:hidden}
       <div class="simple-eyebrow">VISÃO DO MÊS</div>
 <div class="workspace-share" id="workspaceShareBox" style="display:none">
   <div><span>Ambiente compartilhado:</span> <strong id="workspaceShareName">Meu ambiente</strong> · Código <strong id="workspaceShareCode">—</strong></div>
-  <button type="button" onclick="copyWorkspaceCode()">Copiar código</button>
+  <button type="button" onclick="copyWorkspaceCode()">Copiar link</button>
 </div>
 
       <h2 id="simpleMonthTitle">Controle mensal</h2>
@@ -1070,9 +1095,7 @@ body.section-modal-open{overflow:hidden}
       <div class="field"><label>Nome do familiar (opcional)</label><input id="inviteName" placeholder="Ex.: Marcelo"></div>
       <div class="field family-action-field"><button type="button" class="btn btn-primary" onclick="createFamilyInvite()">Gerar convite</button></div>
     </div>
-    <div class="family-help">
-      O convite fica vinculado ao e-mail informado. Use “Enviar convite” ou “Copiar código”; o código completo não precisa ficar exposto na tela.
-    </div>
+    <div class="family-help">Informe o e-mail do familiar e gere o convite. Use <strong>Enviar convite</strong> ou <strong>Copiar link</strong>. O familiar deve abrir esse link e concluir o cadastro com o mesmo e-mail.</div>
     
   </div>
 
@@ -1080,7 +1103,8 @@ body.section-modal-open{overflow:hidden}
     Você é integrante deste ambiente. Apenas o administrador pode convidar ou remover membros.
   </div>
 
-  <div class="invite-test-note"><strong>Modo de teste GitHub Pages:</strong> o convite agora funciona entre aparelhos diferentes porque o próprio código contém a identificação do ambiente e o e-mail convidado. Os lançamentos financeiros ainda não sincronizam entre aparelhos sem um banco de dados online.</div>
+  
+  <div class="invite-test-note"><strong>Teste da jornada:</strong> gere um convite novo nesta versão, copie o link e abra em uma janela anônima ou outro aparelho. A FINORA deve reconhecer o convite automaticamente e abrir o cadastro de integrante com o e-mail já preenchido.</div>
   <div class="family-list" id="familyMembersList"></div>
   <div class="family-list" id="familyInvitesList"></div>
 </section>
@@ -2508,21 +2532,26 @@ function createFamilyInvite(){
   const users=loadFinoraUsers();
   if(users.some(u=>u.workspaceId===currentWorkspaceId&&u.email===email))return toast('Este e-mail já faz parte da família.');
 
-  const invites=loadFinoraInvites();
-  const existing=invites.find(i=>i.workspaceId===currentWorkspaceId&&i.email===email&&i.status==='pending');
-  if(existing)return toast('Já existe um convite pendente para este e-mail.');
+  let invites=loadFinoraInvites().filter(i=>i.protocolVersion===FINORA_INVITE_PROTOCOL_VERSION);
+  // Keep one active invitation per e-mail/workspace.
+  invites=invites.filter(i=>!(i.workspaceId===currentWorkspaceId&&i.email===email&&i.status==='pending'));
 
-  const baseInvite={
+  const invite={
     id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),
-    workspaceId:currentWorkspaceId,email,name,status:'pending',
-    invitedBy:currentUser.id,createdAt:new Date().toISOString()
+    protocolVersion:FINORA_INVITE_PROTOCOL_VERSION,
+    workspaceId:currentWorkspaceId,
+    email,name,status:'pending',
+    invitedBy:currentUser.id,
+    createdAt:new Date().toISOString()
   };
-  baseInvite.code=createPortableInvitePayload(baseInvite);
+  invite.code=createPortableInvitePayload(invite);
+  invite.url=buildInviteUrl(invite);
 
-  invites.push(baseInvite);
+  invites.push(invite);
   saveFinoraInvites(invites);
   $('inviteEmail').value='';$('inviteName').value='';
-  renderFamilyAccess();toast('Convite criado para uso em qualquer aparelho.');
+  renderFamilyAccess();
+  toast('Convite criado. Use “Copiar link” ou “Enviar convite”.');
 }
 
 function regenerateFamilyInvite(id){
@@ -2545,22 +2574,19 @@ function sendFamilyInvite(id){
   if(!isAdmin())return;
   const inv=loadFinoraInvites().find(i=>i.id===id);if(!inv)return;
   const ws=currentWorkspace();
+  const link=inv.url||buildInviteUrl(inv);
   const subject=encodeURIComponent(`Convite FINORA — ${ws?.name||'Ambiente financeiro'}`);
   const body=encodeURIComponent(
 `Olá${inv.name?' '+inv.name:''},
 
 Você foi convidado(a) para participar do ambiente financeiro "${ws?.name||'FINORA'}".
 
-Para criar seu acesso:
-1. Abra a FINORA.
-2. Clique em "Criar conta".
-3. Escolha "Integrante da família — aceitar um convite".
-4. Cadastre seu próprio nome, CPF, e-mail e senha.
-5. Cole o código completo abaixo:
+Clique no link abaixo para criar seu acesso:
+${link}
 
-${inv.code}
+Ao abrir a FINORA, o convite será reconhecido automaticamente e o e-mail convidado será preenchido.
 
-Importante: utilize o mesmo e-mail para o qual este convite foi enviado.
+Importante: crie sua conta usando exatamente este e-mail: ${inv.email}
 
 FINORA — Controle Financeiro Pessoal & Familiar`
   );
@@ -2568,8 +2594,14 @@ FINORA — Controle Financeiro Pessoal & Familiar`
 }
 function copyFamilyInvite(id){
   const inv=loadFinoraInvites().find(i=>i.id===id);if(!inv)return;
+  const link=inv.url||buildInviteUrl(inv);
+  if(navigator.clipboard?.writeText)navigator.clipboard.writeText(link).then(()=>toast('Link do convite copiado.'));
+  else prompt('Copie o link do convite:',link);
+}
+function copyFamilyInviteCode(id){
+  const inv=loadFinoraInvites().find(i=>i.id===id);if(!inv)return;
   if(navigator.clipboard?.writeText)navigator.clipboard.writeText(inv.code).then(()=>toast('Código copiado.'));
-  else toast(`Código: ${inv.code}`);
+  else prompt('Copie o código:',inv.code);
 }
 function cancelFamilyInvite(id){
   if(!isAdmin())return;
@@ -2617,12 +2649,12 @@ function renderFamilyAccess(){
       <div class="family-actions">${admin&&u.role!=='admin'?`<button class="danger" onclick="removeFamilyMember('${u.id}')">Remover</button>`:''}</div>
     </div>`).join(''):'<div class="empty">Nenhum integrante.</div>');
 
-  const invites=loadFinoraInvites().filter(i=>i.workspaceId===currentWorkspaceId);
+  const invites=loadFinoraInvites().filter(i=>i.workspaceId===currentWorkspaceId&&i.protocolVersion===FINORA_INVITE_PROTOCOL_VERSION);
   $('familyInvitesList').innerHTML=`<div class="simple-eyebrow" style="margin-top:10px">CONVITES</div>`+
     (invites.length?invites.map(i=>`<div class="family-row">
-      <div><strong>${esc(i.name||i.email)}</strong><small>${esc(i.email)} · <span class="invite-code" title="Use os botões ao lado para copiar ou enviar o código completo">${esc(inviteDisplayCode(i))}</span> <span class="status-chip ${i.status}">${i.status==='pending'?'Pendente':'Utilizado'}</span></small></div>
+      <div><strong>${esc(i.name||i.email)}</strong><small>${esc(i.email)} · <span class="invite-code">Convite v2 · ${esc((i.code||'').slice(0,14))}…</span> <span class="status-chip ${i.status}">${i.status==='pending'?'Pendente':'Utilizado'}</span></small></div>
       <div class="family-actions">
-        ${admin&&i.status==='pending'?`<button onclick="sendFamilyInvite('${i.id}')">Enviar convite</button><button onclick="copyFamilyInvite('${i.id}')">Copiar código</button><button class="danger" onclick="cancelFamilyInvite('${i.id}')">Cancelar</button>`:''}
+        ${admin&&i.status==='pending'?`<button onclick="sendFamilyInvite('${i.id}')">Enviar convite</button><button onclick="copyFamilyInvite('${i.id}')">Copiar link</button><button class="danger" onclick="cancelFamilyInvite('${i.id}')">Cancelar</button>`:''}
         ${admin&&i.status==='used'?`<button onclick="regenerateFamilyInvite('${i.id}')">Gerar novo convite</button>`:''}
       </div>
     </div>`).join(''):'<div class="empty">Nenhum convite criado.</div>');
@@ -3114,6 +3146,8 @@ const FINORA_USERS_KEY='finora_users_local_v6';
 const FINORA_SESSION_KEY='finora_session_local_v6';
 const FINORA_WORKSPACES_KEY='finora_workspaces_local_v2';
 const FINORA_INVITES_KEY='finora_invites_local_v1';
+const FINORA_INVITE_PROTOCOL_VERSION=2;
+const FINORA_INVITE_MIGRATION_KEY='finora_invite_migration_v40';
 let currentUser=null;
 
 async function finoraHash(s){
@@ -3150,6 +3184,14 @@ function cleanupPendingInvitesV39(){
   localStorage.setItem(FINORA_PENDING_CLEANUP_V39,'done');
 }
 
+
+function migrateInvitesV40(){
+  if(localStorage.getItem(FINORA_INVITE_MIGRATION_KEY)==='done')return;
+  // Remove all old invitations from previous test versions.
+  localStorage.setItem(FINORA_INVITES_KEY,'[]');
+  localStorage.setItem(FINORA_INVITE_MIGRATION_KEY,'done');
+}
+
 function loadFinoraInvites(){try{return JSON.parse(localStorage.getItem(FINORA_INVITES_KEY)||'[]')}catch(e){return []}}
 function saveFinoraInvites(rows){localStorage.setItem(FINORA_INVITES_KEY,JSON.stringify(rows))}
 function createInviteCode(){
@@ -3171,7 +3213,7 @@ function b64UrlDecodeText(text){
 function createPortableInvitePayload(invite){
   const ws=workspaceById(invite.workspaceId);
   const payload={
-    v:1,
+    v:FINORA_INVITE_PROTOCOL_VERSION,
     type:'finora-family-invite',
     workspaceId:invite.workspaceId,
     workspaceName:ws?.name||'Ambiente familiar',
@@ -3180,19 +3222,37 @@ function createPortableInvitePayload(invite){
     createdAt:invite.createdAt||new Date().toISOString(),
     nonce:invite.id||String(Date.now())
   };
-  return 'FINORA1.'+b64UrlEncodeText(JSON.stringify(payload));
+  return 'FINORA2.'+b64UrlEncodeText(JSON.stringify(payload));
 }
 function parsePortableInviteCode(raw){
   const code=String(raw||'').trim();
-  if(!code.startsWith('FINORA1.'))return null;
+  if(!code.startsWith('FINORA2.'))return null;
   try{
     const payload=JSON.parse(b64UrlDecodeText(code.slice(8)));
-    if(payload?.v!==1||payload?.type!=='finora-family-invite'||!payload.workspaceId||!payload.email)return null;
+    if(payload?.v!==FINORA_INVITE_PROTOCOL_VERSION||payload?.type!=='finora-family-invite'||!payload.workspaceId||!payload.email)return null;
     return payload;
   }catch(e){
     return null;
   }
 }
+
+function buildInviteUrl(invite){
+  const token=invite.code||createPortableInvitePayload(invite);
+  const base=location.origin && location.origin!=='null'
+    ? location.origin+location.pathname
+    : location.href.split('#')[0].split('?')[0];
+  return `${base}#finora-invite=${encodeURIComponent(token)}`;
+}
+function parseInviteFromLocation(){
+  const hash=location.hash||'';
+  const m=hash.match(/(?:^#|&)finora-invite=([^&]+)/);
+  if(!m)return null;
+  try{return decodeURIComponent(m[1])}catch(e){return m[1]}
+}
+function clearInviteFromLocation(){
+  if(history.replaceState)history.replaceState(null,'',location.pathname+location.search);
+}
+
 function authErr(msg){const e=$('authError');e.textContent=msg;e.style.display='block'}
 function clearAuthErr(){$('authError').style.display='none';$('authError').textContent=''}
 function authMode(mode){
@@ -3281,73 +3341,52 @@ $('doRegister').addEventListener('click',async()=>{
     role='admin';
   }else{
     const rawCode=$('regInviteCode').value.trim();
-    if(!rawCode)return authErr('Informe o código recebido por e-mail.');
+    if(!rawCode)return authErr('O convite não foi reconhecido. Abra o link recebido ou cole o código completo.');
 
-    let invite=inviteByCode(rawCode);
-    let portable=parsePortableInviteCode(rawCode);
+    const portable=parsePortableInviteCode(rawCode);
+    if(!portable)return authErr('Convite inválido. Peça ao administrador para gerar um novo convite nesta versão da FINORA.');
 
-    if(!invite && !portable){
-      return authErr('Código de convite inválido. Copie o código completo recebido do administrador.');
+    if((portable.email||'').trim().toLowerCase()!==email){
+      return authErr(`Este convite foi enviado para ${portable.email}. Use exatamente esse e-mail no cadastro.`);
     }
 
-    if(invite){
-      if(invite.status==='used'){
-        const existingMember=users.find(u=>u.workspaceId===invite.workspaceId && u.email===email);
-        if(existingMember)return authErr('Este convite já foi utilizado. Se você já criou sua conta, use a aba “Entrar”.');
-        return authErr('Este convite já foi utilizado. Peça ao administrador para gerar um novo convite.');
-      }
-      if(invite.status!=='pending')return authErr('Este convite não está mais ativo.');
-      if((invite.email||'').trim().toLowerCase()!==email){
-        return authErr(`Este convite foi enviado para ${invite.email}. Cadastre-se usando exatamente esse e-mail.`);
-      }
-      workspace=workspaceById(invite.workspaceId);
-      if(!workspace)return authErr('O ambiente familiar deste convite não está disponível.');
-      role='member';
+    let workspaces=loadFinoraWorkspaces();
+    workspace=workspaces.find(w=>w.id===portable.workspaceId);
+    if(!workspace){
+      workspace={
+        id:portable.workspaceId,
+        name:portable.workspaceName||'Ambiente familiar',
+        importedFromInvite:true,
+        createdAt:new Date().toISOString()
+      };
+      workspaces.push(workspace);
+      saveFinoraWorkspaces(workspaces);
+    }
+    role='member';
 
-      const invites=loadFinoraInvites();
-      const idx=invites.findIndex(i=>i.id===invite.id);
-      if(idx>=0){
-        invites[idx]={...invite,status:'used',usedAt:new Date().toISOString(),usedByEmail:email};
-        saveFinoraInvites(invites);
-      }
+    // Store a receipt locally. Acceptance no longer depends on admin localStorage.
+    let localInvites=loadFinoraInvites().filter(i=>i.protocolVersion===FINORA_INVITE_PROTOCOL_VERSION);
+    const existingReceipt=localInvites.find(i=>i.code===rawCode);
+    if(existingReceipt){
+      existingReceipt.status='used';
+      existingReceipt.usedAt=new Date().toISOString();
+      existingReceipt.usedByEmail=email;
     }else{
-      // Portable invitation: works across devices/browser storage.
-      if((portable.email||'').trim().toLowerCase()!==email){
-        return authErr(`Este convite foi criado para ${portable.email}. Use exatamente esse e-mail no cadastro.`);
-      }
-
-      let workspaces=loadFinoraWorkspaces();
-      workspace=workspaces.find(w=>w.id===portable.workspaceId);
-      if(!workspace){
-        workspace={
-          id:portable.workspaceId,
-          name:portable.workspaceName||'Ambiente familiar',
-          importedFromInvite:true,
-          createdAt:new Date().toISOString()
-        };
-        workspaces.push(workspace);
-        saveFinoraWorkspaces(workspaces);
-      }
-      role='member';
-
-      // Store a local receipt so this browser knows this portable invitation was consumed here.
-      const localInvites=loadFinoraInvites();
-      if(!localInvites.some(i=>i.code===rawCode)){
-        localInvites.push({
-          id:portable.nonce||String(Date.now()),
-          workspaceId:portable.workspaceId,
-          email:portable.email,
-          name:portable.name||'',
-          code:rawCode,
-          status:'used',
-          createdAt:portable.createdAt||new Date().toISOString(),
-          usedAt:new Date().toISOString(),
-          usedByEmail:email,
-          portable:true
-        });
-        saveFinoraInvites(localInvites);
-      }
+      localInvites.push({
+        id:portable.nonce||String(Date.now()),
+        protocolVersion:FINORA_INVITE_PROTOCOL_VERSION,
+        workspaceId:portable.workspaceId,
+        email:portable.email,
+        name:portable.name||'',
+        code:rawCode,
+        status:'used',
+        createdAt:portable.createdAt||new Date().toISOString(),
+        usedAt:new Date().toISOString(),
+        usedByEmail:email,
+        portable:true
+      });
     }
+    saveFinoraInvites(localInvites);
   }
 
   const user={
@@ -3357,6 +3396,7 @@ $('doRegister').addEventListener('click',async()=>{
   };
   users.push(user);saveFinoraUsers(users);
   localStorage.setItem(FINORA_SESSION_KEY,user.id);
+  clearInviteFromLocation();
   openFinora(user);
 });
 
@@ -3487,9 +3527,35 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape' && $('profileModalBackdrop')?.classList.contains('open'))closeProfileModal();
 });
 
+
+function applyInviteFromUrl(){
+  const token=parseInviteFromLocation();
+  if(!token)return;
+  const payload=parsePortableInviteCode(token);
+  if(!payload)return;
+
+  authMode('register');
+  if($('regWorkspaceMode')){
+    $('regWorkspaceMode').value='join';
+    updateWorkspaceMode();
+  }
+  $('regInviteCode').value=token;
+  $('regEmail').value=payload.email||'';
+  $('regEmail').readOnly=true;
+  if(payload.name && !$('regName').value)$('regName').value=payload.name;
+
+  const e=$('authError');
+  e.textContent=`Convite reconhecido para ${payload.email}. Complete seu cadastro para entrar em "${payload.workspaceName||'Ambiente familiar'}".`;
+  e.style.display='block';
+  e.style.background='#eaf5ee';
+  e.style.color='#226345';
+}
+
 (function(){
+  migrateInvitesV40();
   cleanupPendingInvitesV39();
   updateWorkspaceMode();
+  applyInviteFromUrl();
   const sid=localStorage.getItem(FINORA_SESSION_KEY);
   const user=loadFinoraUsers().find(u=>u.id===sid);
   if(user)openFinora(user);
