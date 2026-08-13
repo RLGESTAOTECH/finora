@@ -3275,19 +3275,88 @@ function closeCloudModal(){
   document.body.classList.remove('section-modal-open');
 }
 async function testCloudConnection(){
+  const btn = document.querySelector('#cloudAdminFields .cloud-actions .btn-soft');
+  const originalText = btn ? btn.textContent : 'Testar conexão';
+
+  function setCloudMessage(kind,title,message){
+    const box=$('cloudStatusBox');
+    if(!box)return;
+    box.classList.remove('connected','error');
+    if(kind==='connected')box.classList.add('connected');
+    if(kind==='error')box.classList.add('error');
+    if($('cloudStatusTitle'))$('cloudStatusTitle').textContent=title;
+    if($('cloudStatusText'))$('cloudStatusText').textContent=message;
+  }
+
   try{
-    const url=$('cloudSupabaseUrl').value.trim().replace(/\/+$/,'');
-    const key=$('cloudSupabaseKey').value.trim();
-    if(!url||!key)return toast('Informe a URL e a chave pública do Supabase.');
+    const url=($('cloudSupabaseUrl')?.value||'').trim().replace(/\/+$/,'');
+    const key=($('cloudSupabaseKey')?.value||'').trim();
+
+    if(!url||!key){
+      setCloudMessage('error','Dados incompletos','Informe a URL e a chave pública do Supabase.');
+      toast('Informe a URL e a chave pública do Supabase.');
+      return false;
+    }
+
+    if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)){
+      setCloudMessage('error','URL inválida','Use a URL do projeto no formato https://seuprojeto.supabase.co');
+      toast('A URL do Supabase parece inválida.');
+      return false;
+    }
+
+    if(btn){ btn.disabled=true; btn.textContent='Testando...'; }
+    setCloudMessage('','Testando conexão','A FINORA está consultando o Supabase...');
+
+    const headers={'apikey':key,'Accept':'application/json'};
+    if(key.split('.').length===3) headers['Authorization']='Bearer '+key;
+
+    const endpoint=url+'/rest/v1/finora_workspace_state?select=workspace_id&limit=1';
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),12000);
+
+    let response;
+    try{
+      response=await fetch(endpoint,{method:'GET',headers,signal:controller.signal});
+    }finally{
+      clearTimeout(timeout);
+    }
+
+    let bodyText='';
+    try{ bodyText=await response.text(); }catch(_){}
+
+    if(!response.ok){
+      let detail=bodyText;
+      try{
+        const parsed=JSON.parse(bodyText);
+        detail=parsed.message||parsed.msg||parsed.error_description||parsed.hint||bodyText;
+      }catch(_){}
+
+      if(response.status===401)
+        throw new Error('Chave pública rejeitada pelo Supabase (401). Confira a Publishable / anon key.');
+      if(response.status===403)
+        throw new Error('Acesso negado (403). Confira as políticas RLS e permissões da tabela.');
+      if(response.status===404 || /relation .* does not exist|could not find the table|schema cache/i.test(detail||''))
+        throw new Error('A tabela finora_workspace_state não foi encontrada. Execute o SQL da FINORA no Supabase.');
+
+      throw new Error('Supabase respondeu '+response.status+(detail?' — '+detail:''));
+    }
+
     saveCloudConfigLocal({url,key});
     ensureWorkspaceCloudToken();
-    const client=getCloudClient();
-    if(!client)throw new Error('Cliente Supabase indisponível');
-    const {error}=await client.from('finora_workspace_state').select('workspace_id').eq('workspace_id',currentWorkspaceId).maybeSingle();
-    if(error && !/0 rows/i.test(error.message||''))throw error;
-    updateCloudUI('connected');toast('Conexão com a nuvem funcionando.');
+    setCloudMessage('connected','Conexão funcionando','Supabase respondeu com sucesso. A FINORA está pronta para sincronizar este ambiente.');
+    toast('Conexão com o Supabase funcionando.');
+    return true;
+
   }catch(e){
-    console.error(e);updateCloudUI('error');toast('Não foi possível conectar ao Supabase.');
+    console.error('FINORA cloud test',e);
+    const msg=e?.name==='AbortError'
+      ? 'O Supabase não respondeu dentro de 12 segundos. Verifique a internet e a URL do projeto.'
+      : (e?.message||'Não foi possível conectar ao Supabase.');
+    setCloudMessage('error','Falha na conexão',msg);
+    toast('Falha no teste: '+msg);
+    return false;
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent=originalText; }
   }
 }
 async function saveCloudConfiguration(){
