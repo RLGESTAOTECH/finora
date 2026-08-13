@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v43-family-cloud">
+<meta name="finora-version" content="v44-safe-merge">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3033,8 +3033,24 @@ function editRow(id){
   $('fileInfo').textContent=x.attachment?`Arquivo atual: ${x.attachment.name}`:'O arquivo fica salvo somente neste navegador.';
   const _launch=$('simpleLaunchPanel');if(_launch)_launch.scrollTo({top:0,behavior:'smooth'});
 }
-function deleteRow(id){if(confirm('Excluir este lançamento?')){data=data.filter(x=>x.id!==id);save();render();toast('Lançamento excluído.')}}
-function markPaid(id){const x=data.find(r=>r.id===id);if(x){x.status='pago';x.dataPagamento=today();save();render();toast('Marcado como pago/recebido.')}}
+function deleteRow(id){
+  if(confirm('Excluir este lançamento?')){
+    recordTransactionDeletion(id);
+    data=data.filter(x=>x.id!==id);
+    save();
+    render();
+    toast('Lançamento excluído.');
+  }
+}
+function markPaid(id){
+  const x=data.find(r=>r.id===id);
+  if(x){
+    x.status='pago';
+    x.dataPagamento=today();
+    x.updatedAt=new Date().toISOString();
+    save();render();toast('Marcado como pago/recebido.');
+  }
+}
 function downloadFile(id){
   const x=data.find(r=>r.id===id);if(!x?.attachment)return;
   const a=document.createElement('a');a.href=x.attachment.data;a.download=x.attachment.name;a.click();
@@ -3049,7 +3065,9 @@ $('cancelEdit').onclick=()=>{
 };
 $('clearAccount').onclick=()=>{
   if(confirm(`Apagar todos os registros da conta "${currentWorkspaceName||'Meu ambiente'}"?`)){
-    data=data.filter(x=>x.account!==account);save();render();toast('Registros apagados.');
+    data.filter(x=>sameWorkspace(x)).forEach(x=>recordTransactionDeletion(x.id));
+    data=data.filter(x=>!sameWorkspace(x));
+    save();render();toast('Registros apagados.');
   }
 };
 $('exportCsv').onclick=()=>{
@@ -3265,6 +3283,69 @@ async function sha256Hex(text){
   return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
 }
 
+
+function loadDeletedTransactions(){
+  try{return JSON.parse(localStorage.getItem(FINORA_DELETED_TX_KEY)||'[]')}
+  catch(e){return []}
+}
+function saveDeletedTransactions(rows){
+  localStorage.setItem(FINORA_DELETED_TX_KEY,JSON.stringify(Array.isArray(rows)?rows:[]));
+}
+function txTime(x){
+  const raw=x?.updatedAt||x?.createdAt||x?.dataLancamento||'1970-01-01T00:00:00.000Z';
+  const t=Date.parse(raw);
+  return Number.isFinite(t)?t:0;
+}
+function normalizeTxRecord(x){
+  if(!x)return null;
+  const id=x.id||('legacy-'+String(x.workspaceId||currentWorkspaceId)+'-'+
+    String(x.tipo||'')+'-'+String(x.descricao||'')+'-'+String(x.dataLancamento||x.vencimento||'')+'-'+String(x.valor||0));
+  return {...x,id,workspaceId:x.workspaceId||currentWorkspaceId,account:'family'};
+}
+function mergeTransactions(localRows,remoteRows,tombstones){
+  const map=new Map();
+  [...(Array.isArray(remoteRows)?remoteRows:[]),...(Array.isArray(localRows)?localRows:[])].forEach(raw=>{
+    const x=normalizeTxRecord(raw);
+    if(!x||!x.id)return;
+    const prev=map.get(x.id);
+    if(!prev || txTime(x)>=txTime(prev))map.set(x.id,x);
+  });
+
+  const tombMap=new Map();
+  (Array.isArray(tombstones)?tombstones:[]).forEach(t=>{
+    if(!t?.id)return;
+    const prev=tombMap.get(t.id);
+    if(!prev || Date.parse(t.deletedAt||0)>=Date.parse(prev.deletedAt||0))tombMap.set(t.id,t);
+  });
+
+  tombMap.forEach((t,id)=>{
+    const row=map.get(id);
+    if(!row || Date.parse(t.deletedAt||0)>=txTime(row))map.delete(id);
+  });
+
+  return [...map.values()];
+}
+function mergeTombstones(a,b){
+  const map=new Map();
+  [...(Array.isArray(a)?a:[]),...(Array.isArray(b)?b:[])].forEach(t=>{
+    if(!t?.id)return;
+    const prev=map.get(t.id);
+    if(!prev || Date.parse(t.deletedAt||0)>=Date.parse(prev.deletedAt||0))map.set(t.id,t);
+  });
+  return [...map.values()];
+}
+function recordTransactionDeletion(id){
+  const row=data.find(x=>x.id===id);
+  const ws=row?.workspaceId||currentWorkspaceId;
+  const tombstones=loadDeletedTransactions();
+  const next=mergeTombstones(tombstones,[{
+    id,
+    workspaceId:ws,
+    deletedAt:new Date().toISOString()
+  }]);
+  saveDeletedTransactions(next);
+}
+
 function cloudStatePayload(){
   const workspaceRows=data.filter(x=>sameWorkspace(x));
   const cards=accountCards();
@@ -3280,6 +3361,7 @@ function cloudStatePayload(){
     workspaceName:currentWorkspaceName,
     updatedAt:new Date().toISOString(),
     transactions:workspaceRows,
+    transactionTombstones:loadDeletedTransactions().filter(t=>t.workspaceId===currentWorkspaceId),
     cards,
     members,
     invites
@@ -3428,9 +3510,6 @@ async function pushCloudState(showToast=false){
   try{
     let payload=cloudStatePayload();
 
-    // Lê o estado atual apenas para mesclar metadados familiares.
-    // Assim, a confirmação de um convite em outro computador não apaga
-    // integrantes/convites já conhecidos pelo administrador.
     const {data:remoteRow,error:readError}=await client
       .from('finora_workspace_state')
       .select('state')
@@ -3439,6 +3518,20 @@ async function pushCloudState(showToast=false){
     if(readError)throw readError;
 
     const remoteState=remoteRow?.state||{};
+
+    // MERGE SEGURO: nunca substitui cegamente os lançamentos da nuvem.
+    // O registro mais recente por ID vence; exclusões usam tombstones.
+    const mergedTombstones=mergeTombstones(
+      remoteState.transactionTombstones||[],
+      payload.transactionTombstones||[]
+    );
+    payload.transactions=mergeTransactions(
+      payload.transactions||[],
+      remoteState.transactions||[],
+      mergedTombstones
+    );
+    payload.transactionTombstones=mergedTombstones;
+
     payload.members=mergeCloudMembers(remoteState.members||[],payload.members||[]);
     payload.invites=mergeCloudInvites(remoteState.invites||[],payload.invites||[]);
 
@@ -3453,8 +3546,14 @@ async function pushCloudState(showToast=false){
       .upsert(row,{onConflict:'workspace_id'});
     if(error)throw error;
 
-    // Mantém o espelho local alinhado com o que foi persistido.
+    // Atualiza o navegador com o mesmo estado consolidado que foi salvo.
+    data=data.filter(x=>!sameWorkspace(x)).concat(
+      payload.transactions.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'}))
+    );
+    localStorage.setItem(KEY,JSON.stringify(data));
+    saveDeletedTransactions(payload.transactionTombstones||[]);
     saveCloudMembers(payload.members||[]);
+
     const otherInvites=loadFinoraInvites().filter(i=>i.workspaceId!==currentWorkspaceId);
     const localCurrent=loadFinoraInvites().filter(i=>i.workspaceId===currentWorkspaceId);
     const mergedInvites=mergeCloudInvites(payload.invites||[],localCurrent);
@@ -3462,8 +3561,9 @@ async function pushCloudState(showToast=false){
 
     const stamp=new Date().toLocaleString('pt-BR');
     localStorage.setItem(FINORA_CLOUD_SYNC_KEY,stamp);
+    render();
     updateCloudUI('connected');
-    if(showToast)toast('Dados enviados para a nuvem.');
+    if(showToast)toast('Dados enviados e consolidados na nuvem.');
     return true;
   }catch(e){
     console.error('FINORA cloud push',e);
@@ -3498,17 +3598,26 @@ async function pullCloudState(showToast=false){
     const remoteCards=Array.isArray(state.cards)?state.cards:[];
     const remoteMembers=Array.isArray(state.members)?state.members:[];
     const remoteInvites=Array.isArray(state.invites)?state.invites:[];
+    const remoteTombstones=Array.isArray(state.transactionTombstones)?state.transactionTombstones:[];
 
-    // Dados financeiros do ambiente.
-    data=data.filter(x=>!sameWorkspace(x))
-      .concat(remoteTx.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'})));
+    const localTx=data.filter(x=>sameWorkspace(x));
+    const localTombstones=loadDeletedTransactions().filter(t=>t.workspaceId===currentWorkspaceId);
+    const mergedTombstones=mergeTombstones(remoteTombstones,localTombstones);
+    const mergedTx=mergeTransactions(localTx,remoteTx,mergedTombstones);
+
+    // IMPORTANTE: mantém lançamentos locais novos que ainda não chegaram à nuvem.
+    data=data.filter(x=>!sameWorkspace(x)).concat(
+      mergedTx.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'}))
+    );
     localStorage.setItem(KEY,JSON.stringify(data));
+    saveDeletedTransactions(
+      loadDeletedTransactions().filter(t=>t.workspaceId!==currentWorkspaceId).concat(mergedTombstones)
+    );
 
     const allCards=loadFinoraCards().filter(c=>c.workspaceId!==currentWorkspaceId)
       .concat(remoteCards.map(c=>({...c,workspaceId:currentWorkspaceId,account:'family'})));
     saveFinoraCards(allCards);
 
-    // Diretório familiar compartilhado: NÃO traz hashes de senha/CPF.
     const mergedMembers=mergeCloudMembers(
       loadCloudMembers().filter(u=>u.workspaceId===currentWorkspaceId),
       remoteMembers.map(u=>({...u,workspaceId:currentWorkspaceId}))
@@ -3516,7 +3625,6 @@ async function pullCloudState(showToast=false){
     const otherCloudMembers=loadCloudMembers().filter(u=>u.workspaceId!==currentWorkspaceId);
     saveCloudMembers(otherCloudMembers.concat(mergedMembers));
 
-    // Convites: "used" sempre prevalece sobre "pending".
     const localAllInvites=loadFinoraInvites();
     const localCurrent=localAllInvites.filter(i=>i.workspaceId===currentWorkspaceId);
     const otherInvites=localAllInvites.filter(i=>i.workspaceId!==currentWorkspaceId);
@@ -3533,7 +3641,7 @@ async function pullCloudState(showToast=false){
     render();
     renderFamilyAccess();
     updateCloudUI('connected');
-    if(showToast)toast('Dados atualizados pela nuvem.');
+    if(showToast)toast('Dados consolidados com a nuvem.');
     return true;
   }catch(e){
     console.error('FINORA cloud pull',e);
@@ -3607,6 +3715,7 @@ const FINORA_SESSION_KEY='finora_session_local_v6';
 const FINORA_WORKSPACES_KEY='finora_workspaces_local_v2';
 const FINORA_INVITES_KEY='finora_invites_local_v1';
 const FINORA_CLOUD_MEMBERS_KEY='finora_cloud_members_v43';
+const FINORA_DELETED_TX_KEY='finora_deleted_transactions_v44';
 const FINORA_INVITE_PROTOCOL_VERSION=2;
 const FINORA_INVITE_MIGRATION_KEY='finora_invite_migration_v40';
 let currentUser=null;
