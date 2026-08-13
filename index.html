@@ -2668,6 +2668,29 @@ function clearPendingInvites(){
   toast('Todos os convites deste ambiente foram excluídos.');
 }
 
+
+function normalizeFinoraEmail(v){return String(v||'').trim().toLowerCase()}
+
+/* Se um integrante já existe no ambiente, o convite correspondente não pode continuar pendente. */
+function reconcileAcceptedFamilyInvites(){
+  if(!currentWorkspaceId)return false;
+  const members=loadFinoraUsers().filter(u=>u.workspaceId===currentWorkspaceId);
+  if(!members.length)return false;
+  const memberEmails=new Set(members.map(u=>normalizeFinoraEmail(u.email)).filter(Boolean));
+  let changed=false;
+  const invites=loadFinoraInvites().map(inv=>{
+    if(inv.workspaceId===currentWorkspaceId &&
+       inv.status==='pending' &&
+       memberEmails.has(normalizeFinoraEmail(inv.email))){
+      changed=true;
+      return {...inv,status:'used',usedAt:inv.usedAt||new Date().toISOString()};
+    }
+    return inv;
+  });
+  if(changed)saveFinoraInvites(invites);
+  return changed;
+}
+
 function renderFamilyAccess(){
   if(!$('finoraFamilyAccess')||!currentUser)return;
   const admin=isAdmin();
@@ -2683,6 +2706,7 @@ function renderFamilyAccess(){
       <div class="family-actions">${admin&&u.role!=='admin'?`<button class="danger" onclick="removeFamilyMember('${u.id}')">Remover</button>`:''}</div>
     </div>`).join(''):'<div class="empty">Nenhum integrante.</div>');
 
+  reconcileAcceptedFamilyInvites();
   const invites=loadFinoraInvites().filter(i=>i.workspaceId===currentWorkspaceId&&i.protocolVersion===FINORA_INVITE_PROTOCOL_VERSION);
   $('familyInvitesList').innerHTML=`<div class="simple-eyebrow" style="margin-top:10px">CONVITES</div>`+
     (invites.length?invites.map(i=>`<div class="family-row">
@@ -3452,7 +3476,62 @@ async function pullCloudState(showToast=false){
 async function initializeCloudForWorkspace(){
   if(!cloudConfigured())return;
   await pullCloudState(false);
+  reconcileAcceptedFamilyInvites();
+  startFinoraRealtimeSync();
 }
+
+/* FINORA v41 — sincronização automática entre aparelhos */
+let finoraAutoSyncTimer=null;
+let finoraAutoSyncApplying=false;
+let finoraRealtimeChannel=null;
+
+function scheduleFinoraCloudPush(delay=700){
+  if(finoraAutoSyncApplying || !currentWorkspaceId || !cloudConfigured())return;
+  clearTimeout(finoraAutoSyncTimer);
+  finoraAutoSyncTimer=setTimeout(async()=>{
+    if(finoraAutoSyncApplying || !cloudConfigured())return;
+    try{ await pushCloudState(false); }
+    catch(e){ console.error('FINORA auto push',e); }
+  },delay);
+}
+
+async function finoraAutoPull(){
+  if(!currentWorkspaceId || !cloudConfigured() || finoraAutoSyncApplying)return false;
+  finoraAutoSyncApplying=true;
+  try{
+    const ok=await pullCloudState(false);
+    if(ok){
+      reconcileAcceptedFamilyInvites();
+      renderFamilyAccess();
+    }
+    return ok;
+  }finally{
+    finoraAutoSyncApplying=false;
+  }
+}
+
+function startFinoraRealtimeSync(){
+  try{
+    if(finoraRealtimeChannel && finoraSupabase?.removeChannel){
+      finoraSupabase.removeChannel(finoraRealtimeChannel);
+      finoraRealtimeChannel=null;
+    }
+    if(!cloudConfigured() || !finoraSupabase || !currentWorkspaceId)return;
+    finoraRealtimeChannel=finoraSupabase
+      .channel('finora-workspace-'+currentWorkspaceId)
+      .on('postgres_changes',{
+        event:'*',schema:'public',table:'finora_workspace_state',
+        filter:'workspace_id=eq.'+currentWorkspaceId
+      },()=>finoraAutoPull())
+      .subscribe();
+  }catch(e){ console.warn('FINORA realtime indisponível; usando atualização por foco.',e); }
+}
+
+window.addEventListener('focus',()=>{ if(currentUser) finoraAutoPull(); });
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && currentUser) finoraAutoPull();
+});
+
 
 const FINORA_USERS_KEY='finora_users_local_v6';
 const FINORA_SESSION_KEY='finora_session_local_v6';
@@ -3505,7 +3584,10 @@ function migrateInvitesV40(){
 }
 
 function loadFinoraInvites(){try{return JSON.parse(localStorage.getItem(FINORA_INVITES_KEY)||'[]')}catch(e){return []}}
-function saveFinoraInvites(rows){localStorage.setItem(FINORA_INVITES_KEY,JSON.stringify(rows))}
+function saveFinoraInvites(rows){
+  localStorage.setItem(FINORA_INVITES_KEY,JSON.stringify(rows));
+  scheduleFinoraCloudPush();
+}
 function createInviteCode(){
   const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let code='FINORA-';
   for(let i=0;i<6;i++)code+=chars[Math.floor(Math.random()*chars.length)];
@@ -3967,6 +4049,28 @@ function applyInviteFromUrl(){
   const sid=localStorage.getItem(FINORA_SESSION_KEY);
   const user=loadFinoraUsers().find(u=>u.id===sid);
   if(user)await openFinora(user);
+})();
+
+
+/* FINORA v41 — qualquer alteração persistida no estado financeiro agenda envio à nuvem. */
+(function(){
+  const originalSetItem=Storage.prototype.setItem;
+  Storage.prototype.setItem=function(key,value){
+    originalSetItem.call(this,key,value);
+    try{
+      const k=String(key||'');
+      const ignored=[
+        FINORA_SESSION_KEY,
+        FINORA_CLOUD_SYNC_KEY,
+        FINORA_CLOUD_CONFIG_KEY
+      ].filter(Boolean);
+      if(this===localStorage && currentUser && !finoraAutoSyncApplying &&
+         !ignored.includes(k) &&
+         (k.startsWith('finora_') || k.startsWith('finance_'))){
+        scheduleFinoraCloudPush();
+      }
+    }catch(e){}
+  };
 })();
 
 </script>
