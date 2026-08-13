@@ -3535,6 +3535,33 @@ function parsePortableInviteCode(raw){
   }
 }
 
+
+function importCloudAccessFromInvite(payload){
+  if(!payload?.workspaceId)return false;
+  let changed=false;
+
+  // The Supabase URL and publishable/anon key are public client configuration.
+  // The workspace token is the FINORA shared-environment credential.
+  if(payload.cloud?.url && payload.cloud?.key){
+    saveCloudConfigLocal({
+      url:String(payload.cloud.url).trim().replace(/\/+$/,''),
+      key:String(payload.cloud.key).trim()
+    });
+    changed=true;
+  }
+
+  if(payload.cloud?.token){
+    const workspaces=loadFinoraWorkspaces();
+    const idx=workspaces.findIndex(w=>w.id===payload.workspaceId);
+    if(idx>=0){
+      workspaces[idx].cloudToken=payload.cloud.token;
+      saveFinoraWorkspaces(workspaces);
+      changed=true;
+    }
+  }
+  return changed;
+}
+
 function buildInviteUrl(invite){
   const token=invite.code||createPortableInvitePayload(invite);
   const base=location.origin && location.origin!=='null'
@@ -3595,7 +3622,10 @@ async function openFinora(user){
   ensureRecurringNextMonths();
   normalizeVariableReminders();
   resetForm();
-  if(cloudConfigured()) await pullCloudState(false);
+  if(cloudConfigured()){
+    await pullCloudState(false);
+    startCloudPolling();
+  }
   render();
   renderFamilyAccess();
   updateCloudUI();
@@ -3664,6 +3694,20 @@ $('doRegister').addEventListener('click',async()=>{
       saveFinoraWorkspaces(workspaces);
     }
     role='member';
+
+    // Import the shared cloud access carried by the administrator's invite.
+    // This makes Supabase configuration automatic on the family member's device.
+    if(portable.cloud?.token){
+      let wsRows=loadFinoraWorkspaces();
+      const wsIdx=wsRows.findIndex(w=>w.id===portable.workspaceId);
+      if(wsIdx>=0){
+        wsRows[wsIdx].cloudToken=portable.cloud.token;
+        saveFinoraWorkspaces(wsRows);
+      }
+    }
+    if(portable.cloud?.url && portable.cloud?.key){
+      saveCloudConfigLocal({url:portable.cloud.url,key:portable.cloud.key});
+    }
 
     // Store a receipt locally. Acceptance no longer depends on admin localStorage.
     let localInvites=loadFinoraInvites().filter(i=>i.protocolVersion===FINORA_INVITE_PROTOCOL_VERSION);
@@ -3831,9 +3875,30 @@ document.addEventListener('keydown',e=>{
 
 function applyInviteFromUrl(){
   const token=parseInviteFromLocation();
-  if(!token)return;
+  if(!token)return null;
   const payload=parsePortableInviteCode(token);
-  if(!payload)return;
+  if(!payload)return null;
+
+  // If this browser already knows the workspace, refresh its cloud credentials
+  // immediately from the new invitation.
+  importCloudAccessFromInvite(payload);
+
+  const existingUser=loadFinoraUsers().find(u=>
+    u.workspaceId===payload.workspaceId &&
+    String(u.email||'').trim().toLowerCase()===String(payload.email||'').trim().toLowerCase()
+  );
+
+  if(existingUser){
+    authMode('login');
+    if($('loginIdentifier'))$('loginIdentifier').value=existingUser.email||payload.email||'';
+    const e=$('authError');
+    e.textContent=`Acesso à nuvem atualizado para "${payload.workspaceName||'Ambiente familiar'}". Entre normalmente para carregar os dados compartilhados.`;
+    e.style.display='block';
+    e.style.background='#eaf5ee';
+    e.style.color='#226345';
+    clearInviteFromLocation();
+    return payload;
+  }
 
   authMode('register');
   if($('regWorkspaceMode')){
@@ -3850,6 +3915,7 @@ function applyInviteFromUrl(){
   e.style.display='block';
   e.style.background='#eaf5ee';
   e.style.color='#226345';
+  return payload;
 }
 
 (async function(){
