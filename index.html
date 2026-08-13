@@ -1102,7 +1102,7 @@ body.section-modal-open{overflow:hidden}
       <p id="familyAccessSubtitle">Gerencie quem pode acessar este ambiente financeiro.</p>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <button type="button" class="simple-action" id="clearPendingInvitesBtn" onclick="clearPendingInvites()">Limpar pendentes</button>
+      <button type="button" class="simple-action" id="clearPendingInvitesBtn" onclick="clearPendingInvites()">Limpar convites</button>
       <span class="role-badge" id="currentRoleBadge">Administrador</span>
     </div>
   </div>
@@ -2576,6 +2576,18 @@ function createFamilyInvite(){
   toast('Convite criado. Use “Copiar link” ou “Enviar convite”.');
 }
 
+function deleteFamilyInvite(id){
+  if(!isAdmin())return toast('Somente o administrador pode excluir convites.');
+  const invites=loadFinoraInvites();
+  const inv=invites.find(i=>i.id===id && i.workspaceId===currentWorkspaceId);
+  if(!inv)return toast('Convite não encontrado.');
+  const label=inv.name||inv.email||'este convite';
+  if(!confirm(`Excluir definitivamente o convite de ${label}? Isso não remove integrantes nem dados financeiros.`))return;
+  saveFinoraInvites(invites.filter(i=>i.id!==id));
+  renderFamilyAccess();
+  toast('Convite excluído.');
+}
+
 function regenerateFamilyInvite(id){
   if(!isAdmin())return;
   const invites=loadFinoraInvites();
@@ -2646,14 +2658,14 @@ function inviteDisplayCode(invite){
 
 
 function clearPendingInvites(){
-  if(!isAdmin())return;
+  if(!isAdmin())return toast('Somente o administrador pode limpar convites.');
   const all=loadFinoraInvites();
-  const pending=all.filter(i=>i.workspaceId===currentWorkspaceId&&i.status==='pending');
-  if(!pending.length)return toast('Não há convites pendentes.');
-  if(!confirm(`Excluir ${pending.length} convite${pending.length===1?'':'s'} pendente${pending.length===1?'':'s'}?`))return;
-  saveFinoraInvites(all.filter(i=>!(i.workspaceId===currentWorkspaceId&&i.status==='pending')));
+  const current=all.filter(i=>i.workspaceId===currentWorkspaceId);
+  if(!current.length)return toast('Não há convites para limpar.');
+  if(!confirm(`Excluir ${current.length} convite(s) deste ambiente? Integrantes e dados financeiros serão preservados.`))return;
+  saveFinoraInvites(all.filter(i=>i.workspaceId!==currentWorkspaceId));
   renderFamilyAccess();
-  toast('Convites pendentes excluídos.');
+  toast('Todos os convites deste ambiente foram excluídos.');
 }
 
 function renderFamilyAccess(){
@@ -2676,8 +2688,8 @@ function renderFamilyAccess(){
     (invites.length?invites.map(i=>`<div class="family-row">
       <div><strong>${esc(i.name||i.email)}</strong><small>${esc(i.email)} · <span class="invite-code">Convite v2 · ${esc((i.code||'').slice(0,14))}…</span> <span class="status-chip ${i.status}">${i.status==='pending'?'Pendente':'Utilizado'}</span></small></div>
       <div class="family-actions">
-        ${admin&&i.status==='pending'?`<button onclick="sendFamilyInvite('${i.id}')">Enviar convite</button><button onclick="copyFamilyInvite('${i.id}')">Copiar link</button><button class="danger" onclick="cancelFamilyInvite('${i.id}')">Cancelar</button>`:''}
-        ${admin&&i.status==='used'?`<button onclick="regenerateFamilyInvite('${i.id}')">Gerar novo convite</button>`:''}
+        ${admin&&i.status==='pending'?`<button onclick="sendFamilyInvite('${i.id}')">Enviar convite</button><button onclick="copyFamilyInvite('${i.id}')">Copiar link</button><button class="danger" onclick="cancelFamilyInvite('${i.id}')">Cancelar</button><button class="danger" onclick="deleteFamilyInvite('${i.id}')">Excluir</button>`:''}
+        ${admin&&i.status==='used'?`<button onclick="regenerateFamilyInvite('${i.id}')">Gerar novo convite</button><button class="danger" onclick="deleteFamilyInvite('${i.id}')">Excluir</button>`:''}
       </div>
     </div>`).join(''):'<div class="empty">Nenhum convite criado.</div>');
 }
