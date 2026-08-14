@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v77-pessoa-estavel-categoria-livre-moeda">
+<meta name="finora-version" content="v78-pessoa-nao-reseta">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3738,11 +3738,20 @@ function fillPeople(selected){
   const el=$('pessoa');
   if(!el)return;
 
-  const names=people();
   const previous=String(el.value||'').trim();
-  const desired=String(selected||previous||'').trim();
+  const explicit=String(selected||'').trim();
 
-  // Só remonta a lista se os nomes realmente mudaram.
+  // A lista-base vem dos integrantes atuais.
+  let names=people().map(v=>String(v||'').trim()).filter(Boolean);
+
+  // Regra de estabilidade:
+  // se o usuário já escolheu uma pessoa no formulário, essa escolha não pode
+  // desaparecer por causa de polling, realtime ou re-render da tela.
+  const keep=explicit || previous || '';
+  if(keep && !names.includes(keep))names=[keep,...names];
+
+  names=[...new Set(names)];
+
   const currentOptions=[...el.options].map(o=>o.value);
   const sameList=currentOptions.length===names.length &&
     currentOptions.every((v,i)=>v===names[i]);
@@ -3751,23 +3760,30 @@ function fillPeople(selected){
     el.innerHTML=names.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
   }
 
-  // Prioridade: seleção explícita > valor que o usuário já escolheu > primeiro item.
-  if(desired && names.includes(desired))el.value=desired;
-  else if(previous && names.includes(previous))el.value=previous;
+  if(keep && names.includes(keep))el.value=keep;
   else if(names.length)el.value=names[0];
 
   const quick=$('entradaMesPessoa');
   if(quick){
-    const keep=quick.value;
+    const quickKeep=quick.value;
+    let quickNames=[...names];
+    if(quickKeep && !quickNames.includes(quickKeep))quickNames=[quickKeep,...quickNames];
+    quickNames=[...new Set(quickNames)];
+
     const qOptions=[...quick.options].map(o=>o.value);
-    const qSame=qOptions.length===names.length && qOptions.every((v,i)=>v===names[i]);
-    if(!qSame)quick.innerHTML=names.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
-    if(names.includes(keep))quick.value=keep;
-    else if(names.length)quick.value=names[0];
+    const qSame=qOptions.length===quickNames.length &&
+      qOptions.every((v,i)=>v===quickNames[i]);
+
+    if(!qSame){
+      quick.innerHTML=quickNames.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+    }
+
+    if(quickKeep && quickNames.includes(quickKeep))quick.value=quickKeep;
+    else if(quickNames.length)quick.value=quickNames[0];
   }
 
   const note=$('simonePayNote');
-  if(note)note.style.display=names.includes('Simone')?'inline':'none';
+  if(note)note.style.display=names.some(n=>/^simone\b/i.test(n))?'inline':'none';
 }
 function effectiveStatus(x){
   if(x.status==='pago') return 'pago';
@@ -5415,6 +5431,7 @@ function applyLaunchMode(mode,{keepForm=false}={}){
 
 function openLaunchModal(mode='list'){
   openSectionModal('simpleLaunchPanel');
+  if(mode==='entrada' || mode==='saida')fillPeople($('pessoa')?.value||'');
   applyLaunchMode(mode);
   const root=$('simpleLaunchPanel');
   if(root)root.scrollTop=0;
@@ -5646,7 +5663,14 @@ function render(){
   updateAdminDangerControls();
   document.querySelectorAll('.account').forEach(b=>b.classList.toggle('active',b.dataset.account===account));
   $('accountLabel').textContent=currentWorkspaceName||'Meu ambiente';
-  fillPeople();
+  // Não remonta o combo Pessoa durante atualizações automáticas.
+  // Isso preserva a escolha feita pelo usuário até salvar/cancelar.
+  const launchPanel=$('simpleLaunchPanel');
+  const launchFormVisible=launchPanel && (
+    launchPanel.classList.contains('section-modal-active') ||
+    launchPanel.classList.contains('open')
+  );
+  if(!launchFormVisible)fillPeople();
   const month=$('filtroMes').value||currentMonth();
   const acc=data.filter(x=>sameWorkspace(x));
   const monthRows=acc.filter(x=>recordMonth(x)===month);
@@ -8362,35 +8386,40 @@ setTimeout(renderHomeCategoryDonut,0);
 </script>
 
 
-<script id="finora-v77-person-guard">
+
+
+
+<script id="finora-v78-person-lock">
 (function(){
-  function installPersonGuard(){
+  let lockedPerson='';
+
+  function install(){
     const el=document.getElementById('pessoa');
-    if(!el || el.dataset.personGuard==='1')return;
-    el.dataset.personGuard='1';
-    let last=el.value||'';
+    if(!el || el.dataset.v78PersonLock==='1')return;
+    el.dataset.v78PersonLock='1';
 
     el.addEventListener('change',()=>{
-      last=el.value||last;
-      requestAnimationFrame(()=>{
-        // Se algum render legado remontar o select no mesmo ciclo, restaura a escolha.
-        const values=[...el.options].map(o=>o.value);
-        if(last && values.includes(last) && el.value!==last){
-          el.value=last;
-        }
-      });
+      lockedPerson=el.value||'';
     });
 
-    new MutationObserver(()=>{
+    // Se qualquer rotina externa tentar trocar o valor enquanto o modal estiver aberto,
+    // restaura a escolha do usuário.
+    setInterval(()=>{
+      const panel=document.getElementById('simpleLaunchPanel');
+      if(!panel || !el || !lockedPerson)return;
+
+      const open=panel.classList.contains('section-modal-active') || panel.classList.contains('open');
+      if(!open)return;
+
       const values=[...el.options].map(o=>o.value);
-      if(last && values.includes(last) && el.value!==last){
-        el.value=last;
+      if(values.includes(lockedPerson) && el.value!==lockedPerson){
+        el.value=lockedPerson;
       }
-    }).observe(el,{childList:true});
+    },500);
   }
 
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installPersonGuard);
-  else installPersonGuard();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);
+  else install();
 })();
 </script>
 
