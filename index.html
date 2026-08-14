@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v70-relatorios-extrato-categorias">
+<meta name="finora-version" content="v71-pizza-categorias-home">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -2363,6 +2363,9 @@ button[data-finora-delete="card"]:disabled{
 @media(max-width:430px){.report-filters{grid-template-columns:1fr}.finora-report-head{align-items:flex-start;flex-direction:column}}
 @media print{body *{visibility:hidden!important}#finoraReportsPanel,#finoraReportsPanel *{visibility:visible!important}#finoraReportsPanel{position:absolute!important;left:0!important;top:0!important;width:100%!important;max-height:none!important;overflow:visible!important;transform:none!important}.popup-modal-close,.report-actions,.report-tabs{display:none!important}}
 
+
+/* FINORA v71 — pizza de categorias no painel principal */
+.finora-home-category-card .finora-evolution-head{margin-bottom:2px}.finora-home-donut-layout{margin-top:10px}.finora-home-category-card .report-donut{width:230px;height:230px}.finora-home-category-card .report-donut:after{inset:46px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -2522,26 +2525,19 @@ button[data-finora-delete="card"]:disabled{
   </div>
 
 
-  <section class="finora-evolution-card" id="finoraEvolutionCard">
-    <div class="finora-evolution-head">
-      <div>
-        <span class="finora-evolution-kicker">EVOLUÇÃO FINANCEIRA</span>
-        <h3>Gráfico de evolução</h3>
-        <p id="finoraEvolutionSubtitle">Entradas, despesas e saldo dos últimos meses.</p>
-      </div>
-      <div class="finora-evolution-legend" aria-label="Legenda do gráfico">
-        <span><i class="evo-dot income"></i>Entradas</span>
-        <span><i class="evo-dot expense"></i>Despesas</span>
-        <span><i class="evo-dot balance"></i>Saldo</span>
-      </div>
+  <section class="finora-evolution-card finora-home-category-card" id="finoraHomeCategoryCard">
+  <div class="finora-evolution-head">
+    <div>
+      <span class="finora-evolution-kicker">DESPESAS DO MÊS</span>
+      <h3>Despesas por categoria</h3>
+      <p id="finoraHomeCategorySubtitle">Somente categorias com movimentação no mês selecionado.</p>
     </div>
-    <div class="finora-evolution-chart-wrap">
-      <svg id="finoraEvolutionChart" class="finora-evolution-chart" viewBox="0 0 1000 320" role="img" aria-label="Evolução financeira mensal"></svg>
-      <div class="finora-chart-empty" id="finoraEvolutionEmpty" style="display:none">
-        Registre lançamentos para acompanhar a evolução financeira ao longo dos meses.
-      </div>
-    </div>
-  </section>
+  </div>
+  <div class="report-donut-layout finora-home-donut-layout">
+    <div class="report-donut" id="homeCategoryDonut"><div><small>Total de despesas</small><strong id="homeCategoryDonutTotal">R$ 0,00</strong></div></div>
+    <div class="report-legend" id="homeCategoryLegend"></div>
+  </div>
+</section>
 
   <div class="simple-sheet">
     <section class="simple-column income-column">
@@ -2655,10 +2651,7 @@ button[data-finora-delete="card"]:disabled{
       <div class="report-kpi debit"><span>Débitos</span><strong id="reportDebits">R$ 0,00</strong></div>
       <div class="report-kpi balance"><span>Saldo do período</span><strong id="reportBalance">R$ 0,00</strong></div>
     </div>
-    <div class="report-chart-card">
-      <div><h4>Despesas por categoria</h4><small>Somente categorias com movimentação no período.</small></div>
-      <div class="report-donut-layout"><div class="report-donut" id="reportDonut"><div><small>Total de despesas</small><strong id="reportDonutTotal">R$ 0,00</strong></div></div><div class="report-legend" id="reportLegend"></div></div>
-    </div>
+    
   </div>
   <div id="reportStatement" class="report-view">
     <div class="statement-summary"><span id="statementCount">0 movimentações</span><strong id="statementNet">Saldo: R$ 0,00</strong></div>
@@ -7468,7 +7461,7 @@ function renderFinoraReports(){
   if(!$('finoraReportsPanel'))return;populateReportFilters();const rows=reportRows(),known=rows.filter(simpleKnownValue);
   const credits=known.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0),debits=known.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0);
   $('reportCredits').textContent=money(credits);$('reportDebits').textContent=money(debits);$('reportBalance').textContent=money(credits-debits);
-  renderReportDonut(rows);renderReportStatement(rows);if(!['overview','statement'].includes(finoraReportTab))renderReportBreakdown(rows,finoraReportTab);
+  renderReportStatement(rows);if(!['overview','statement'].includes(finoraReportTab))renderReportBreakdown(rows,finoraReportTab);
 }
 function exportFinoraReportCSV(){
   const rows=reportRows();const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
@@ -7479,5 +7472,29 @@ function exportFinoraReportCSV(){
 function printFinoraReport(){window.print()}
 </script>
 
+
+<script>
+function renderHomeCategoryDonut(){
+  const donut=$('homeCategoryDonut'),legend=$('homeCategoryLegend'),totalEl=$('homeCategoryDonutTotal');
+  if(!donut||!legend||!totalEl)return;
+  const month=$('filtroMes')?.value||currentMonth();
+  const rows=data.filter(x=>sameWorkspace(x)&&recordMonth(x)===month&&x.tipo==='saida'&&simpleKnownValue(x));
+  const sums={};rows.forEach(x=>{const k=x.categoria||'Outros';sums[k]=(sums[k]||0)+Number(x.valor||0)});
+  const items=Object.entries(sums).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]),total=items.reduce((s,[,v])=>s+v,0);
+  totalEl.textContent=money(total);
+  const colors=['#0f5a3e','#2f7d5a','#70a083','#b98b43','#8b6f47','#a54a45','#5c7568','#9bb6a7','#34483e','#c3a86c','#7b8e84','#d3c3a0'];
+  if(!total){donut.style.background='#edf2ef';legend.innerHTML='<div class="empty">Nenhuma despesa no mês selecionado.</div>';return}
+  let acc=0,parts=[];
+  items.forEach(([k,v],i)=>{const a=acc/total*360;acc+=v;const b=acc/total*360;parts.push(`${colors[i%colors.length]} ${a}deg ${b}deg`)});
+  donut.style.background=`conic-gradient(${parts.join(',')})`;
+  legend.innerHTML=items.map(([k,v],i)=>`<div class="report-legend-row"><i class="report-legend-dot" style="background:${colors[i%colors.length]}"></i><b>${reportEsc(k)}</b><em>${(v/total*100).toFixed(1).replace('.',',')}%</em><span>${money(v)}</span></div>`).join('');
+}
+document.addEventListener('change',e=>{if(e.target?.id==='filtroMes')setTimeout(renderHomeCategoryDonut,0)});
+const _finoraOldRenderSimpleDashboard=window.renderSimpleDashboard;
+if(typeof _finoraOldRenderSimpleDashboard==='function'){
+  window.renderSimpleDashboard=function(){const r=_finoraOldRenderSimpleDashboard.apply(this,arguments);renderHomeCategoryDonut();return r}
+}
+setTimeout(renderHomeCategoryDonut,0);
+</script>
 </body>
 </html>
