@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v63-despesa-de">
+<meta name="finora-version" content="v64-despesa-integrantes-ambiente">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -2806,7 +2806,7 @@ button[data-finora-delete]{
     <div class="field expense-owner-field" id="expenseOwnerField">
       <label>Despesa de</label>
       <select id="expenseOwner"></select>
-      <div class="file-note">Selecione de quem é esta despesa. Use “Família / compartilhada” quando o gasto for de todos.</div>
+      <div class="file-note">Selecione um integrante deste ambiente ou “Família / compartilhada” quando o gasto for de todos.</div>
     </div>
     <div class="field full">
       <label>Descrição</label>
@@ -4935,26 +4935,62 @@ function launchMetaHtml(x){
 }
 
 
+function expenseOwnerNames(){
+  const members=typeof familyMembersDirectory==='function'
+    ? familyMembersDirectory()
+    : [];
+
+  const names=members
+    .filter(m=>m && m.workspaceId===currentWorkspaceId)
+    .map(m=>String(m.name||'').trim())
+    .filter(Boolean);
+
+  // Garante que o próprio usuário também apareça mesmo antes de uma sincronização local.
+  if(currentUser?.name)names.push(String(currentUser.name).trim());
+
+  // Compatibilidade com cadastros locais antigos do mesmo ambiente.
+  (loadFinoraUsers?.()||[])
+    .filter(u=>u.workspaceId===currentWorkspaceId)
+    .forEach(u=>{
+      if(u?.name)names.push(String(u.name).trim());
+    });
+
+  return [...new Set(names)]
+    .filter(n=>n && n!=='Família' && n!=='Família / compartilhada')
+    .sort((a,b)=>a.localeCompare(b,'pt-BR'));
+}
+
 function fillExpenseOwners(selected=''){
   const el=$('expenseOwner');
   if(!el)return;
-  const names=people();
-  const options=[
+
+  const names=expenseOwnerNames();
+  const current=selected || el.value || $('pessoa')?.value || '';
+
+  el.innerHTML=[
     '<option value="Família / compartilhada">Família / compartilhada</option>',
     ...names.map(name=>`<option value="${esc(name)}">${esc(name)}</option>`)
-  ];
-  el.innerHTML=options.join('');
-  const preferred=selected || $('pessoa')?.value || names[0] || 'Família / compartilhada';
-  el.value=options.some(o=>o.includes(`value="${preferred.replace(/"/g,'&quot;')}"`))
-    ? preferred
-    : (names.includes(preferred)?preferred:'Família / compartilhada');
+  ].join('');
+
+  if(current && (current==='Família / compartilhada' || names.includes(current))){
+    el.value=current;
+  }else if($('pessoa')?.value && names.includes($('pessoa').value)){
+    el.value=$('pessoa').value;
+  }else{
+    el.value='Família / compartilhada';
+  }
 }
 function updateExpenseOwnerField(){
   const field=$('expenseOwnerField');
   if(!field)return;
   const isExpense=$('tipo')?.value==='saida';
   field.style.display=isExpense?'block':'none';
-  if(isExpense && !$('expenseOwner')?.value)fillExpenseOwners($('pessoa')?.value||'');
+
+  if(isExpense){
+    // Recarrega a cada abertura/troca para refletir imediatamente
+    // os integrantes do ambiente atual (ex.: Marcelo, Simone, etc.).
+    fillExpenseOwners($('expenseOwner')?.value || $('pessoa')?.value || '');
+  }
 }
 
 function updateTypeLabels(){
