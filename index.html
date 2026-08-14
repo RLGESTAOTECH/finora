@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v53-convite-usuario-existente">
+<meta name="finora-version" content="v54-convites-feedback">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -4991,17 +4991,13 @@ $('doRegister').addEventListener('click',async()=>{
         role
       });
     }else{
-      // Corrige CPF/nome apenas quando faltarem no perfil existente.
-      const patch={
-        user_id:authUser.id,
-        name:profile.name||name,
-        email:profile.email||email,
-        cpf_hash:profile.cpf_hash||cpfHash,
-        cpf_masked:profile.cpf_masked||maskCPF(cpf),
-        workspace_id:profile.workspace_id||workspace.id,
-        role:profile.role||role
-      };
-      profile=await upsertOwnFinoraProfile(patch);
+      // Conta existente: nunca recriar/upsertar o perfil apenas para aceitar outro ambiente.
+      // O vínculo do novo ambiente pertence a finora_workspace_members.
+      // Também validamos o CPF digitado contra o perfil autenticado, quando houver hash salvo.
+      if(profile.cpf_hash && profile.cpf_hash!==cpfHash){
+        await client.auth.signOut();
+        return authErr('O CPF informado não corresponde à conta deste e-mail. Entre com os dados da conta FINORA já cadastrada ou recupere seu acesso.');
+      }
     }
 
     if(mode==='join'){
@@ -5054,8 +5050,8 @@ $('doRegister').addEventListener('click',async()=>{
 
     if(mode==='join'){
       toast(existingAccount
-        ? `Acesso ao ambiente ${workspace.name} adicionado à sua conta.`
-        : `Conta criada e acesso ao ambiente ${workspace.name} liberado.`);
+        ? `Acesso liberado! O ambiente ${workspace.name} foi adicionado à sua conta FINORA.`
+        : `Conta criada com sucesso! Seu acesso ao ambiente ${workspace.name} foi liberado.`);
     }
 
   }catch(e){
@@ -5063,15 +5059,21 @@ $('doRegister').addEventListener('click',async()=>{
     const msg=String(e?.message||'Não foi possível concluir o acesso.');
 
     if(/already registered|already been registered|user already exists/i.test(msg)){
-      return authErr('Este e-mail já possui conta FINORA. Informe a senha atual dessa conta para aceitar o novo ambiente.');
+      return authErr(`Este e-mail já possui uma conta FINORA. Informe a senha atual para adicionar o ambiente ${workspace?.name||'autorizado'} à sua conta.`);
     }
-    if(/Invalid login credentials/i.test(msg)){
-      return authErr('Este e-mail já possui conta FINORA, mas a senha informada não confere.');
+    if(/Invalid login credentials|invalid_credentials/i.test(msg)){
+      return authErr('A senha informada não corresponde à conta existente. Verifique a senha ou utilize a recuperação de senha.');
     }
-    if(/duplicate|cpf_hash|unique/i.test(msg)){
-      return authErr('Este CPF ou e-mail já está vinculado a uma conta FINORA.');
+    if(/finora_profiles_cpf_hash_uq|cpf_hash/i.test(msg)){
+      return authErr('Este CPF já está vinculado a uma conta FINORA. Entre com a conta já cadastrada ou recupere seu acesso.');
     }
-    authErr(msg);
+    if(/duplicate|23505|unique/i.test(msg)){
+      return authErr('Já existe um cadastro com esses dados na FINORA. Entre com a conta existente ou recupere seu acesso.');
+    }
+    if(/invite|convite|expired|expir/i.test(msg)){
+      return authErr('Este convite não está mais disponível. Solicite um novo convite ao administrador.');
+    }
+    authErr('Não foi possível concluir o acesso agora. Verifique os dados informados e tente novamente.');
   }
 });
 
