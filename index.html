@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v69-exclusao-cartao-confiavel">
+<meta name="finora-version" content="v70-relatorios-extrato-categorias">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -2330,6 +2330,39 @@ button[data-finora-delete="card"]:disabled{
   transform:none!important;
 }
 
+
+/* FINORA v70 — Relatórios e Extrato */
+.finora-reports-panel{padding:18px!important}
+#finoraReportsPanel.section-modal-active{display:block!important;width:min(1220px,96vw)!important}
+.finora-report-head{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:2px 2px 14px;border-bottom:1px solid #e4ebe7}
+.finora-report-head h3{margin:0;color:#174b36;font-size:18px}.finora-report-head small{font:9px Verdana,sans-serif;color:#718078}
+.report-actions{display:flex;gap:7px;flex-wrap:wrap}
+.report-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;padding:14px 0}
+.report-tabs{display:flex;gap:5px;overflow:auto;padding:5px;background:#f1f5f2;border-radius:10px;margin-bottom:14px}
+.report-tabs button{border:0;background:transparent;padding:9px 12px;border-radius:7px;white-space:nowrap;cursor:pointer;font:9px Verdana,sans-serif;color:#52675c}
+.report-tabs button.active{background:#0f5a3e;color:#fff;font-weight:700}
+.report-view{display:none}.report-view.active{display:block}
+.report-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.report-kpi{border:1px solid #dfe7e2;border-radius:12px;padding:14px;background:#fff}
+.report-kpi span{display:block;font:9px Verdana,sans-serif;text-transform:uppercase;color:#708078}.report-kpi strong{display:block;font-size:23px;margin-top:5px}
+.report-kpi.credit{border-top:3px solid #238856}.report-kpi.debit{border-top:3px solid #b84a42}.report-kpi.balance{border-top:3px solid #315c49}
+.report-chart-card{border:1px solid #dfe7e2;border-radius:14px;padding:16px;background:#fff}.report-chart-card h4{margin:0;color:#234a38}.report-chart-card small{font:9px Verdana,sans-serif;color:#75847c}
+.report-donut-layout{display:grid;grid-template-columns:280px 1fr;gap:24px;align-items:center;margin-top:15px}
+.report-donut{width:240px;height:240px;border-radius:50%;display:grid;place-items:center;background:#edf2ef;position:relative;margin:auto}
+.report-donut:after{content:'';position:absolute;inset:48px;background:#fff;border-radius:50%}
+.report-donut>div{z-index:1;text-align:center;width:120px}.report-donut>div small{display:block}.report-donut>div strong{display:block;margin-top:5px;font-size:17px}
+.report-legend{display:grid;gap:7px}.report-legend-row{display:grid;grid-template-columns:12px 1fr auto auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid #eef2ef;font:9px Verdana,sans-serif}
+.report-legend-dot{width:10px;height:10px;border-radius:50%}.report-legend-row b{font-size:10px}.report-legend-row em{font-style:normal;color:#718078}
+.statement-summary{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;background:#f3f7f4;border:1px solid #e0e7e3;border-radius:10px;margin-bottom:8px;font:9px Verdana,sans-serif}
+.statement-list{border:1px solid #e3e9e5;border-radius:12px;overflow:hidden}
+.statement-day{padding:8px 12px;background:#f4f7f5;border-top:1px solid #e5ebe7;font:9px Verdana,sans-serif;font-weight:700;color:#53665c}
+.statement-row{display:grid;grid-template-columns:1fr auto;gap:14px;padding:11px 12px;border-top:1px solid #edf1ee;background:#fff}
+.statement-row:first-child{border-top:0}.statement-row strong{font:11px Verdana,sans-serif}.statement-row small{display:block;margin-top:3px;font:8px Verdana,sans-serif;color:#77857e;line-height:1.5}.statement-amount{font:11px Verdana,sans-serif;font-weight:700;white-space:nowrap}.statement-amount.in{color:#17794a}.statement-amount.out{color:#a13a32}
+.report-breakdown{display:grid;gap:8px}.report-breakdown-row{display:grid;grid-template-columns:minmax(120px,1fr) 2fr auto;gap:10px;align-items:center;border:1px solid #e3e9e5;border-radius:10px;padding:10px;background:#fff;font:9px Verdana,sans-serif}.report-breakdown-track{height:8px;background:#edf2ef;border-radius:999px;overflow:hidden}.report-breakdown-track i{display:block;height:100%;background:#315c49;border-radius:999px}
+@media(max-width:760px){#finoraReportsPanel.section-modal-active{width:100vw!important}.report-filters{grid-template-columns:1fr 1fr}.report-kpis{grid-template-columns:1fr}.report-donut-layout{grid-template-columns:1fr}.report-donut{width:210px;height:210px}.report-legend-row{grid-template-columns:12px 1fr auto}.report-legend-row em{display:none}}
+@media(max-width:430px){.report-filters{grid-template-columns:1fr}.finora-report-head{align-items:flex-start;flex-direction:column}}
+@media print{body *{visibility:hidden!important}#finoraReportsPanel,#finoraReportsPanel *{visibility:visible!important}#finoraReportsPanel{position:absolute!important;left:0!important;top:0!important;width:100%!important;max-height:none!important;overflow:visible!important;transform:none!important}.popup-modal-close,.report-actions,.report-tabs{display:none!important}}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -2383,6 +2416,7 @@ button[data-finora-delete="card"]:disabled{
     <button type="button" onclick="openSectionModal('simpleAlertsPanel')"><span class="ico">◷</span>Alertas</button>
     <button type="button" onclick="openSectionModal('finoraMonthlySheet')"><span class="ico">▦</span>Planilha mensal</button>
     <button type="button" onclick="openSectionModal('finoraCategories')"><span class="ico">◫</span>Visão por categoria</button>
+    <button type="button" onclick="openReportsPanel()"><span class="ico">◉</span>Relatórios</button>
     <button type="button" id="familyAccessNav" onclick="openSectionModal('finoraFamilyAccess')"><span class="ico">♙</span>Família e acessos</button>
     <button type="button" onclick="openCloudModal()"><span class="ico">☁</span>Sincronização</button>
   </nav>
@@ -2586,6 +2620,51 @@ button[data-finora-delete="card"]:disabled{
     <button type="button" class="simple-action" onclick="shareCategoryImage()">Compartilhar imagem</button>
   </div>
   <div class="finora-figures" id="finoraCategoryFigures"></div>
+</section>
+
+
+<section class="popup-only-panel finora-reports-panel" id="finoraReportsPanel">
+  <div class="finora-report-head">
+    <div><h3>Relatórios</h3><small>Análise financeira do ambiente selecionado.</small></div>
+    <div class="report-actions">
+      <button type="button" class="simple-action" onclick="printFinoraReport()">Imprimir</button>
+      <button type="button" class="simple-action" onclick="exportFinoraReportCSV()">Exportar CSV</button>
+    </div>
+  </div>
+  <div class="report-filters">
+    <div class="field"><label>Mês / ano</label><input type="month" id="reportMonth" onchange="renderFinoraReports()"></div>
+    <div class="field"><label>Ambiente</label><input id="reportWorkspace" disabled></div>
+    <div class="field"><label>Pessoa</label><select id="reportPerson" onchange="renderFinoraReports()"><option value="">Todas</option></select></div>
+    <div class="field"><label>Categoria</label><select id="reportCategory" onchange="renderFinoraReports()"><option value="">Todas</option></select></div>
+    <div class="field"><label>Forma de pagamento</label><select id="reportPayment" onchange="renderFinoraReports()"><option value="">Todas</option></select></div>
+    <div class="field"><label>Cartão</label><select id="reportCard" onchange="renderFinoraReports()"><option value="">Todos</option></select></div>
+    <div class="field"><label>Status</label><select id="reportStatus" onchange="renderFinoraReports()"><option value="">Todos</option><option value="pago">Pago / recebido</option><option value="pendente">Pendente</option><option value="atrasado">Atrasado</option></select></div>
+    <div class="field"><label>Movimentação</label><select id="reportType" onchange="renderFinoraReports()"><option value="">Créditos e débitos</option><option value="entrada">Créditos</option><option value="saida">Débitos</option></select></div>
+  </div>
+  <div class="report-tabs">
+    <button class="active" data-report-tab="overview" onclick="setReportTab('overview',this)">Visão geral</button>
+    <button data-report-tab="statement" onclick="setReportTab('statement',this)">Extrato</button>
+    <button data-report-tab="category" onclick="setReportTab('category',this)">Categorias</button>
+    <button data-report-tab="person" onclick="setReportTab('person',this)">Por pessoa</button>
+    <button data-report-tab="payment" onclick="setReportTab('payment',this)">Formas de pagamento</button>
+    <button data-report-tab="cards" onclick="setReportTab('cards',this)">Cartões</button>
+  </div>
+  <div id="reportOverview" class="report-view active">
+    <div class="report-kpis">
+      <div class="report-kpi credit"><span>Créditos</span><strong id="reportCredits">R$ 0,00</strong></div>
+      <div class="report-kpi debit"><span>Débitos</span><strong id="reportDebits">R$ 0,00</strong></div>
+      <div class="report-kpi balance"><span>Saldo do período</span><strong id="reportBalance">R$ 0,00</strong></div>
+    </div>
+    <div class="report-chart-card">
+      <div><h4>Despesas por categoria</h4><small>Somente categorias com movimentação no período.</small></div>
+      <div class="report-donut-layout"><div class="report-donut" id="reportDonut"><div><small>Total de despesas</small><strong id="reportDonutTotal">R$ 0,00</strong></div></div><div class="report-legend" id="reportLegend"></div></div>
+    </div>
+  </div>
+  <div id="reportStatement" class="report-view">
+    <div class="statement-summary"><span id="statementCount">0 movimentações</span><strong id="statementNet">Saldo: R$ 0,00</strong></div>
+    <div class="statement-list" id="statementList"></div>
+  </div>
+  <div id="reportBreakdown" class="report-view"><div class="report-breakdown" id="reportBreakdownRows"></div></div>
 </section>
 
 <section class="popup-only-panel finora-cards-panel" id="finoraCardsPanel">
@@ -4685,6 +4764,7 @@ function openSectionModal(id){
   if(id==='finoraFamilyAccess')renderFamilyAccess();
   if(id==='finoraCategories')renderCategoryFigures();
   if(id==='simpleAlertsPanel')renderAlerts();
+  if(id==='finoraReportsPanel')renderFinoraReports();
 }
 function closeSectionModal(){
   if(activeSectionModalId){
@@ -7311,6 +7391,93 @@ $('adminAuthPassword')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.pre
     </div>
   </section>
 </div>
+
+
+<script>
+let finoraReportTab='overview';
+function reportEsc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function reportPaymentOf(x){return x.formaPagamento||x.paymentMethod||x.meioPagamento||''}
+function reportPersonOf(x){return x.expenseOwner||x.despesaDe||x.pessoa||'Família'}
+function reportCardName(x){
+  const c=accountCards().find(c=>String(c.id)===String(x.cardId||''));
+  return c?c.name:(x.cardName||'');
+}
+function fillReportSelect(id,values,allLabel){
+  const el=$(id);if(!el)return;const keep=el.value;
+  const vals=[...new Set(values.filter(Boolean).map(String))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  el.innerHTML=`<option value="">${allLabel}</option>`+vals.map(v=>`<option value="${reportEsc(v)}">${reportEsc(v)}</option>`).join('');
+  if(vals.includes(keep))el.value=keep;
+}
+function reportRows(){
+  const month=$('reportMonth')?.value||currentMonth(),person=$('reportPerson')?.value||'',cat=$('reportCategory')?.value||'',
+        payment=$('reportPayment')?.value||'',card=$('reportCard')?.value||'',status=$('reportStatus')?.value||'',type=$('reportType')?.value||'';
+  return data.filter(x=>sameWorkspace(x))
+    .filter(x=>(!month||recordMonth(x)===month)&&(!person||reportPersonOf(x)===person)&&(!cat||(x.categoria||'Outros')===cat)&&
+      (!payment||reportPaymentOf(x)===payment)&&(!card||String(x.cardId||'')===card)&&(!status||effectiveStatus(x)===status)&&(!type||x.tipo===type))
+    .sort((a,b)=>(referenceDate(b)||'').localeCompare(referenceDate(a)||''));
+}
+function populateReportFilters(){
+  const rows=data.filter(x=>sameWorkspace(x));
+  if(!$('reportMonth').value)$('reportMonth').value=$('filtroMes')?.value||currentMonth();
+  $('reportWorkspace').value=currentWorkspaceName||'Meu ambiente';
+  fillReportSelect('reportPerson',rows.map(reportPersonOf),'Todas');
+  fillReportSelect('reportCategory',rows.map(x=>x.categoria||'Outros'),'Todas');
+  fillReportSelect('reportPayment',rows.map(reportPaymentOf),'Todas');
+  const cards=accountCards(),el=$('reportCard'),keep=el.value;
+  el.innerHTML='<option value="">Todos</option>'+cards.map(c=>`<option value="${reportEsc(c.id)}">${reportEsc(c.name)}</option>`).join('');
+  if(cards.some(c=>String(c.id)===keep))el.value=keep;
+}
+function setReportTab(tab,btn){
+  finoraReportTab=tab;
+  document.querySelectorAll('.report-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.reportTab===tab));
+  $('reportOverview').classList.toggle('active',tab==='overview');
+  $('reportStatement').classList.toggle('active',tab==='statement');
+  $('reportBreakdown').classList.toggle('active',!['overview','statement'].includes(tab));
+  renderFinoraReports();
+}
+function openReportsPanel(){openSectionModal('finoraReportsPanel')}
+function renderReportDonut(rows){
+  const sums={};rows.filter(x=>x.tipo==='saida'&&simpleKnownValue(x)).forEach(x=>{const k=x.categoria||'Outros';sums[k]=(sums[k]||0)+Number(x.valor||0)});
+  const items=Object.entries(sums).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]),total=items.reduce((s,[,v])=>s+v,0);
+  $('reportDonutTotal').textContent=money(total);
+  const colors=['#0f5a3e','#2f7d5a','#70a083','#b98b43','#8b6f47','#a54a45','#5c7568','#9bb6a7','#34483e','#c3a86c','#7b8e84','#d3c3a0'];
+  if(!total){$('reportDonut').style.background='#edf2ef';$('reportLegend').innerHTML='<div class="empty">Nenhuma despesa no período.</div>';return}
+  let acc=0,parts=[];
+  items.forEach(([k,v],i)=>{const a=acc/total*360;acc+=v;const b=acc/total*360;parts.push(`${colors[i%colors.length]} ${a}deg ${b}deg`)});
+  $('reportDonut').style.background=`conic-gradient(${parts.join(',')})`;
+  $('reportLegend').innerHTML=items.map(([k,v],i)=>`<div class="report-legend-row"><i class="report-legend-dot" style="background:${colors[i%colors.length]}"></i><b>${reportEsc(k)}</b><em>${(v/total*100).toFixed(1).replace('.',',')}%</em><span>${money(v)}</span></div>`).join('');
+}
+function renderReportStatement(rows){
+  const known=rows.filter(simpleKnownValue),net=known.reduce((s,x)=>s+(x.tipo==='entrada'?Number(x.valor||0):-Number(x.valor||0)),0);
+  $('statementCount').textContent=`${rows.length} movimentaç${rows.length===1?'ão':'ões'}`;$('statementNet').textContent=`Saldo: ${money(net)}`;
+  if(!rows.length){$('statementList').innerHTML='<div class="empty">Nenhuma movimentação encontrada com os filtros selecionados.</div>';return}
+  let last='';
+  $('statementList').innerHTML=rows.map(x=>{
+    const d=referenceDate(x)||'',day=d?new Date(d+'T12:00:00').toLocaleDateString('pt-BR'):'Sem data',head=day!==last?(last=day,`<div class="statement-day">${day}</div>`):'';
+    const val=Number(x.valor||0),sign=x.tipo==='entrada'?'+':'−',meta=[reportPersonOf(x),x.categoria,reportPaymentOf(x),reportCardName(x),effectiveStatus(x)].filter(Boolean).join(' · ');
+    return `${head}<div class="statement-row"><div><strong>${reportEsc(x.descricao||'Movimentação')}</strong><small>${reportEsc(meta)}</small></div><div class="statement-amount ${x.tipo==='entrada'?'in':'out'}">${sign} ${simpleKnownValue(x)?money(val):'Valor pendente'}</div></div>`;
+  }).join('');
+}
+function renderReportBreakdown(rows,tab){
+  let getter=tab==='category'?(x=>x.categoria||'Outros'):tab==='person'?reportPersonOf:tab==='payment'?(x=>reportPaymentOf(x)||'Não informado'):(x=>reportCardName(x)||'Sem cartão');
+  const sums={};rows.filter(x=>x.tipo==='saida'&&simpleKnownValue(x)).forEach(x=>{const k=getter(x);sums[k]=(sums[k]||0)+Number(x.valor||0)});
+  const items=Object.entries(sums).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]),max=items[0]?.[1]||1;
+  $('reportBreakdownRows').innerHTML=items.length?items.map(([k,v])=>`<div class="report-breakdown-row"><strong>${reportEsc(k)}</strong><div class="report-breakdown-track"><i style="width:${v/max*100}%"></i></div><span>${money(v)}</span></div>`).join(''):'<div class="empty">Nenhuma despesa encontrada para esta análise.</div>';
+}
+function renderFinoraReports(){
+  if(!$('finoraReportsPanel'))return;populateReportFilters();const rows=reportRows(),known=rows.filter(simpleKnownValue);
+  const credits=known.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0),debits=known.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0);
+  $('reportCredits').textContent=money(credits);$('reportDebits').textContent=money(debits);$('reportBalance').textContent=money(credits-debits);
+  renderReportDonut(rows);renderReportStatement(rows);if(!['overview','statement'].includes(finoraReportTab))renderReportBreakdown(rows,finoraReportTab);
+}
+function exportFinoraReportCSV(){
+  const rows=reportRows();const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const lines=[['Data','Tipo','Descrição','Pessoa','Categoria','Forma de pagamento','Cartão','Status','Valor'].map(q).join(';')];
+  rows.forEach(x=>lines.push([referenceDate(x),x.tipo==='entrada'?'Crédito':'Débito',x.descricao,reportPersonOf(x),x.categoria||'',reportPaymentOf(x),reportCardName(x),effectiveStatus(x),simpleKnownValue(x)?Number(x.valor||0).toFixed(2).replace('.',','):''].map(q).join(';')));
+  const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`FINORA_relatorio_${$('reportMonth').value||'periodo'}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
+}
+function printFinoraReport(){window.print()}
+</script>
 
 </body>
 </html>
