@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v61-x-e-despesas-limpos">
+<meta name="finora-version" content="v63-despesa-de">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -2242,6 +2242,84 @@ button[data-finora-delete]{
   }
 }
 
+
+/* FINORA v62 — cor personalizada dos cartões */
+.card-color-picker{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:9px;
+  min-height:46px;
+  padding:8px 10px;
+  border:1px solid #d3ddd7;
+  border-radius:14px;
+  background:#fff;
+}
+.card-color-swatch{
+  width:30px!important;
+  height:30px!important;
+  min-width:30px!important;
+  padding:0!important;
+  border-radius:50%!important;
+  background:var(--swatch)!important;
+  border:3px solid #fff!important;
+  box-shadow:0 0 0 1px #cdd8d2!important;
+  transform:none!important;
+}
+.card-color-swatch:hover{
+  transform:scale(1.07)!important;
+}
+.card-color-swatch.selected{
+  box-shadow:0 0 0 3px rgba(24,103,69,.24),0 0 0 1px #195f46 inset!important;
+}
+.card-color-custom{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-height:32px;
+  padding:3px 8px;
+  border:1px solid #d6e1db;
+  border-radius:999px;
+  color:#345249;
+  font-size:10px;
+  cursor:pointer;
+  background:#f7faf8;
+}
+.card-color-custom input[type="color"]{
+  width:28px!important;
+  height:28px!important;
+  min-height:28px!important;
+  padding:2px!important;
+  border-radius:50%!important;
+  border:0!important;
+  background:transparent!important;
+  cursor:pointer;
+}
+.finora-card-visual{
+  transition:background .22s ease,box-shadow .22s ease!important;
+}
+@media(max-width:820px){
+  .card-color-picker{gap:8px}
+  .card-color-swatch{
+    width:32px!important;
+    height:32px!important;
+    min-width:32px!important;
+  }
+}
+
+
+/* FINORA v63 — identificação de quem é a despesa */
+.expense-owner-field{
+  animation:finoraExpenseOwnerIn .16s ease-out;
+}
+@keyframes finoraExpenseOwnerIn{
+  from{opacity:0;transform:translateY(-3px)}
+  to{opacity:1;transform:translateY(0)}
+}
+#simpleLaunchPanel.launch-entry-mode #expenseOwnerField{
+  display:none!important;
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -2529,6 +2607,26 @@ button[data-finora-delete]{
         <option value="outra">Outra</option>
       </select>
     </div>
+    <div class="field card-color-field">
+      <label>Cor do cartão</label>
+      <div class="card-color-picker" id="cardColorPicker">
+        <input type="hidden" id="cardColor" value="#0b3d2e">
+        <button type="button" class="card-color-swatch selected" data-card-color="#0b3d2e" style="--swatch:#0b3d2e" aria-label="Verde escuro" title="Verde escuro"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#145c44" style="--swatch:#145c44" aria-label="Verde" title="Verde"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#1f7a4c" style="--swatch:#1f7a4c" aria-label="Verde folha" title="Verde folha"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#1f4f73" style="--swatch:#1f4f73" aria-label="Azul petróleo" title="Azul petróleo"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#263238" style="--swatch:#263238" aria-label="Grafite" title="Grafite"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#111111" style="--swatch:#111111" aria-label="Preto" title="Preto"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#6d4c41" style="--swatch:#6d4c41" aria-label="Marrom" title="Marrom"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#8b2f3c" style="--swatch:#8b2f3c" aria-label="Vinho" title="Vinho"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#7b5ea7" style="--swatch:#7b5ea7" aria-label="Roxo" title="Roxo"></button>
+        <label class="card-color-custom" title="Escolher outra cor">
+          <span>Outra</span>
+          <input type="color" id="cardColorCustom" value="#0b3d2e">
+        </label>
+      </div>
+      <div class="file-note">Escolha a cor visual do cartão. Ela aparecerá em “Cartões cadastrados”.</div>
+    </div>
     <div class="field"><label>Categoria padrão do cartão</label>
       <select id="cardDefaultCategory">
         <option value="">Sem categoria padrão</option>
@@ -2704,6 +2802,11 @@ button[data-finora-delete]{
     <div class="field">
       <label>Pessoa</label>
       <select id="pessoa" required></select>
+    </div>
+    <div class="field expense-owner-field" id="expenseOwnerField">
+      <label>Despesa de</label>
+      <select id="expenseOwner"></select>
+      <div class="file-note">Selecione de quem é esta despesa. Use “Família / compartilhada” quando o gasto for de todos.</div>
     </div>
     <div class="field full">
       <label>Descrição</label>
@@ -3692,6 +3795,30 @@ function loadFinoraCards(){
 }
 function saveFinoraCards(cards){localStorage.setItem(FINORA_CARDS_KEY,JSON.stringify(cards))}
 function accountCards(){return loadFinoraCards().filter(c=>c.workspaceId===currentWorkspaceId)}
+
+function setCardColor(value){
+  const color=String(value||'#0b3d2e');
+  if($('cardColor'))$('cardColor').value=color;
+  if($('cardColorCustom'))$('cardColorCustom').value=color;
+  document.querySelectorAll('#cardColorPicker .card-color-swatch').forEach(btn=>{
+    btn.classList.toggle('selected',String(btn.dataset.cardColor||'').toLowerCase()===color.toLowerCase());
+  });
+}
+function installCardColorPicker(){
+  const picker=$('cardColorPicker');
+  if(!picker || picker.dataset.ready==='1')return;
+  picker.dataset.ready='1';
+
+  picker.addEventListener('click',e=>{
+    const btn=e.target.closest('.card-color-swatch');
+    if(!btn)return;
+    e.preventDefault();
+    setCardColor(btn.dataset.cardColor);
+  });
+
+  $('cardColorCustom')?.addEventListener('input',e=>setCardColor(e.target.value));
+}
+
 function fillCardOwners(){
   const el=$('cardOwner'); if(!el)return;
   el.innerHTML=people().map(p=>`<option>${p}</option>`).join('');
@@ -3705,6 +3832,8 @@ function toggleCardForm(force){
   const show=force===undefined?!$('cardFormPanel')?.classList.contains('section-modal-active'):force;
   if(show){
     fillCardOwners();
+    installCardColorPicker();
+    if(!$('cardEditId')?.value)setCardColor('#0b3d2e');
     openSectionModal('cardFormPanel');
   }else if(activeSectionModalId==='cardFormPanel'){
     closeSectionModal();
@@ -3713,26 +3842,26 @@ function toggleCardForm(force){
 function openCardPanel(){openSectionModal('finoraCardsPanel')}
 function scrollFinora(id){$(id)?.scrollIntoView({behavior:'smooth',block:'start'})}
 async function saveFinoraCard(){
-  const name=$('cardName').value.trim(),issuer=$('cardIssuer').value.trim(),owner=$('cardOwner').value,last4=$('cardLast4').value.replace(/\D/g,''),expiry=$('cardExpiry').value.trim(),dueDay=Number($('cardDueDay').value||0),brandChoice=$('cardBrand').value,defaultCategory=$('cardDefaultCategory').value;
+  const name=$('cardName').value.trim(),issuer=$('cardIssuer').value.trim(),owner=$('cardOwner').value,last4=$('cardLast4').value.replace(/\D/g,''),expiry=$('cardExpiry').value.trim(),dueDay=Number($('cardDueDay').value||0),brandChoice=$('cardBrand').value,defaultCategory=$('cardDefaultCategory').value,cardColor=$('cardColor')?.value||'#0b3d2e';
   const brand=brandChoice==='auto'?inferCardBrand(name,issuer):brandChoice;
   if(dueDay&&(dueDay<1||dueDay>31))return toast('Informe um dia de vencimento entre 1 e 31.');
   if(!name)return toast('Informe o nome do cartão.');
   if(last4&&last4.length!==4)return toast('Informe apenas os 4 últimos dígitos.');
   const cards=loadFinoraCards(),id=$('cardEditId').value||(crypto.randomUUID?crypto.randomUUID():String(Date.now()));
   const existing=cards.find(c=>c.id===id);
-  const row={...(existing||{}),id,account:'family',workspaceId:currentWorkspaceId,name,issuer,owner,last4,expiry,dueDay,brand,defaultCategory,updatedAt:new Date().toISOString()};
+  const row={...(existing||{}),id,account:'family',workspaceId:currentWorkspaceId,name,issuer,owner,last4,expiry,dueDay,brand,defaultCategory,cardColor,updatedAt:new Date().toISOString()};
   const idx=cards.findIndex(c=>c.id===id);if(idx>=0)cards[idx]=row;else cards.push(row);
   saveFinoraCards(cards);saveCardTombstones(loadCardTombstones().filter(t=>t.id!==id));
   renderFinoraCards();fillLaunchCards();
   try{if(cloudConfigured())await pushCloudState(false);toast(existing?'Cartão atualizado e sincronizado.':'Cartão cadastrado e sincronizado.')}
   catch(e){console.error(e);scheduleCloudPush();toast('Cartão salvo neste aparelho. A sincronização será repetida.')}
   ['cardEditId','cardName','cardIssuer','cardLast4','cardExpiry','cardDueDay'].forEach(fid=>$(fid).value='');
-  $('cardDefaultCategory').value='';$('cardBrand').value='auto';toggleCardForm(false);
+  $('cardDefaultCategory').value='';$('cardBrand').value='auto';setCardColor('#0b3d2e');toggleCardForm(false);
 }
 function editFinoraCard(id){
   const c=loadFinoraCards().find(x=>x.id===id);if(!c)return;
   $('cardEditId').value=c.id;$('cardName').value=c.name||'';$('cardIssuer').value=c.issuer||'';$('cardLast4').value=c.last4||'';$('cardExpiry').value=c.expiry||'';$('cardDueDay').value=c.dueDay||'';$('cardBrand').value=c.brand||'auto';$('cardDefaultCategory').value=c.defaultCategory||'';
-  fillCardOwners();$('cardOwner').value=c.owner||people()[0];toggleCardForm(true);
+  fillCardOwners();$('cardOwner').value=c.owner||people()[0];installCardColorPicker();setCardColor(c.cardColor||'#0b3d2e');toggleCardForm(true);
 }
 async function deleteFinoraCard(id){
   const card=loadFinoraCards().find(c=>String(c.id)===String(id)&&c.workspaceId===currentWorkspaceId);
@@ -3745,6 +3874,7 @@ async function deleteFinoraCard(id){
     renderFinoraCards();
     fillLaunchCards();
   fillPaymentAccounts();
+  fillExpenseOwners($('expenseOwner')?.value||$('pessoa')?.value||'');
 
     if(cloudConfigured()){
       const ok=await pushCloudState(false);
@@ -3770,7 +3900,7 @@ function renderFinoraCards(){
   box.innerHTML=cards.length?cards.map(c=>{
     const brand=c.brand&&c.brand!=='auto'?c.brand:inferCardBrand(c.name,c.issuer);
     return `<div class="finora-card-item">
-      <div class="finora-card-visual">
+      <div class="finora-card-visual" style="background:linear-gradient(135deg,${esc(c.cardColor||'#0b3d2e')} 0%,${esc(c.cardColor||'#0b3d2e')} 72%,rgba(255,255,255,.10) 72%)!important;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div class="brandname">${esc(c.issuer||'CARTÃO')}</div>
           <div class="card-brand-logo">${cardBrandMarkup(brand)}</div>
@@ -4717,7 +4847,7 @@ function render(){
     const st=effectiveStatus(x);
     return `<tr>
       <td><strong>${esc(x.descricao)}</strong>${launchMetaHtml(x)?`<br>${launchMetaHtml(x)}`:''}</td>
-      <td>${esc(x.pessoa)}</td>
+      <td>${esc(x.tipo==='saida'?(x.expenseOwner||x.pessoa):x.pessoa)}</td>
       <td>${x.vencimento?dateBR(x.vencimento):''}</td>
       <td><span class="badge ${st}">${x.tipo==='entrada'?(st==='pago'?'Recebido':st==='atrasado'?'Recebimento atrasado':'A receber'):(st==='pago'?'Pago':st==='atrasado'?'Atrasado':'Pendente')}</span></td>
       <td class="money ${x.tipo==='entrada'?'in':'out'}">${x.valorPendente?'<span style="color:#855f22">Valor a definir</span>':`${x.tipo==='entrada'?'+':'−'} ${money(x.valor)}`}</td>
@@ -4738,8 +4868,11 @@ function resetForm(){
   $('cancelEdit').style.display='none';$('dataLancamento').value=today();$('recorrente').value='nao';$('valorRecorrente').value='mesmo';$('recRule').value='fixo';fillPeople();editingAttachment=null;
   $('fileInfo').textContent='O arquivo fica salvo somente neste navegador.';
   if($('paymentAccount'))$('paymentAccount').value='';
+  if($('expenseOwner'))$('expenseOwner').value='';
   fillPaymentAccounts();
+  fillExpenseOwners($('pessoa')?.value||'');
   updatePaymentAccountField();
+  updateExpenseOwnerField();
   if(currentLaunchMode==='entrada')$('tipo').value='entrada';
   else if(currentLaunchMode==='saida')$('tipo').value='saida';
   
@@ -4801,6 +4934,29 @@ function launchMetaHtml(x){
   return `<span class="finora-launch-meta">${parts.join('<span class="meta-dot">·</span>')}</span>`;
 }
 
+
+function fillExpenseOwners(selected=''){
+  const el=$('expenseOwner');
+  if(!el)return;
+  const names=people();
+  const options=[
+    '<option value="Família / compartilhada">Família / compartilhada</option>',
+    ...names.map(name=>`<option value="${esc(name)}">${esc(name)}</option>`)
+  ];
+  el.innerHTML=options.join('');
+  const preferred=selected || $('pessoa')?.value || names[0] || 'Família / compartilhada';
+  el.value=options.some(o=>o.includes(`value="${preferred.replace(/"/g,'&quot;')}"`))
+    ? preferred
+    : (names.includes(preferred)?preferred:'Família / compartilhada');
+}
+function updateExpenseOwnerField(){
+  const field=$('expenseOwnerField');
+  if(!field)return;
+  const isExpense=$('tipo')?.value==='saida';
+  field.style.display=isExpense?'block':'none';
+  if(isExpense && !$('expenseOwner')?.value)fillExpenseOwners($('pessoa')?.value||'');
+}
+
 function updateTypeLabels(){
   const entrada=$('tipo').value==='entrada';
   const lbl=$('dateTargetLabel');
@@ -4814,6 +4970,7 @@ function updateTypeLabels(){
     status.value=current;
   }
   updatePaymentAccountField();
+  updateExpenseOwnerField();
 }
 
 function autoValorRecorrente(){
@@ -4834,6 +4991,12 @@ function autoValorRecorrente(){
   const el=$(id); if(el){el.addEventListener('input',autoValorRecorrente);el.addEventListener('change',autoValorRecorrente);}
 });
 $('tipo').addEventListener('change',updateTypeLabels);
+$('pessoa')?.addEventListener('change',()=>{
+  if($('tipo')?.value==='saida'){
+    const current=$('expenseOwner')?.value||'';
+    if(!current || current==='Família / compartilhada')fillExpenseOwners($('pessoa').value);
+  }
+});
 $('forma')?.addEventListener('change',()=>{
   updatePaymentAccountField();
   autoValorRecorrente();
@@ -4853,7 +5016,9 @@ $('entryForm').addEventListener('submit',async e=>{
   let recRuleVal=$('recRule').value||'fixo';
 
 
-  const row={id,account:'family',workspaceId:currentWorkspaceId,tipo:$('tipo').value,pessoa:$('pessoa').value,descricao:descVal,
+  const row={id,account:'family',workspaceId:currentWorkspaceId,tipo:$('tipo').value,pessoa:$('pessoa').value,
+    expenseOwner:$('tipo').value==='saida'?($('expenseOwner')?.value||$('pessoa').value):'',
+    descricao:descVal,
     categoria:$('categoria').value.trim(),essentialType:$('tipo').value==='saida'?$('essentialType').value:'',valor:Number($('valor').value),dataLancamento:dataLancVal,
     vencimento:vencVal,status:$('status').value,recorrente:recorrenciaVal,recRule:recRuleVal,
     valorRecorrente:$('valorRecorrente').value,valorPendente:false,beneficiario:$('beneficiario').value.trim(),parcelas:$('parcelas').value.trim(),cardId:$('launchCard')?.value||'',forma:$('forma').value,
@@ -4871,7 +5036,7 @@ function editRow(id){
   const x=data.find(r=>r.id===id);if(!x)return;
   openSectionModal('simpleLaunchPanel');
   applyLaunchMode(x.tipo==='entrada'?'entrada':'saida',{keepForm:true});
-  $('editId').value=x.id;$('tipo').value=x.tipo;fillPeople(x.pessoa);$('descricao').value=x.descricao;
+  $('editId').value=x.id;$('tipo').value=x.tipo;fillPeople(x.pessoa);fillExpenseOwners(x.expenseOwner||x.pessoa||'');$('descricao').value=x.descricao;
   $('categoria').value=x.categoria||'';$('essentialType').value=x.essentialType||inferEssentialType(x);$('valor').value=x.valor;$('dataLancamento').value=x.dataLancamento||today();
   $('vencimento').value=x.vencimento||'';$('beneficiario').value=x.beneficiario||'';$('parcelas').value=x.parcelas||'';fillLaunchCards(x.cardId||'');$('status').value=x.status;$('recorrente').value=x.recorrente||'nao';$('valorRecorrente').value=x.valorRecorrente||'mesmo';$('recRule').value=x.recRule||'fixo';$('forma').value=x.forma||'Boleto';$('observacao').value=x.observacao||'';
   fillPaymentAccounts(x.paymentAccount||'');
@@ -5028,8 +5193,8 @@ $('clearAccount').onclick=async()=>{
 };
 $('exportCsv').onclick=()=>{
   const rows=data.filter(x=>sameWorkspace(x));
-  const headers=['Tipo','Pessoa','Descrição','Categoria','Valor','Data','Vencimento','Status','Forma de pagamento','Conta / origem do pagamento','Observação'];
-  const csv=[headers,...rows.map(x=>[x.tipo,x.pessoa,x.descricao,x.categoria,x.valor,x.dataLancamento,x.vencimento,effectiveStatus(x),x.forma,x.paymentAccount||'',x.observacao])]
+  const headers=['Tipo','Pessoa','Despesa de','Descrição','Categoria','Valor','Data','Vencimento','Status','Forma de pagamento','Conta / origem do pagamento','Observação'];
+  const csv=[headers,...rows.map(x=>[x.tipo,x.pessoa,x.tipo==='saida'?(x.expenseOwner||x.pessoa):'',x.descricao,x.categoria,x.valor,x.dataLancamento,x.vencimento,effectiveStatus(x),x.forma,x.paymentAccount||'',x.observacao])]
     .map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n');
   const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download=`controle-${account}-${today()}.csv`;a.click();URL.revokeObjectURL(a.href);
