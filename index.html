@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v52-ambientes">
+<meta name="finora-version" content="v53-convite-usuario-existente">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -1336,7 +1336,7 @@ body.section-modal-open{overflow:hidden}
     <div id="joinWorkspaceFields" style="display:none">
       <div class="auth-field"><label>Ambiente permitido</label><select id="regAllowedWorkspace"><option value="">Abra o link do convite</option></select></div>
       <div class="auth-field"><label>Código recebido por e-mail</label><input id="regInviteCode" autocomplete="off" placeholder="Convite preenchido automaticamente pelo link"></div>
-      <div class="auth-family-badge">O administrador define o ambiente autorizado. Ao abrir o link, você verá somente o ambiente permitido e concluirá o cadastro nele.</div>
+      <div class="auth-family-badge">O administrador define o ambiente autorizado. Se você já possui conta FINORA, informe a senha atual para adicionar este ambiente à mesma conta.</div>
     </div>
 
     <div class="auth-field"><label>Senha</label><input id="regPass" type="password" placeholder="Mínimo 6 caracteres"></div>
@@ -4895,7 +4895,7 @@ $('doRegister').addEventListener('click',async()=>{
 
   if(mode==='create'){
     const workspaceName=$('regWorkspaceName').value.trim();
-    if(!workspaceName)return authErr('Informe um nome para o ambiente financeiro.');
+    if(!workspaceName)return authErr('Informe o ambiente.');
     workspace={
       id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),
       name:workspaceName,
@@ -4913,33 +4913,96 @@ $('doRegister').addEventListener('click',async()=>{
 
     const selectedAllowed=$('regAllowedWorkspace')?.value||portable.workspaceId;
     const allowedIds=(Array.isArray(portable.allowedWorkspaces)?portable.allowedWorkspaces:[]).map(w=>w.id);
-    if(allowedIds.length&&!allowedIds.includes(selectedAllowed))return authErr('O ambiente selecionado não está autorizado por este convite.');
+    if(allowedIds.length&&!allowedIds.includes(selectedAllowed))
+      return authErr('O ambiente selecionado não está autorizado por este convite.');
+
     const allowedInfo=(portable.allowedWorkspaces||[]).find(w=>w.id===selectedAllowed);
-    workspace={id:selectedAllowed,name:allowedInfo?.name||portable.workspaceName||'Ambiente familiar',importedFromInvite:true,createdAt:new Date().toISOString()};
+    workspace={
+      id:selectedAllowed,
+      name:allowedInfo?.name||portable.workspaceName||'Ambiente familiar',
+      importedFromInvite:true,
+      createdAt:new Date().toISOString()
+    };
     role='member';
   }
 
   try{
-    const signup=await client.auth.signUp({
-      email,
-      password:p,
-      options:{data:{name,finora:true}}
-    });
-    if(signup.error)throw signup.error;
-    if(!signup.data?.user)throw new Error('Não foi possível criar a conta online.');
-    if(!signup.data?.session){
-      throw new Error('Conta criada. Confirme seu e-mail e depois use a aba “Entrar”.');
+    let authUser=null;
+    let existingAccount=false;
+
+    // Convite para alguém que já possui conta FINORA:
+    // em vez de tentar criar outro auth.users, autenticamos e adicionamos o novo ambiente.
+    if(mode==='join'){
+      const login=await client.auth.signInWithPassword({email,password:p});
+      if(!login.error && login.data?.user){
+        authUser=login.data.user;
+        existingAccount=true;
+      }else{
+        const msg=String(login.error?.message||'');
+        // Só tenta signUp quando o erro realmente indica que a conta não existe/credencial inválida.
+        const signup=await client.auth.signUp({
+          email,
+          password:p,
+          options:{data:{name,finora:true}}
+        });
+
+        if(signup.error){
+          // Se signUp informa conta existente, a senha fornecida não autenticou essa conta.
+          if(/already registered|already been registered|user already exists/i.test(String(signup.error.message||''))){
+            return authErr('Este e-mail já possui conta FINORA. Informe a senha atual dessa conta para aceitar o novo ambiente.');
+          }
+          throw signup.error;
+        }
+
+        if(!signup.data?.user)throw new Error('Não foi possível criar a conta online.');
+        if(!signup.data?.session){
+          throw new Error('Conta criada. Confirme seu e-mail e depois abra novamente o convite.');
+        }
+        authUser=signup.data.user;
+      }
+    }else{
+      const signup=await client.auth.signUp({
+        email,
+        password:p,
+        options:{data:{name,finora:true}}
+      });
+      if(signup.error)throw signup.error;
+      if(!signup.data?.user)throw new Error('Não foi possível criar a conta online.');
+      if(!signup.data?.session){
+        throw new Error('Conta criada. Confirme seu e-mail e depois use a aba “Entrar”.');
+      }
+      authUser=signup.data.user;
     }
 
-    const profile=await upsertOwnFinoraProfile({
-      user_id:signup.data.user.id,
-      name,
-      email,
-      cpf_hash:cpfHash,
-      cpf_masked:maskCPF(cpf),
-      workspace_id:workspace.id,
-      role
-    });
+    if(!authUser)throw new Error('Não foi possível identificar a conta autenticada.');
+
+    // Perfil: para conta existente, preservamos o perfil principal;
+    // o novo vínculo de ambiente fica em finora_workspace_members.
+    let profile=await authProfileByUserId(authUser.id);
+
+    if(!profile){
+      profile=await upsertOwnFinoraProfile({
+        user_id:authUser.id,
+        name,
+        email,
+        cpf_hash:cpfHash,
+        cpf_masked:maskCPF(cpf),
+        workspace_id:workspace.id,
+        role
+      });
+    }else{
+      // Corrige CPF/nome apenas quando faltarem no perfil existente.
+      const patch={
+        user_id:authUser.id,
+        name:profile.name||name,
+        email:profile.email||email,
+        cpf_hash:profile.cpf_hash||cpfHash,
+        cpf_masked:profile.cpf_masked||maskCPF(cpf),
+        workspace_id:profile.workspace_id||workspace.id,
+        role:profile.role||role
+      };
+      profile=await upsertOwnFinoraProfile(patch);
+    }
 
     if(mode==='join'){
       const {error:joinError}=await client.rpc('finora_join_workspace',{p_workspace_id:workspace.id});
@@ -4952,7 +5015,6 @@ $('doRegister').addEventListener('click',async()=>{
     else workspaces.push(workspace);
     saveFinoraWorkspaces(workspaces);
 
-    // Keep a local receipt of the invitation for the current UI/history only.
     if(mode==='join'&&portable){
       let localInvites=loadFinoraInvites();
       const rawCode=$('regInviteCode').value.trim();
@@ -4963,7 +5025,7 @@ $('doRegister').addEventListener('click',async()=>{
         localInvites.push({
           id:portable.nonce||String(Date.now()),
           protocolVersion:portable.v||FINORA_INVITE_PROTOCOL_VERSION,
-          workspaceId:portable.workspaceId,
+          workspaceId:workspace.id,
           email:portable.email,
           name:portable.name||'',
           code:rawCode,
@@ -4977,21 +5039,38 @@ $('doRegister').addEventListener('click',async()=>{
       saveFinoraInvites(localInvites);
     }
 
+    // Recarrega ambientes online já com o novo vínculo
     const user=await cacheAuthProfile(profile);
     localStorage.setItem(FINORA_SESSION_KEY,user.id);
     clearInviteFromLocation();
-    await openFinora(user);
 
-    // First administrator creates the initial shared state.
+    await refreshOnlineWorkspaces();
+
+    // Abre diretamente no ambiente recém-aceito.
+    localStorage.setItem('finora_active_workspace_v52',workspace.id);
+    await openFinora({...user,workspaceId:workspace.id});
+
     if(role==='admin')await pushCloudState(false);
 
+    if(mode==='join'){
+      toast(existingAccount
+        ? `Acesso ao ambiente ${workspace.name} adicionado à sua conta.`
+        : `Conta criada e acesso ao ambiente ${workspace.name} liberado.`);
+    }
+
   }catch(e){
-    console.error('FINORA online registration',e);
-    const msg=String(e?.message||'Não foi possível criar sua conta.');
-    if(/already registered|already been registered|user already exists/i.test(msg))
-      return authErr('Este e-mail já possui conta online. Use a aba “Entrar”.');
-    if(/duplicate|cpf_hash|unique/i.test(msg))
+    console.error('FINORA online registration/join',e);
+    const msg=String(e?.message||'Não foi possível concluir o acesso.');
+
+    if(/already registered|already been registered|user already exists/i.test(msg)){
+      return authErr('Este e-mail já possui conta FINORA. Informe a senha atual dessa conta para aceitar o novo ambiente.');
+    }
+    if(/Invalid login credentials/i.test(msg)){
+      return authErr('Este e-mail já possui conta FINORA, mas a senha informada não confere.');
+    }
+    if(/duplicate|cpf_hash|unique/i.test(msg)){
       return authErr('Este CPF ou e-mail já está vinculado a uma conta FINORA.');
+    }
     authErr(msg);
   }
 });
