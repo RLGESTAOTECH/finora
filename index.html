@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v78-pessoa-nao-reseta">
+<meta name="finora-version" content="v79-filtro-periodo-relatorios">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3031,6 +3031,17 @@ body > .user-chip{
   letter-spacing:.01em;
 }
 
+
+/* FINORA v79 — período em dias nos Relatórios */
+.report-period-field{grid-column:span 2}
+.report-custom-dates{display:none;grid-column:span 2;grid-template-columns:1fr 1fr;gap:9px}
+.report-custom-dates.open{display:grid}
+.report-period-hint{grid-column:1/-1;font:8px Verdana,sans-serif;color:#74827a;margin-top:-3px}
+@media(max-width:760px){
+  .report-period-field,.report-custom-dates{grid-column:1/-1}
+  .report-custom-dates{grid-template-columns:1fr}
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -3307,6 +3318,22 @@ body > .user-chip{
   </div>
   <div class="report-filters">
     <div class="field"><label>Mês / ano</label><input type="month" id="reportMonth" onchange="renderFinoraReports()"></div>
+    <div class="field report-period-field"><label>Período</label>
+      <select id="reportPeriod" onchange="onReportPeriodChange()">
+        <option value="month">Mês selecionado</option>
+        <option value="7">Últimos 7 dias</option>
+        <option value="15">Últimos 15 dias</option>
+        <option value="30">Últimos 30 dias</option>
+        <option value="60">Últimos 60 dias</option>
+        <option value="90">Últimos 90 dias</option>
+        <option value="custom">Personalizado</option>
+      </select>
+    </div>
+    <div class="report-custom-dates" id="reportCustomDates">
+      <div class="field"><label>De</label><input type="date" id="reportDateFrom" onchange="renderFinoraReports()"></div>
+      <div class="field"><label>Até</label><input type="date" id="reportDateTo" onchange="renderFinoraReports()"></div>
+    </div>
+
     <div class="field"><label>Ambiente</label><input id="reportWorkspace" disabled></div>
     <div class="field"><label>Pessoa</label><select id="reportPerson" onchange="renderFinoraReports()"><option value="">Todas</option></select></div>
     <div class="field"><label>Categoria</label><select id="reportCategory" onchange="renderFinoraReports()"><option value="">Todas</option></select></div>
@@ -8266,10 +8293,64 @@ function fillReportSelect(id,values,allLabel){
   el.innerHTML=`<option value="">${allLabel}</option>`+vals.map(v=>`<option value="${reportEsc(v)}">${reportEsc(v)}</option>`).join('');
   if(vals.includes(keep))el.value=keep;
 }
+
+function reportISODate(value){
+  if(!value)return '';
+  const s=String(value).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
+  const br=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if(br)return `${br[3]}-${br[2]}-${br[1]}`;
+  const d=new Date(s);
+  if(Number.isNaN(d.getTime()))return '';
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function reportPeriodBounds(){
+  const mode=$('reportPeriod')?.value||'month';
+  const month=$('reportMonth')?.value||'';
+  if(mode==='month'){
+    if(!month)return {from:'',to:''};
+    const [y,m]=month.split('-').map(Number);
+    const last=new Date(y,m,0).getDate();
+    return {from:`${month}-01`,to:`${month}-${String(last).padStart(2,'0')}`};
+  }
+  if(mode==='custom'){
+    return {from:$('reportDateFrom')?.value||'',to:$('reportDateTo')?.value||''};
+  }
+  const days=Number(mode);
+  if(days>0){
+    const end=new Date();
+    const start=new Date(end);
+    start.setDate(end.getDate()-(days-1));
+    const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    return {from:iso(start),to:iso(end)};
+  }
+  return {from:'',to:''};
+}
+function reportDateMatchesPeriod(x){
+  const iso=reportISODate(referenceDate(x));
+  if(!iso)return false;
+  const {from,to}=reportPeriodBounds();
+  return (!from||iso>=from)&&(!to||iso<=to);
+}
+function onReportPeriodChange(){
+  const custom=$('reportPeriod')?.value==='custom';
+  $('reportCustomDates')?.classList.toggle('open',custom);
+  if(custom){
+    const month=$('reportMonth')?.value;
+    if(month && !$('reportDateFrom').value && !$('reportDateTo').value){
+      const [y,m]=month.split('-').map(Number);
+      $('reportDateFrom').value=`${month}-01`;
+      $('reportDateTo').value=`${month}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
+    }
+  }
+  renderFinoraReports();
+}
+
 function reportRows(){
   const month=$('reportMonth')?.value||currentMonth(),person=$('reportPerson')?.value||'',cat=$('reportCategory')?.value||'',
         payment=$('reportPayment')?.value||'',card=$('reportCard')?.value||'',status=$('reportStatus')?.value||'',type=$('reportType')?.value||'';
-  return data.filter(x=>sameWorkspace(x))
+  return data.filter(x=>reportDateMatchesPeriod(x)&&sameWorkspace(x))
     .filter(x=>(!month||recordMonth(x)===month)&&(!person||reportPersonOf(x)===person)&&(!cat||(x.categoria||'Outros')===cat)&&
       (!payment||reportPaymentOf(x)===payment)&&(!card||String(x.cardId||'')===card)&&(!status||effectiveStatus(x)===status)&&(!type||x.tipo===type))
     .sort((a,b)=>(referenceDate(b)||'').localeCompare(referenceDate(a)||''));
@@ -8332,7 +8413,7 @@ function exportFinoraReportCSV(){
   const rows=reportRows();const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
   const lines=[['Data','Tipo','Descrição','Pessoa','Categoria','Forma de pagamento','Cartão','Status','Valor'].map(q).join(';')];
   rows.forEach(x=>lines.push([referenceDate(x),x.tipo==='entrada'?'Crédito':'Débito',x.descricao,reportPersonOf(x),x.categoria||'',reportPaymentOf(x),reportCardName(x),effectiveStatus(x),simpleKnownValue(x)?Number(x.valor||0).toFixed(2).replace('.',','):''].map(q).join(';')));
-  const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`FINORA_relatorio_${$('reportMonth').value||'periodo'}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
+  const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`FINORA_relatorio_${$('reportPeriod')?.value==='month'?($('reportMonth').value||'periodo'):(reportPeriodBounds().from||'inicio')+'_a_'+(reportPeriodBounds().to||'fim')}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
 }
 function printFinoraReport(){window.print()}
 </script>
