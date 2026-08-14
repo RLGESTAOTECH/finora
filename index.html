@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v81-extrato-impressao-limpa-watermark">
+<meta name="finora-version" content="v82-categorias-cartoes-grafico-3d-header">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3309,6 +3309,124 @@ body > .user-chip{
   }
 }
 
+
+/* ==========================================================
+   FINORA v82 — Categoria controlada + gráfico 3D + branding
+   ========================================================== */
+
+/* Categoria: entrada livre, despesa por combo */
+#categoriaExpense{display:none}
+#simpleLaunchPanel.launch-expense-mode #categoria{display:none!important}
+#simpleLaunchPanel.launch-expense-mode #categoriaExpense{display:block!important}
+#simpleLaunchPanel.launch-entry-mode #categoria{display:block!important}
+#simpleLaunchPanel.launch-entry-mode #categoriaExpense{display:none!important}
+#simpleLaunchPanel.launch-entry-mode #categoryHelp{
+  display:block!important;
+}
+#simpleLaunchPanel.launch-expense-mode #categoryHelp{
+  color:#60756b!important;
+}
+#categoriaExpense{
+  background-color:#fff!important;
+  font-weight:600!important;
+  color:#173d31!important;
+}
+
+/* Branding superior simplificado */
+.finora-title-only{
+  display:flex!important;
+  align-items:center!important;
+  min-height:58px!important;
+  padding:0 4px!important;
+}
+.finora-title-only h1{
+  margin:0!important;
+  color:#2aa66d!important;
+  font-family:"Segoe UI","Trebuchet MS",Arial,sans-serif!important;
+  font-size:34px!important;
+  font-weight:800!important;
+  line-height:1!important;
+  letter-spacing:.20em!important;
+  text-transform:uppercase!important;
+  text-shadow:
+    0 1px 0 #168052,
+    0 2px 0 #0f6842,
+    0 4px 10px rgba(15,90,70,.18)!important;
+}
+.finora-title-only .premium-eyebrow,
+.finora-title-only p{display:none!important}
+
+/* Gráfico de despesas: visual 3D profissional */
+.finora-home-category-card{
+  overflow:visible!important;
+}
+.finora-home-donut-layout{
+  align-items:center!important;
+  perspective:900px!important;
+}
+.finora-home-category-card .report-donut{
+  transform:perspective(720px) rotateX(18deg) rotateZ(-3deg)!important;
+  transform-style:preserve-3d!important;
+  box-shadow:
+    0 12px 0 rgba(31,55,45,.24),
+    0 20px 26px rgba(19,63,47,.22),
+    inset 0 0 0 1px rgba(255,255,255,.28)!important;
+  border:1px solid rgba(12,56,42,.12)!important;
+  transition:transform .25s ease,box-shadow .25s ease!important;
+}
+.finora-home-category-card .report-donut:hover{
+  transform:perspective(720px) rotateX(12deg) rotateZ(-2deg) scale(1.025)!important;
+  box-shadow:
+    0 14px 0 rgba(31,55,45,.22),
+    0 25px 34px rgba(19,63,47,.25)!important;
+}
+.finora-home-category-card .report-donut:after{
+  box-shadow:
+    inset 0 0 0 1px rgba(16,63,47,.08),
+    0 6px 18px rgba(14,39,31,.08)!important;
+}
+.finora-home-category-card .report-legend{
+  gap:3px!important;
+}
+.finora-home-category-card .report-legend-row{
+  grid-template-columns:14px minmax(140px,1fr) 82px 118px!important;
+  padding:11px 8px!important;
+  border-radius:8px!important;
+  transition:background .15s ease!important;
+}
+.finora-home-category-card .report-legend-row:hover{
+  background:#f4f8f5!important;
+}
+.finora-home-category-card .report-legend-row b{
+  font-size:11px!important;
+}
+.finora-home-category-card .report-legend-row em{
+  font-size:12px!important;
+  font-weight:800!important;
+  color:#143e31!important;
+  text-align:right!important;
+}
+.finora-home-category-card .report-legend-row span{
+  font-size:11px!important;
+  font-weight:750!important;
+  color:#253d33!important;
+  text-align:right!important;
+}
+.finora-home-category-card .report-legend-dot{
+  width:12px!important;
+  height:12px!important;
+  box-shadow:0 2px 5px rgba(0,0,0,.14)!important;
+}
+@media(max-width:760px){
+  .finora-title-only h1{
+    font-size:28px!important;
+    letter-spacing:.14em!important;
+  }
+  .finora-home-category-card .report-legend-row{
+    grid-template-columns:12px minmax(100px,1fr) 58px 95px!important;
+  }
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -3363,7 +3481,7 @@ body > .user-chip{
     <button type="button" onclick="openSectionModal('finoraMonthlySheet')"><span class="ico">▦</span>Planilha mensal</button>
     <button type="button" onclick="openSectionModal('finoraCategories')"><span class="ico">◫</span>Visão por categoria</button>
     <button type="button" onclick="openReportsPanel()"><span class="ico">◉</span>Relatórios</button>
-    <button type="button" id="familyAccessNav" onclick="openSectionModal('finoraFamilyAccess')"><span class="ico">♙</span>Família e acessos</button>
+    <button type="button" id="familyAccessNav" onclick="openSectionModal('finoraFamilyAccess')"><span class="ico">♙</span>Acesso</button>
     <button type="button" onclick="openCloudModal()"><span class="ico">☁</span>Sincronização</button>
   </nav>
   <div class="finora-sidebar-reserve">
@@ -3423,10 +3541,8 @@ body > .user-chip{
 </div>
 <div class="shell">
 <header>
-  <div class="brand finora-header-brand finora-premium-heading">
-    <span class="premium-eyebrow">FINORA · CONTROLE FINANCEIRO</span>
-    <h1>Seu dinheiro, com clareza.</h1>
-    <p>Controle financeiro pessoal e familiar <b>· seu ambiente, suas escolhas.</b></p>
+  <div class="brand finora-header-brand finora-premium-heading finora-title-only">
+    <h1>FINORA</h1>
   </div>
   <div class="finora-session-panel" id="userChip">
     <button type="button" class="user-profile-trigger finora-session-profile" id="profileBtn" title="Abrir meu perfil">
@@ -3506,7 +3622,7 @@ body > .user-chip{
 <section class="popup-only-panel finora-family-panel" id="finoraFamilyAccess">
   <div class="finora-family-head">
     <div>
-      <h3>Família e acessos</h3>
+      <h3>Acesso</h3>
       <p id="familyAccessSubtitle">Gerencie quem pode acessar este ambiente financeiro.</p>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -3688,6 +3804,11 @@ body > .user-chip{
         <button type="button" class="card-color-swatch" data-card-color="#6d4c41" style="--swatch:#6d4c41" aria-label="Marrom" title="Marrom"></button>
         <button type="button" class="card-color-swatch" data-card-color="#8b2f3c" style="--swatch:#8b2f3c" aria-label="Vinho" title="Vinho"></button>
         <button type="button" class="card-color-swatch" data-card-color="#7b5ea7" style="--swatch:#7b5ea7" aria-label="Roxo" title="Roxo"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#f2c94c" style="--swatch:#f2c94c" aria-label="Amarelo" title="Amarelo"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#f28c28" style="--swatch:#f28c28" aria-label="Laranja" title="Laranja"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#e77aa8" style="--swatch:#e77aa8" aria-label="Rosa" title="Rosa"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#c83f49" style="--swatch:#c83f49" aria-label="Vermelho" title="Vermelho"></button>
+        <button type="button" class="card-color-swatch" data-card-color="#8a9296" style="--swatch:#8a9296" aria-label="Cinza" title="Cinza"></button>
         <label class="card-color-custom" title="Escolher outra cor">
           <span>Outra</span>
           <input type="color" id="cardColorCustom" value="#0b3d2e">
@@ -3884,10 +4005,31 @@ body > .user-chip{
       <label id="beneficiaryLabel">Beneficiário / Favorecido</label>
       <input id="beneficiario" placeholder="Ex.: Vivo, imobiliária, mercado...">
     </div>
-    <div class="field">
+    <div class="field" id="categoryField">
       <label>Categoria</label>
-      <input id="categoria" type="text" autocomplete="off" placeholder="Digite a categoria. Ex.: Habitação">
-      <div class="file-note">Campo livre: digite a categoria que desejar.</div>
+      <input id="categoria" type="text" autocomplete="off" placeholder="Digite a categoria. Ex.: Renda">
+      <select id="categoriaExpense" aria-label="Categoria da despesa">
+        <option value="">Selecione uma categoria</option>
+        <option>Cartão de crédito</option>
+        <option>Mercado / Alimentação</option>
+        <option>Moradia</option>
+        <option>Condomínio</option>
+        <option>Água</option>
+        <option>Luz</option>
+        <option>Gás</option>
+        <option>IPTU</option>
+        <option>Telefonia fixa</option>
+        <option>Telefonia móvel</option>
+        <option>Combustível</option>
+        <option>Veículo</option>
+        <option>Despesas pessoais</option>
+        <option>Tarifas bancárias</option>
+        <option>Saúde</option>
+        <option>Educação</option>
+        <option>Serviços</option>
+        <option>Outros</option>
+      </select>
+      <div class="file-note" id="categoryHelp">Selecione uma categoria para classificar a despesa.</div>
     </div>
 
     <div class="field expense-essential-field" id="essentialField">
@@ -5089,12 +5231,7 @@ function merchantCategoryHint(text){
   return '';
 }
 function applyCardCategorySuggestion(){
-  const categoryEl=$('categoria');
-  if(!categoryEl)return;
-
-  // Categoria é livre: nunca sobrescrever algo que o usuário já digitou.
-  if(String(categoryEl.value||'').trim())return;
-
+  if(currentCategoryValue())return;
   const cardId=$('launchCard')?.value;
   if(!cardId)return;
   const c=accountCards().find(x=>x.id===cardId);
@@ -5102,8 +5239,8 @@ function applyCardCategorySuggestion(){
 
   const desc=$('descricao')?.value||'',benef=$('beneficiario')?.value||'';
   const merchantHint=merchantCategoryHint(`${benef} ${desc}`);
-  if(merchantHint)categoryEl.value=merchantHint;
-  else if(c.defaultCategory)categoryEl.value=c.defaultCategory;
+  if(merchantHint)setCategoryValue(merchantHint);
+  else if(c.defaultCategory)setCategoryValue(c.defaultCategory);
 }
 
 async function shareCategoryImage(){
@@ -5712,6 +5849,7 @@ function applyLaunchMode(mode,{keepForm=false}={}){
     if(!keepForm)resetForm();
     $('tipo').value='entrada';
     updateTypeLabels();
+    updateCategoryControl();
     $('descricao').placeholder='Ex.: Salário, aluguel recebido, reembolso...';
     $('formTitle').textContent=$('editId').value?'Editar entrada':'Nova entrada';
     $('launchListTitle').textContent='Entradas registradas';
@@ -5723,6 +5861,7 @@ function applyLaunchMode(mode,{keepForm=false}={}){
     if(!keepForm)resetForm();
     $('tipo').value='saida';
     updateTypeLabels();
+    updateCategoryControl();
     if(!$('essentialType').value)$('essentialType').value='essential';
     $('formTitle').textContent=$('editId').value?'Editar despesa / saída':'Nova despesa / saída';
     $('launchListTitle').textContent='Despesas / saídas registradas';
@@ -6257,11 +6396,40 @@ function updateTypeLabels(){
   }
   updatePaymentAccountField();
   updateExpenseOwnerField();
+  updateCategoryControl();
+}
+
+
+function currentCategoryValue(){
+  const isExpense=$('tipo')?.value==='saida';
+  return String(isExpense?($('categoriaExpense')?.value||''):($('categoria')?.value||'')).trim();
+}
+function setCategoryValue(value){
+  const v=String(value||'').trim();
+  if($('categoria'))$('categoria').value=v;
+  if($('categoriaExpense')){
+    const options=[...$('categoriaExpense').options].map(o=>o.value);
+    $('categoriaExpense').value=options.includes(v)?v:'';
+  }
+}
+function updateCategoryControl(){
+  const expense=$('tipo')?.value==='saida';
+  const help=$('categoryHelp');
+  if(help){
+    help.textContent=expense
+      ?'Selecione uma categoria. Essa classificação alimenta o gráfico “Despesas por categoria”.'
+      :'Informe a categoria da entrada.';
+  }
+  if(expense && $('categoriaExpense')){
+    const current=String($('categoria')?.value||'').trim();
+    const options=[...$('categoriaExpense').options].map(o=>o.value);
+    if(current && options.includes(current))$('categoriaExpense').value=current;
+  }
 }
 
 function autoValorRecorrente(){
   const desc=($('descricao').value||'').toLowerCase();
-  const cat=($('categoria').value||'').toLowerCase();
+  const cat=currentCategoryValue().toLowerCase();
   const forma=($('forma').value||'').toLowerCase();
   const pessoa=$('pessoa').value;
   const tipo=$('tipo').value;
@@ -6276,6 +6444,7 @@ function autoValorRecorrente(){
 ['descricao','categoria','forma','pessoa','tipo'].forEach(id=>{
   const el=$(id); if(el){el.addEventListener('input',autoValorRecorrente);el.addEventListener('change',autoValorRecorrente);}
 });
+if($('categoriaExpense')){$('categoriaExpense').addEventListener('change',()=>{if($('categoria'))$('categoria').value=$('categoriaExpense').value;autoValorRecorrente();renderHomeCategoryDonut();});}
 $('tipo').addEventListener('change',updateTypeLabels);
 $('pessoa')?.addEventListener('change',()=>{
   const selectedPerson=$('pessoa')?.value||'';
@@ -6310,7 +6479,7 @@ $('entryForm').addEventListener('submit',async e=>{
   const row={id,account:'family',workspaceId:currentWorkspaceId,tipo:$('tipo').value,pessoa:$('pessoa').value,
     expenseOwner:$('tipo').value==='saida'?($('expenseOwner')?.value||$('pessoa').value):'',
     descricao:descVal,
-    categoria:$('categoria').value.trim(),essentialType:$('tipo').value==='saida'?$('essentialType').value:'',valor:parseBRLInput($('valor').value),dataLancamento:dataLancVal,
+    categoria:currentCategoryValue(),essentialType:$('tipo').value==='saida'?$('essentialType').value:'',valor:parseBRLInput($('valor').value),dataLancamento:dataLancVal,
     vencimento:vencVal,status:$('status').value,recorrente:recorrenciaVal,recRule:recRuleVal,
     valorRecorrente:$('valorRecorrente').value,valorPendente:false,beneficiario:$('beneficiario').value.trim(),parcelas:$('parcelas').value.trim(),cardId:$('launchCard')?.value||'',forma:$('forma').value,
     paymentAccount:paymentNeedsAccount($('forma').value)?$('paymentAccount').value.trim():'',
@@ -6328,7 +6497,7 @@ function editRow(id){
   openSectionModal('simpleLaunchPanel');
   applyLaunchMode(x.tipo==='entrada'?'entrada':'saida',{keepForm:true});
   $('editId').value=x.id;$('tipo').value=x.tipo;fillPeople(x.pessoa);$('pessoa').value=x.pessoa||$('pessoa').value;fillExpenseOwners(x.expenseOwner||x.pessoa||'');$('descricao').value=x.descricao;
-  $('categoria').value=x.categoria||'';$('essentialType').value=x.essentialType||inferEssentialType(x);$('valor').value=formatBRLInput(x.valor);$('dataLancamento').value=x.dataLancamento||today();
+  setCategoryValue(x.categoria||'');$('essentialType').value=x.essentialType||inferEssentialType(x);$('valor').value=formatBRLInput(x.valor);$('dataLancamento').value=x.dataLancamento||today();
   $('vencimento').value=x.vencimento||'';$('beneficiario').value=x.beneficiario||'';$('parcelas').value=x.parcelas||'';fillLaunchCards(x.cardId||'');$('status').value=x.status;$('recorrente').value=x.recorrente||'nao';$('valorRecorrente').value=x.valorRecorrente||'mesmo';$('recRule').value=x.recRule||'fixo';$('forma').value=x.forma||'Boleto';$('observacao').value=x.observacao||'';
   fillPaymentAccounts(x.paymentAccount||'');
   updateTypeLabels();
@@ -6535,7 +6704,7 @@ $('readBoletoBtn').onclick=async()=>{
     if(f.pessoa&&[...$('pessoa').options].some(o=>o.value===f.pessoa))$('pessoa').value=f.pessoa;
     if(f.descricao)$('descricao').value=f.descricao;
     if($('beneficiario'))$('beneficiario').value=f.beneficiario||'';
-    if(f.categoria)$('categoria').value=f.categoria;
+    if(f.categoria)setCategoryValue(f.categoria);
     if(f.valor!=null)$('valor').value=formatBRLInput(Number(f.valor));
     $('dataLancamento').value=today();
     if(f.vencimento)$('vencimento').value=f.vencimento;
@@ -8492,7 +8661,7 @@ $('adminAuthPassword')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.pre
         <button class="simple-action" onclick="closeMobileMore();openSimplePanel('simpleImportPanel','extrato')">Extratos</button>
         <button class="simple-action" onclick="closeMobileMore();openSectionModal('finoraMonthlySheet')">Planilha mensal</button>
         <button class="simple-action" onclick="closeMobileMore();openSectionModal('finoraCategories')">Categorias</button>
-        <button class="simple-action" onclick="closeMobileMore();openSectionModal('finoraFamilyAccess')">Família e acessos</button>
+        <button class="simple-action" onclick="closeMobileMore();openSectionModal('finoraFamilyAccess')">Acesso</button>
         <button class="simple-action" onclick="closeMobileMore();openCloudModal()">Sincronização</button>
       </div>
     </div>
@@ -8677,7 +8846,7 @@ function renderReportDonut(rows){
   const sums={};rows.filter(x=>x.tipo==='saida'&&simpleKnownValue(x)).forEach(x=>{const k=x.categoria||'Outros';sums[k]=(sums[k]||0)+Number(x.valor||0)});
   const items=Object.entries(sums).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]),total=items.reduce((s,[,v])=>s+v,0);
   $('reportDonutTotal').textContent=money(total);
-  const colors=['#0f5a3e','#2f7d5a','#70a083','#b98b43','#8b6f47','#a54a45','#5c7568','#9bb6a7','#34483e','#c3a86c','#7b8e84','#d3c3a0'];
+  const colors=['#0f6b4c','#e2a93b','#d95852','#3776c5','#ef8b3e','#7a5bb5','#24a6a1','#d46b9c','#78848b','#284b63','#4da56a','#9b6a46','#c7b33f','#5b8def','#bd5f79','#6f7c46'];
   if(!total){$('reportDonut').style.background='#edf2ef';$('reportLegend').innerHTML='<div class="empty">Nenhuma despesa no período.</div>';return}
   let acc=0,parts=[];
   items.forEach(([k,v],i)=>{const a=acc/total*360;acc+=v;const b=acc/total*360;parts.push(`${colors[i%colors.length]} ${a}deg ${b}deg`)});
@@ -8871,7 +9040,7 @@ function renderHomeCategoryDonut(){
   const sums={};rows.forEach(x=>{const k=x.categoria||'Outros';sums[k]=(sums[k]||0)+Number(x.valor||0)});
   const items=Object.entries(sums).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]),total=items.reduce((s,[,v])=>s+v,0);
   totalEl.textContent=money(total);
-  const colors=['#0f5a3e','#2f7d5a','#70a083','#b98b43','#8b6f47','#a54a45','#5c7568','#9bb6a7','#34483e','#c3a86c','#7b8e84','#d3c3a0'];
+  const colors=['#0f6b4c','#e2a93b','#d95852','#3776c5','#ef8b3e','#7a5bb5','#24a6a1','#d46b9c','#78848b','#284b63','#4da56a','#9b6a46','#c7b33f','#5b8def','#bd5f79','#6f7c46'];
   if(!total){donut.style.background='#edf2ef';legend.innerHTML='<div class="empty">Nenhuma despesa no mês selecionado.</div>';return}
   let acc=0,parts=[];
   items.forEach(([k,v],i)=>{const a=acc/total*360;acc+=v;const b=acc/total*360;parts.push(`${colors[i%colors.length]} ${a}deg ${b}deg`)});
