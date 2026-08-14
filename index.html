@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v75-recupera-dados-ambiente">
+<meta name="finora-version" content="v76-categoria-livre-mascara-moeda">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3020,6 +3020,17 @@ body > .user-chip{
   border:1px solid #dbe8e1;
 }
 
+
+/* FINORA v76 — Categoria livre + máscara monetária */
+#categoria{
+  background-image:none!important;
+}
+#valor{
+  font-variant-numeric:tabular-nums;
+  font-weight:650;
+  letter-spacing:.01em;
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -3567,18 +3578,8 @@ body > .user-chip{
     </div>
     <div class="field">
       <label>Categoria</label>
-      <input id="categoria" list="categorias" placeholder="Ex.: Habitação">
-      <div class="file-note">Use as categorias sugeridas para alimentar corretamente os destaques e rankings.</div>
-      <datalist id="categorias">
-        <option>Renda</option>
-        <option>Moradia</option><option>Condomínio</option><option>Água</option>
-        <option>Luz</option><option>Gás</option><option>IPTU</option>
-        <option>Telefonia fixa</option><option>Telefonia móvel</option>
-        <option>Mercado / Alimentação</option><option>Combustível</option><option>Veículo</option>
-        <option>Despesas pessoais</option><option>Tarifas bancárias</option>
-        <option>Cartão de crédito</option><option>Saúde</option><option>Educação</option>
-        <option>Serviços</option><option>Impostos</option><option>Outros</option>
-      </datalist>
+      <input id="categoria" type="text" autocomplete="off" placeholder="Digite a categoria. Ex.: Habitação">
+      <div class="file-note">Campo livre: digite a categoria que desejar.</div>
     </div>
 
     <div class="field expense-essential-field" id="essentialField">
@@ -3592,7 +3593,7 @@ body > .user-chip{
 
     <div class="field">
       <label>Valor (R$)</label>
-      <input id="valor" type="number" step="0.01" min="0" required placeholder="0,00">
+      <input id="valor" type="text" inputmode="decimal" autocomplete="off" required placeholder="R$ 0,00">
     </div>
     <div class="field">
       <label>Data do lançamento</label>
@@ -5672,10 +5673,50 @@ function render(){
     </tr>`
   }).join('')}</tbody></table>`;
 }
+
+function parseBRLInput(value){
+  let s=String(value??'').trim();
+  if(!s)return 0;
+  s=s.replace(/\s/g,'').replace(/R\$/gi,'').replace(/[^\d,.\-]/g,'');
+  const lastComma=s.lastIndexOf(',');
+  const lastDot=s.lastIndexOf('.');
+  if(lastComma>=0 && lastDot>=0){
+    if(lastComma>lastDot){
+      s=s.replace(/\./g,'').replace(',','.');
+    }else{
+      s=s.replace(/,/g,'');
+    }
+  }else if(lastComma>=0){
+    s=s.replace(/\./g,'').replace(',','.');
+  }else{
+    // Se houver mais de um ponto, trata como separador de milhar, mantendo o último como decimal.
+    const dots=(s.match(/\./g)||[]).length;
+    if(dots>1){
+      const parts=s.split('.');
+      const dec=parts.pop();
+      s=parts.join('')+'.'+dec;
+    }
+  }
+  const n=Number(s);
+  return Number.isFinite(n)?Math.max(0,n):0;
+}
+function formatBRLInput(value){
+  const n=typeof value==='number'?value:parseBRLInput(value);
+  return 'R$ '+Number(n||0).toLocaleString('pt-BR',{
+    minimumFractionDigits:2,
+    maximumFractionDigits:2
+  });
+}
+function normalizeBRLTyping(value){
+  // Durante a digitação preserva números, vírgula e ponto;
+  // a máscara completa é aplicada ao sair do campo.
+  return String(value??'').replace(/[^\d,.\sR$]/g,'');
+}
+
 function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function dateBR(s){const [y,m,d]=s.split('-');return `${d}/${m}/${y}`}
 function resetForm(){
-  $('entryForm').reset();$('editId').value='';
+  $('entryForm').reset();$('editId').value='';if($('valor'))$('valor').value='R$ 0,00';
   $('formTitle').textContent=currentLaunchMode==='entrada'?'Nova entrada':currentLaunchMode==='saida'?'Nova despesa / saída':'Novo lançamento';
   $('cancelEdit').style.display='none';$('dataLancamento').value=today();$('recorrente').value='nao';$('valorRecorrente').value='mesmo';$('recRule').value='fixo';fillPeople();editingAttachment=null;
   $('fileInfo').textContent='O arquivo fica salvo somente neste navegador.';
@@ -5699,6 +5740,22 @@ function resetForm(){
   }
 });
 
+
+
+const finoraValorInput=$('valor');
+if(finoraValorInput && !finoraValorInput.dataset.brlMask){
+  finoraValorInput.dataset.brlMask='1';
+  finoraValorInput.addEventListener('focus',()=>{
+    if(parseBRLInput(finoraValorInput.value)===0)finoraValorInput.value='';
+  });
+  finoraValorInput.addEventListener('input',()=>{
+    const clean=normalizeBRLTyping(finoraValorInput.value);
+    if(clean!==finoraValorInput.value)finoraValorInput.value=clean;
+  });
+  finoraValorInput.addEventListener('blur',()=>{
+    finoraValorInput.value=formatBRLInput(finoraValorInput.value);
+  });
+}
 
 $('launchCard')?.addEventListener('change',applyCardCategorySuggestion);
 $('descricao')?.addEventListener('blur',()=>{if($('launchCard')?.value)applyCardCategorySuggestion()});
@@ -5887,7 +5944,7 @@ $('entryForm').addEventListener('submit',async e=>{
   const row={id,account:'family',workspaceId:currentWorkspaceId,tipo:$('tipo').value,pessoa:$('pessoa').value,
     expenseOwner:$('tipo').value==='saida'?($('expenseOwner')?.value||$('pessoa').value):'',
     descricao:descVal,
-    categoria:$('categoria').value.trim(),essentialType:$('tipo').value==='saida'?$('essentialType').value:'',valor:Number($('valor').value),dataLancamento:dataLancVal,
+    categoria:$('categoria').value.trim(),essentialType:$('tipo').value==='saida'?$('essentialType').value:'',valor:parseBRLInput($('valor').value),dataLancamento:dataLancVal,
     vencimento:vencVal,status:$('status').value,recorrente:recorrenciaVal,recRule:recRuleVal,
     valorRecorrente:$('valorRecorrente').value,valorPendente:false,beneficiario:$('beneficiario').value.trim(),parcelas:$('parcelas').value.trim(),cardId:$('launchCard')?.value||'',forma:$('forma').value,
     paymentAccount:paymentNeedsAccount($('forma').value)?$('paymentAccount').value.trim():'',
@@ -5905,7 +5962,7 @@ function editRow(id){
   openSectionModal('simpleLaunchPanel');
   applyLaunchMode(x.tipo==='entrada'?'entrada':'saida',{keepForm:true});
   $('editId').value=x.id;$('tipo').value=x.tipo;fillPeople(x.pessoa);fillExpenseOwners(x.expenseOwner||x.pessoa||'');$('descricao').value=x.descricao;
-  $('categoria').value=x.categoria||'';$('essentialType').value=x.essentialType||inferEssentialType(x);$('valor').value=x.valor;$('dataLancamento').value=x.dataLancamento||today();
+  $('categoria').value=x.categoria||'';$('essentialType').value=x.essentialType||inferEssentialType(x);$('valor').value=formatBRLInput(x.valor);$('dataLancamento').value=x.dataLancamento||today();
   $('vencimento').value=x.vencimento||'';$('beneficiario').value=x.beneficiario||'';$('parcelas').value=x.parcelas||'';fillLaunchCards(x.cardId||'');$('status').value=x.status;$('recorrente').value=x.recorrente||'nao';$('valorRecorrente').value=x.valorRecorrente||'mesmo';$('recRule').value=x.recRule||'fixo';$('forma').value=x.forma||'Boleto';$('observacao').value=x.observacao||'';
   fillPaymentAccounts(x.paymentAccount||'');
   updateTypeLabels();
@@ -6113,7 +6170,7 @@ $('readBoletoBtn').onclick=async()=>{
     if(f.descricao)$('descricao').value=f.descricao;
     if($('beneficiario'))$('beneficiario').value=f.beneficiario||'';
     if(f.categoria)$('categoria').value=f.categoria;
-    if(f.valor!=null)$('valor').value=Number(f.valor).toFixed(2);
+    if(f.valor!=null)$('valor').value=formatBRLInput(Number(f.valor));
     $('dataLancamento').value=today();
     if(f.vencimento)$('vencimento').value=f.vencimento;
     $('forma').value='Boleto';
