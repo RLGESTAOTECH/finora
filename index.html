@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v79-filtro-periodo-relatorios">
+<meta name="finora-version" content="v80-extrato-bancario-saldos">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3042,6 +3042,110 @@ body > .user-chip{
   .report-custom-dates{grid-template-columns:1fr}
 }
 
+
+/* FINORA v80 — Extrato bancário */
+.statement-period{
+  margin:0 0 8px;
+  padding:9px 12px;
+  border:1px solid #dfe7e2;
+  border-radius:10px;
+  background:#fff;
+  color:#42594e;
+  font:9px Verdana,sans-serif;
+  font-weight:700;
+}
+.statement-summary{
+  align-items:center;
+}
+.statement-balances{
+  display:flex;
+  gap:20px;
+  align-items:center;
+  text-align:right;
+}
+.statement-balances span{
+  display:block;
+}
+.statement-balances small{
+  display:block;
+  margin-bottom:3px;
+  color:#77857e;
+  font:8px Verdana,sans-serif;
+  text-transform:uppercase;
+  letter-spacing:.45px;
+}
+.statement-balances strong{
+  display:block;
+  color:#183e30;
+  font:700 11px Verdana,sans-serif;
+}
+.statement-opening,
+.statement-day-balance{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  padding:8px 12px;
+  font:9px Verdana,sans-serif;
+}
+.statement-opening{
+  background:#eef4f0;
+  border:1px solid #dce6e0;
+  border-radius:10px 10px 0 0;
+  color:#40584d;
+}
+.statement-opening strong{color:#173f31}
+.statement-day-balance{
+  background:#f8faf9;
+  border-top:1px solid #e2e9e5;
+  color:#52665c;
+  font-weight:700;
+}
+.statement-day-balance strong{
+  color:#163d30;
+}
+.statement-day{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.statement-day .day-label{
+  font-weight:700;
+}
+.statement-list{
+  border-radius:0 0 12px 12px!important;
+}
+@media(max-width:700px){
+  .statement-summary{align-items:flex-start;flex-direction:column}
+  .statement-balances{width:100%;justify-content:space-between;text-align:left;gap:10px}
+}
+
+/* Impressão limpa do Extrato: sem filtros e sem controles */
+@media print{
+  #finoraReportsPanel .report-filters,
+  #finoraReportsPanel .report-tabs,
+  #finoraReportsPanel .report-actions,
+  #finoraReportsPanel .popup-close-rail,
+  #finoraReportsPanel .popup-modal-close{
+    display:none!important;
+  }
+  #finoraReportsPanel .finora-report-head{
+    margin-bottom:12px!important;
+    padding-bottom:8px!important;
+  }
+  #finoraReportsPanel .report-view{display:none!important}
+  #finoraReportsPanel #reportStatement.report-view{display:block!important}
+  #finoraReportsPanel #reportStatement,
+  #finoraReportsPanel .statement-list{
+    break-inside:auto!important;
+  }
+  #finoraReportsPanel .statement-row,
+  #finoraReportsPanel .statement-day,
+  #finoraReportsPanel .statement-day-balance{
+    break-inside:avoid!important;
+  }
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -3359,7 +3463,17 @@ body > .user-chip{
     
   </div>
   <div id="reportStatement" class="report-view">
-    <div class="statement-summary"><span id="statementCount">0 movimentações</span><strong id="statementNet">Saldo: R$ 0,00</strong></div>
+    <div class="statement-period" id="statementPeriod">Período: —</div>
+    <div class="statement-summary">
+      <span id="statementCount">0 movimentações</span>
+      <div class="statement-balances">
+        <span><small>Saldo do período</small><strong id="statementNet">R$ 0,00</strong></span>
+        <span><small>Saldo remanescente</small><strong id="statementRemaining">R$ 0,00</strong></span>
+      </div>
+    </div>
+    <div class="statement-opening" id="statementOpening">
+      <span>Saldo anterior</span><strong id="statementOpeningBalance">R$ 0,00</strong>
+    </div>
     <div class="statement-list" id="statementList"></div>
   </div>
   <div id="reportBreakdown" class="report-view"><div class="report-breakdown" id="reportBreakdownRows"></div></div>
@@ -8347,12 +8461,29 @@ function onReportPeriodChange(){
   renderFinoraReports();
 }
 
+function reportFilterValues(){
+  return {
+    person:$('reportPerson')?.value||'',
+    cat:$('reportCategory')?.value||'',
+    payment:$('reportPayment')?.value||'',
+    card:$('reportCard')?.value||'',
+    status:$('reportStatus')?.value||'',
+    type:$('reportType')?.value||''
+  };
+}
+function reportMatchesNonDateFilters(x){
+  const {person,cat,payment,card,status,type}=reportFilterValues();
+  return sameWorkspace(x) &&
+    (!person||reportPersonOf(x)===person) &&
+    (!cat||(x.categoria||'Outros')===cat) &&
+    (!payment||reportPaymentOf(x)===payment) &&
+    (!card||String(x.cardId||'')===card) &&
+    (!status||effectiveStatus(x)===status) &&
+    (!type||x.tipo===type);
+}
 function reportRows(){
-  const month=$('reportMonth')?.value||currentMonth(),person=$('reportPerson')?.value||'',cat=$('reportCategory')?.value||'',
-        payment=$('reportPayment')?.value||'',card=$('reportCard')?.value||'',status=$('reportStatus')?.value||'',type=$('reportType')?.value||'';
-  return data.filter(x=>reportDateMatchesPeriod(x)&&sameWorkspace(x))
-    .filter(x=>(!month||recordMonth(x)===month)&&(!person||reportPersonOf(x)===person)&&(!cat||(x.categoria||'Outros')===cat)&&
-      (!payment||reportPaymentOf(x)===payment)&&(!card||String(x.cardId||'')===card)&&(!status||effectiveStatus(x)===status)&&(!type||x.tipo===type))
+  return data
+    .filter(x=>reportMatchesNonDateFilters(x)&&reportDateMatchesPeriod(x))
     .sort((a,b)=>(referenceDate(b)||'').localeCompare(referenceDate(a)||''));
 }
 function populateReportFilters(){
@@ -8386,16 +8517,99 @@ function renderReportDonut(rows){
   $('reportDonut').style.background=`conic-gradient(${parts.join(',')})`;
   $('reportLegend').innerHTML=items.map(([k,v],i)=>`<div class="report-legend-row"><i class="report-legend-dot" style="background:${colors[i%colors.length]}"></i><b>${reportEsc(k)}</b><em>${(v/total*100).toFixed(1).replace('.',',')}%</em><span>${money(v)}</span></div>`).join('');
 }
+
+function reportBRDate(iso){
+  if(!iso)return '—';
+  const p=String(iso).slice(0,10).split('-');
+  return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;
+}
+function reportPeriodLabel(){
+  const {from,to}=reportPeriodBounds();
+  if(from&&to)return `Período: ${reportBRDate(from)} a ${reportBRDate(to)}`;
+  if(from)return `Período: a partir de ${reportBRDate(from)}`;
+  if(to)return `Período: até ${reportBRDate(to)}`;
+  return 'Período: todos os lançamentos';
+}
+function reportSignedValue(x){
+  if(!simpleKnownValue(x))return 0;
+  const v=Number(x.valor||0);
+  return x.tipo==='entrada'?v:-v;
+}
+function reportOpeningBalance(){
+  const {from}=reportPeriodBounds();
+  if(!from)return 0;
+  return data
+    .filter(x=>reportMatchesNonDateFilters(x))
+    .filter(x=>{
+      const d=reportISODate(referenceDate(x));
+      return d && d<from;
+    })
+    .reduce((sum,x)=>sum+reportSignedValue(x),0);
+}
+
 function renderReportStatement(rows){
-  const known=rows.filter(simpleKnownValue),net=known.reduce((s,x)=>s+(x.tipo==='entrada'?Number(x.valor||0):-Number(x.valor||0)),0);
-  $('statementCount').textContent=`${rows.length} movimentaç${rows.length===1?'ão':'ões'}`;$('statementNet').textContent=`Saldo: ${money(net)}`;
-  if(!rows.length){$('statementList').innerHTML='<div class="empty">Nenhuma movimentação encontrada com os filtros selecionados.</div>';return}
-  let last='';
-  $('statementList').innerHTML=rows.map(x=>{
-    const d=referenceDate(x)||'',day=d?new Date(d+'T12:00:00').toLocaleDateString('pt-BR'):'Sem data',head=day!==last?(last=day,`<div class="statement-day">${day}</div>`):'';
-    const val=Number(x.valor||0),sign=x.tipo==='entrada'?'+':'−',meta=[reportPersonOf(x),x.categoria,reportPaymentOf(x),reportCardName(x),effectiveStatus(x)].filter(Boolean).join(' · ');
-    return `${head}<div class="statement-row"><div><strong>${reportEsc(x.descricao||'Movimentação')}</strong><small>${reportEsc(meta)}</small></div><div class="statement-amount ${x.tipo==='entrada'?'in':'out'}">${sign} ${simpleKnownValue(x)?money(val):'Valor pendente'}</div></div>`;
-  }).join('');
+  const known=rows.filter(simpleKnownValue);
+  const net=known.reduce((s,x)=>s+reportSignedValue(x),0);
+  const opening=reportOpeningBalance();
+  const remaining=opening+net;
+
+  $('statementCount').textContent=`${rows.length} movimentaç${rows.length===1?'ão':'ões'}`;
+  $('statementNet').textContent=money(net);
+  $('statementOpeningBalance').textContent=money(opening);
+  $('statementRemaining').textContent=money(remaining);
+  $('statementPeriod').textContent=reportPeriodLabel();
+
+  if(!rows.length){
+    $('statementList').innerHTML='<div class="empty">Nenhuma movimentação encontrada com os filtros selecionados.</div>';
+    return;
+  }
+
+  // Extrato é exibido em ordem cronológica para que o saldo diário faça sentido.
+  const chronological=[...rows].sort((a,b)=>(referenceDate(a)||'').localeCompare(referenceDate(b)||''));
+  const byDay=new Map();
+  chronological.forEach(x=>{
+    const iso=reportISODate(referenceDate(x))||'';
+    if(!byDay.has(iso))byDay.set(iso,[]);
+    byDay.get(iso).push(x);
+  });
+
+  let running=opening;
+  const blocks=[];
+
+  for(const [iso,dayRows] of byDay.entries()){
+    const dayLabel=iso?reportBRDate(iso):'Sem data';
+    blocks.push(`<div class="statement-day"><span class="day-label">${dayLabel}</span></div>`);
+
+    dayRows.forEach(x=>{
+      const val=Number(x.valor||0);
+      const sign=x.tipo==='entrada'?'+':'−';
+      const meta=[reportPersonOf(x),x.categoria,reportPaymentOf(x),reportCardName(x),effectiveStatus(x)]
+        .filter(Boolean).join(' · ');
+
+      running+=reportSignedValue(x);
+
+      blocks.push(
+        `<div class="statement-row">
+          <div>
+            <strong>${reportEsc(x.descricao||'Movimentação')}</strong>
+            <small>${reportEsc(meta)}</small>
+          </div>
+          <div class="statement-amount ${x.tipo==='entrada'?'in':'out'}">
+            ${sign} ${simpleKnownValue(x)?money(val):'Valor pendente'}
+          </div>
+        </div>`
+      );
+    });
+
+    blocks.push(
+      `<div class="statement-day-balance">
+        <span>Saldo do dia</span>
+        <strong>${money(running)}</strong>
+      </div>`
+    );
+  }
+
+  $('statementList').innerHTML=blocks.join('');
 }
 function renderReportBreakdown(rows,tab){
   let getter=tab==='category'?(x=>x.categoria||'Outros'):tab==='person'?reportPersonOf:tab==='payment'?(x=>reportPaymentOf(x)||'Não informado'):(x=>reportCardName(x)||'Sem cartão');
@@ -8415,7 +8629,28 @@ function exportFinoraReportCSV(){
   rows.forEach(x=>lines.push([referenceDate(x),x.tipo==='entrada'?'Crédito':'Débito',x.descricao,reportPersonOf(x),x.categoria||'',reportPaymentOf(x),reportCardName(x),effectiveStatus(x),simpleKnownValue(x)?Number(x.valor||0).toFixed(2).replace('.',','):''].map(q).join(';')));
   const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`FINORA_relatorio_${$('reportPeriod')?.value==='month'?($('reportMonth').value||'periodo'):(reportPeriodBounds().from||'inicio')+'_a_'+(reportPeriodBounds().to||'fim')}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
 }
-function printFinoraReport(){window.print()}
+function printFinoraReport(){
+  const previous=finoraReportTab;
+  if(previous!=='statement'){
+    finoraReportTab='statement';
+    document.querySelectorAll('.report-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.reportTab==='statement'));
+    $('reportOverview').classList.remove('active');
+    $('reportBreakdown').classList.remove('active');
+    $('reportStatement').classList.add('active');
+    renderFinoraReports();
+  }
+  window.print();
+  if(previous!=='statement'){
+    setTimeout(()=>{
+      finoraReportTab=previous;
+      document.querySelectorAll('.report-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.reportTab===previous));
+      $('reportOverview').classList.toggle('active',previous==='overview');
+      $('reportStatement').classList.toggle('active',previous==='statement');
+      $('reportBreakdown').classList.toggle('active',!['overview','statement'].includes(previous));
+      renderFinoraReports();
+    },250);
+  }
+}
 </script>
 
 
