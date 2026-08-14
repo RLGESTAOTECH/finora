@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v58-dashboard-evolucao">
+<meta name="finora-version" content="v60-forma-pagamento-conta">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -2105,6 +2105,32 @@ button[data-finora-delete]{
   .finora-evolution-legend{gap:9px;font-size:9px}
 }
 
+
+/* FINORA v59 — categorias de despesa zeradas não ocupam espaço visual */
+[data-finora-zero-hidden="true"]{display:none!important}
+
+
+/* FINORA v60 — forma de pagamento e conta de origem */
+#paymentAccountField{
+  animation:finoraPayAccountIn .16s ease-out;
+}
+@keyframes finoraPayAccountIn{
+  from{opacity:0;transform:translateY(-4px)}
+  to{opacity:1;transform:translateY(0)}
+}
+#simpleLaunchPanel.launch-entry-mode #paymentAccountField{
+  display:none!important;
+}
+.finora-launch-meta{
+  color:#74847b;
+  font-size:10px;
+  line-height:1.45;
+}
+.finora-launch-meta .meta-dot{
+  color:#a8b3ad;
+  padding:0 3px;
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -2643,8 +2669,23 @@ button[data-finora-delete]{
     </div>
 
     <div class="field" id="paymentMethodField">
-      <label>Forma</label>
-      <select id="forma"><option>Boleto</option><option>PIX</option><option>Transferência</option><option>Cartão de crédito</option><option>Débito</option><option>Dinheiro</option><option>Outro</option></select>
+      <label>Forma de pagamento</label>
+      <select id="forma">
+        <option>PIX</option>
+        <option>Débito</option>
+        <option>Transferência</option>
+        <option>Dinheiro</option>
+        <option>Boleto</option>
+        <option>Cartão de crédito</option>
+        <option>Outro</option>
+      </select>
+      <div class="file-note">Informe como o pagamento foi realizado. Se a despesa estiver ligada a um cartão, o cartão continua sendo identificado separadamente.</div>
+    </div>
+    <div class="field" id="paymentAccountField" style="display:none">
+      <label>Conta / origem do pagamento</label>
+      <input id="paymentAccount" list="paymentAccounts" placeholder="Ex.: Nubank, Itaú, Mercado Pago">
+      <datalist id="paymentAccounts"></datalist>
+      <div class="file-note">Aparece para PIX, débito e transferência, para registrar de qual conta o valor saiu.</div>
     </div>
     <div class="field full" id="attachmentField">
       <label>Anexar boleto ou comprovante</label>
@@ -3415,12 +3456,12 @@ function renderFinanceDashboard(){
   $('monthlySheetBody').innerHTML=rows.length?rows.sort((a,b)=>(a.vencimento||a.dataLancamento||'').localeCompare(b.vencimento||b.dataLancamento||'')).map(x=>`
     <tr>
       <td>${dateBR(x.vencimento||x.dataLancamento)}</td>
-      <td>${esc(x.categoria||'—')}</td>
-      <td>${esc(x.beneficiario||x.pessoa||'—')}</td>
-      <td>${esc(x.descricao||'—')}</td>
+      <td>${esc(x.categoria||'')}</td>
+      <td>${esc(x.beneficiario||x.pessoa||'')}</td>
+      <td>${esc(x.descricao||'')}</td>
       <td><span class="sheet-status ${effectiveStatus(x)==='pago'?'paid':'pending'}">${x.tipo==='entrada'?(effectiveStatus(x)==='pago'?'Recebido':'A receber'):(effectiveStatus(x)==='pago'?'Pago':'A pagar')}</span></td>
       <td>${x.valorPendente?'Valor a definir':money(x.valor)}</td>
-      <td>${esc(x.parcelas||'—')}</td>
+      <td>${esc(x.parcelas||'')}</td>
     </tr>`).join(''):`<tr><td colspan="7"><div class="visual-empty" style="min-height:110px"><div class="visual-empty-inner"><div class="visual-empty-icon">🧾</div><div class="visual-empty-title">Planilha mensal</div><div class="visual-empty-text">Os lançamentos deste mês aparecerão aqui em formato de planilha.</div></div></div></td></tr>`;
 
   document.querySelectorAll('.month-tab').forEach(b=>b.classList.toggle('active',b.dataset.month===mm));
@@ -3592,6 +3633,7 @@ async function deleteFinoraCard(id){
     saveFinoraCards(loadFinoraCards().filter(c=>String(c.id)!==String(card.id)));
     renderFinoraCards();
     fillLaunchCards();
+  fillPaymentAccounts();
 
     if(cloudConfigured()){
       const ok=await pushCloudState(false);
@@ -4423,6 +4465,81 @@ function renderEvolutionChart(){
   if($('finoraEvolutionSubtitle'))$('finoraEvolutionSubtitle').textContent=`${currentWorkspaceName||'Meu ambiente'} · evolução dos últimos 7 meses`;
 }
 
+
+function finoraHideZeroExpenseRows(){
+  const root = document.querySelector('#simpleDashboard') || document.querySelector('.simple-sheet') || document;
+  if(!root) return;
+
+  // Procura a área cujo cabeçalho é DESPESAS.
+  const candidates = Array.from(root.querySelectorAll('section,div,article'));
+  const expenseBox = candidates.find(el => {
+    const first = (el.querySelector('h1,h2,h3,h4,.title,.simple-title')?.textContent || '').trim().toUpperCase();
+    return first === 'DESPESAS';
+  }) || Array.from(root.querySelectorAll('*')).find(el => {
+    return el.children.length && (el.firstElementChild?.textContent || '').trim().toUpperCase() === 'DESPESAS';
+  });
+
+  if(!expenseBox) return;
+
+  const moneyValue = (txt) => {
+    txt = String(txt || '').replace(/\s/g,'');
+    if(!txt || /R\$\s*[—-]/i.test(String(txt))) return 0;
+    const m = String(txt).match(/R\$\s*(-?[\d.]+(?:,\d{1,2})?)/i);
+    if(!m) return null;
+    return Number(m[1].replace(/\./g,'').replace(',','.')) || 0;
+  };
+
+  // Linhas individuais: oculta somente quando a linha representa categoria
+  // e o valor mostrado é zero/traço. Cabeçalhos e total geral permanecem.
+  const rows = Array.from(expenseBox.querySelectorAll('tr, .simple-row, .expense-row'));
+  rows.forEach(row => {
+    const text = (row.textContent || '').trim();
+    const upper = text.toUpperCase();
+    if(!text) return;
+    if(upper.includes('TOTAL GERAL DE DESPESAS')) return;
+    if(upper === 'ESSENCIAIS' || upper === 'NÃO ESSENCIAIS' || upper === 'NAO ESSENCIAIS') return;
+    if(upper.includes('DESCRIÇÃO') && upper.includes('VALOR')) return;
+
+    const cells = Array.from(row.querySelectorAll('td,th,.value,.amount'));
+    const lastText = (cells.at(-1)?.textContent || '').trim();
+    const val = moneyValue(lastText);
+    if(val === 0 && (/R\$/i.test(lastText) || /[—-]/.test(lastText))){
+      row.style.display = 'none';
+      row.setAttribute('data-finora-zero-hidden','true');
+    } else {
+      row.style.display = '';
+      row.removeAttribute('data-finora-zero-hidden');
+    }
+  });
+
+  // Grupos completos zerados. Detecta títulos/subtotais por texto e esconde
+  // do cabeçalho do grupo até o próximo grupo/total.
+  const allRows = Array.from(expenseBox.querySelectorAll('tr, .simple-row, .expense-row'));
+  const groupNames = ['ESSENCIAIS','NÃO ESSENCIAIS','NAO ESSENCIAIS'];
+
+  allRows.forEach((row, idx) => {
+    const text = (row.textContent || '').trim();
+    const upper = text.toUpperCase();
+    const group = groupNames.find(g => upper.startsWith(g));
+    if(!group) return;
+
+    const val = moneyValue(text);
+    if(val !== 0) return;
+
+    // Se subtotal explicitamente zero, oculta cabeçalho + linhas do grupo,
+    // até encontrar outro grupo ou total geral.
+    row.style.display = 'none';
+    row.setAttribute('data-finora-zero-hidden','true');
+    for(let j=idx+1;j<allRows.length;j++){
+      const next = allRows[j];
+      const nt = (next.textContent || '').trim().toUpperCase();
+      if(groupNames.some(g=>nt.startsWith(g)) || nt.includes('TOTAL GERAL DE DESPESAS')) break;
+      next.style.display='none';
+      next.setAttribute('data-finora-zero-hidden','true');
+    }
+  });
+}
+
 function render(){
   updateAdminDangerControls();
   document.querySelectorAll('.account').forEach(b=>b.classList.toggle('active',b.dataset.account===account));
@@ -4442,6 +4559,7 @@ function render(){
   renderAlerts();
   renderFinanceDashboard();
   renderSimpleDashboard();
+  requestAnimationFrame(finoraHideZeroExpenseRows);
   renderEvolutionChart();
   renderCategoryFigures();
   renderFinoraCards();
@@ -4468,12 +4586,12 @@ function render(){
   </tr></thead><tbody>${rows.map(x=>{
     const st=effectiveStatus(x);
     return `<tr>
-      <td><strong>${esc(x.descricao)}</strong><br><span style="color:#7b8881">${esc(x.categoria||'Sem categoria')} · ${esc(x.forma||'')}</span></td>
+      <td><strong>${esc(x.descricao)}</strong>${launchMetaHtml(x)?`<br>${launchMetaHtml(x)}`:''}</td>
       <td>${esc(x.pessoa)}</td>
-      <td>${x.vencimento?dateBR(x.vencimento):'—'}</td>
+      <td>${x.vencimento?dateBR(x.vencimento):''}</td>
       <td><span class="badge ${st}">${x.tipo==='entrada'?(st==='pago'?'Recebido':st==='atrasado'?'Recebimento atrasado':'A receber'):(st==='pago'?'Pago':st==='atrasado'?'Atrasado':'Pendente')}</span></td>
       <td class="money ${x.tipo==='entrada'?'in':'out'}">${x.valorPendente?'<span style="color:#855f22">Valor a definir</span>':`${x.tipo==='entrada'?'+':'−'} ${money(x.valor)}`}</td>
-      <td>${x.attachment?`<button class="iconbtn" onclick="downloadFile('${x.id}')">Abrir</button>`:'—'}</td>
+      <td>${x.attachment?`<button class="iconbtn" onclick="downloadFile('${x.id}')">Abrir</button>`:''}</td>
       <td><div class="row-actions">
         ${st!=='pago'?`<button type="button" class="iconbtn" title="Marcar como pago" data-row-action="paid" data-row-id="${esc(x.id)}">✓</button>`:''}
         <button type="button" class="iconbtn" data-row-action="edit" data-row-id="${esc(x.id)}">Editar</button>
@@ -4489,6 +4607,9 @@ function resetForm(){
   $('formTitle').textContent=currentLaunchMode==='entrada'?'Nova entrada':currentLaunchMode==='saida'?'Nova despesa / saída':'Novo lançamento';
   $('cancelEdit').style.display='none';$('dataLancamento').value=today();$('recorrente').value='nao';$('valorRecorrente').value='mesmo';$('recRule').value='fixo';fillPeople();editingAttachment=null;
   $('fileInfo').textContent='O arquivo fica salvo somente neste navegador.';
+  if($('paymentAccount'))$('paymentAccount').value='';
+  fillPaymentAccounts();
+  updatePaymentAccountField();
   if(currentLaunchMode==='entrada')$('tipo').value='entrada';
   else if(currentLaunchMode==='saida')$('tipo').value='saida';
   
@@ -4517,6 +4638,39 @@ function readFile(file){
 }
 
 
+
+function paymentNeedsAccount(method){
+  const v=String(method||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  return v==='pix' || v==='debito' || v==='transferencia';
+}
+function updatePaymentAccountField(){
+  const field=$('paymentAccountField');
+  if(!field)return;
+  const show=$('tipo')?.value==='saida' && paymentNeedsAccount($('forma')?.value);
+  field.style.display=show?'block':'none';
+  if(!show && $('paymentAccount'))$('paymentAccount').value='';
+}
+function fillPaymentAccounts(selected=''){
+  const dl=$('paymentAccounts');
+  if(!dl)return;
+  const vals=[...new Set(
+    data.filter(x=>sameWorkspace(x))
+      .map(x=>String(x.paymentAccount||'').trim())
+      .filter(Boolean)
+  )].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  dl.innerHTML=vals.map(v=>`<option value="${esc(v)}"></option>`).join('');
+  if(selected && $('paymentAccount'))$('paymentAccount').value=selected;
+}
+function launchMetaHtml(x){
+  const parts=[];
+  if(String(x.categoria||'').trim())parts.push(esc(x.categoria));
+  if(String(x.forma||'').trim())parts.push(esc(x.forma));
+  if(String(x.paymentAccount||'').trim())parts.push(`Conta: ${esc(x.paymentAccount)}`);
+  if(!parts.length)return '';
+  return `<span class="finora-launch-meta">${parts.join('<span class="meta-dot">·</span>')}</span>`;
+}
+
 function updateTypeLabels(){
   const entrada=$('tipo').value==='entrada';
   const lbl=$('dateTargetLabel');
@@ -4529,6 +4683,7 @@ function updateTypeLabels(){
       : '<option value="pendente">Pendente</option><option value="pago">Pago</option>';
     status.value=current;
   }
+  updatePaymentAccountField();
 }
 
 function autoValorRecorrente(){
@@ -4549,6 +4704,10 @@ function autoValorRecorrente(){
   const el=$(id); if(el){el.addEventListener('input',autoValorRecorrente);el.addEventListener('change',autoValorRecorrente);}
 });
 $('tipo').addEventListener('change',updateTypeLabels);
+$('forma')?.addEventListener('change',()=>{
+  updatePaymentAccountField();
+  autoValorRecorrente();
+});
 
 $('entryForm').addEventListener('submit',async e=>{
   e.preventDefault();
@@ -4568,6 +4727,7 @@ $('entryForm').addEventListener('submit',async e=>{
     categoria:$('categoria').value.trim(),essentialType:$('tipo').value==='saida'?$('essentialType').value:'',valor:Number($('valor').value),dataLancamento:dataLancVal,
     vencimento:vencVal,status:$('status').value,recorrente:recorrenciaVal,recRule:recRuleVal,
     valorRecorrente:$('valorRecorrente').value,valorPendente:false,beneficiario:$('beneficiario').value.trim(),parcelas:$('parcelas').value.trim(),cardId:$('launchCard')?.value||'',forma:$('forma').value,
+    paymentAccount:paymentNeedsAccount($('forma').value)?$('paymentAccount').value.trim():'',
     observacao:$('observacao').value.trim(),attachment,updatedAt:new Date().toISOString()};
   const idx=data.findIndex(x=>x.id===id); if(idx>=0)data[idx]=row;else data.push(row);
   try{save()}catch(err){toast('Arquivo muito grande para o navegador. Remova o anexo.');return}
@@ -4584,7 +4744,9 @@ function editRow(id){
   $('editId').value=x.id;$('tipo').value=x.tipo;fillPeople(x.pessoa);$('descricao').value=x.descricao;
   $('categoria').value=x.categoria||'';$('essentialType').value=x.essentialType||inferEssentialType(x);$('valor').value=x.valor;$('dataLancamento').value=x.dataLancamento||today();
   $('vencimento').value=x.vencimento||'';$('beneficiario').value=x.beneficiario||'';$('parcelas').value=x.parcelas||'';fillLaunchCards(x.cardId||'');$('status').value=x.status;$('recorrente').value=x.recorrente||'nao';$('valorRecorrente').value=x.valorRecorrente||'mesmo';$('recRule').value=x.recRule||'fixo';$('forma').value=x.forma||'Boleto';$('observacao').value=x.observacao||'';
+  fillPaymentAccounts(x.paymentAccount||'');
   updateTypeLabels();
+  if($('paymentAccount'))$('paymentAccount').value=x.paymentAccount||'';
   $('formTitle').textContent=x.tipo==='entrada'?'Editar entrada':'Editar despesa / saída';$('cancelEdit').style.display='block';
   $('fileInfo').textContent=x.attachment?`Arquivo atual: ${x.attachment.name}`:'O arquivo fica salvo somente neste navegador.';
   const _launch=$('simpleLaunchPanel');if(_launch)_launch.scrollTo({top:0,behavior:'smooth'});
@@ -4736,8 +4898,8 @@ $('clearAccount').onclick=async()=>{
 };
 $('exportCsv').onclick=()=>{
   const rows=data.filter(x=>sameWorkspace(x));
-  const headers=['Tipo','Pessoa','Descrição','Categoria','Valor','Data','Vencimento','Status','Forma','Observação'];
-  const csv=[headers,...rows.map(x=>[x.tipo,x.pessoa,x.descricao,x.categoria,x.valor,x.dataLancamento,x.vencimento,effectiveStatus(x),x.forma,x.observacao])]
+  const headers=['Tipo','Pessoa','Descrição','Categoria','Valor','Data','Vencimento','Status','Forma de pagamento','Conta / origem do pagamento','Observação'];
+  const csv=[headers,...rows.map(x=>[x.tipo,x.pessoa,x.descricao,x.categoria,x.valor,x.dataLancamento,x.vencimento,effectiveStatus(x),x.forma,x.paymentAccount||'',x.observacao])]
     .map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n');
   const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download=`controle-${account}-${today()}.csv`;a.click();URL.revokeObjectURL(a.href);
