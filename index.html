@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v73-redesign-premium-aprovado">
+<meta name="finora-version" content="v74-perfil-no-topo">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -2838,6 +2838,176 @@ input:focus,select:focus,textarea:focus{
   .simple-kpi strong{font-size:18px!important}
 }
 
+
+/* ==========================================================
+   FINORA v74 — PERFIL PROFISSIONAL NO TOPO
+   ========================================================== */
+header{
+  display:grid!important;
+  grid-template-columns:minmax(320px,1fr) auto auto!important;
+  align-items:center!important;
+  column-gap:12px!important;
+}
+.finora-premium-heading{
+  min-width:0!important;
+}
+.finora-session-panel#userChip{
+  position:static!important;
+  inset:auto!important;
+  transform:none!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:0!important;
+  padding:0!important;
+  margin:0!important;
+  width:auto!important;
+  max-width:390px!important;
+  min-width:265px!important;
+  min-height:54px!important;
+  border:1px solid #dbe5df!important;
+  border-radius:16px!important;
+  background:rgba(255,255,255,.96)!important;
+  box-shadow:0 10px 28px rgba(14,39,31,.08)!important;
+  overflow:hidden!important;
+  z-index:auto!important;
+}
+.finora-session-profile{
+  flex:1 1 auto!important;
+  min-width:0!important;
+  display:grid!important;
+  grid-template-columns:38px minmax(0,1fr) 18px!important;
+  align-items:center!important;
+  gap:10px!important;
+  min-height:54px!important;
+  padding:7px 10px!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:#153d31!important;
+  text-align:left!important;
+  cursor:pointer!important;
+  box-shadow:none!important;
+}
+.finora-session-profile:hover{
+  background:#f6faf8!important;
+  transform:none!important;
+}
+.finora-session-avatar{
+  width:38px!important;
+  height:38px!important;
+  min-width:38px!important;
+  border-radius:50%!important;
+  display:grid!important;
+  place-items:center!important;
+  background:linear-gradient(145deg,#0f5a46,#1d7a57)!important;
+  color:#fff!important;
+  font-size:12px!important;
+  font-weight:800!important;
+  letter-spacing:.03em!important;
+  box-shadow:0 5px 12px rgba(15,90,70,.18)!important;
+}
+.finora-session-copy{
+  min-width:0!important;
+  display:block!important;
+  line-height:1.15!important;
+}
+.finora-session-copy > strong{
+  display:block!important;
+  max-width:100%!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  color:#153d31!important;
+  font-size:11px!important;
+  font-weight:750!important;
+}
+.finora-session-meta{
+  display:flex!important;
+  align-items:center!important;
+  gap:5px!important;
+  min-width:0!important;
+  margin-top:4px!important;
+  color:#718079!important;
+  font-size:8px!important;
+  font-weight:500!important;
+  white-space:nowrap!important;
+}
+.finora-session-meta #loggedAccount{
+  color:#287055!important;
+  font-weight:700!important;
+}
+.finora-session-meta .user-family{
+  max-width:115px!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.finora-session-dot{
+  color:#b2beb8!important;
+}
+.finora-session-chevron{
+  color:#819088!important;
+  font-size:13px!important;
+}
+.finora-session-logout#logoutBtn{
+  align-self:stretch!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-width:54px!important;
+  padding:0 12px!important;
+  border:0!important;
+  border-left:1px solid #e3eae6!important;
+  border-radius:0!important;
+  background:#fbfcfb!important;
+  color:#496158!important;
+  font-size:9px!important;
+  font-weight:700!important;
+  cursor:pointer!important;
+}
+.finora-session-logout#logoutBtn:hover{
+  background:#edf5f1!important;
+  color:#0f5a46!important;
+  transform:none!important;
+}
+.workspace-top-switch{
+  min-width:205px!important;
+  max-width:250px!important;
+  margin-left:0!important;
+}
+
+/* O antigo chip não deve mais aparecer sobre o conteúdo. */
+body > .user-chip{
+  display:none!important;
+}
+
+/* Tablet */
+@media(max-width:1180px){
+  header{
+    grid-template-columns:minmax(260px,1fr) auto!important;
+    row-gap:10px!important;
+  }
+  .workspace-top-switch{
+    grid-column:1 / -1!important;
+    width:100%!important;
+    max-width:none!important;
+  }
+}
+
+/* Mobile: usuário no topo, compacto e sem mascarar a interface. */
+@media(max-width:820px), (hover:none) and (pointer:coarse){
+  header{
+    display:none!important;
+  }
+  .finora-session-panel#userChip{
+    max-width:none!important;
+    min-width:0!important;
+  }
+  .finora-mobile-topbar .finora-mobile-user{
+    border-radius:999px!important;
+  }
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -2950,13 +3120,6 @@ input:focus,select:focus,textarea:focus{
   </div></div>
  </div>
 </div>
-<div class="user-chip" id="userChip">
-  <button type="button" class="user-profile-trigger" id="profileBtn" title="Meu perfil">
-    <div><strong id="loggedName">Usuário</strong><span> · </span><span id="loggedAccount">FINORA</span><span class="user-family" id="loggedFamily"></span></div>
-  </button>
-  <button type="button" id="logoutBtn">Sair</button>
-</div>
-
 <div class="shell">
 <header>
   <div class="brand finora-header-brand finora-premium-heading">
@@ -2964,6 +3127,24 @@ input:focus,select:focus,textarea:focus{
     <h1>Seu dinheiro, com clareza.</h1>
     <p>Controle financeiro pessoal e familiar <b>· seu ambiente, suas escolhas.</b></p>
   </div>
+  <div class="finora-session-panel" id="userChip">
+    <button type="button" class="user-profile-trigger finora-session-profile" id="profileBtn" title="Abrir meu perfil">
+      <span class="finora-session-avatar" id="userAvatarInitials">U</span>
+      <span class="finora-session-copy">
+        <strong id="loggedName">Usuário</strong>
+        <span class="finora-session-meta">
+          <span id="loggedAccount">FINORA</span>
+          <span class="finora-session-dot">•</span>
+          <span class="user-family" id="loggedFamily">Ambiente</span>
+        </span>
+      </span>
+      <span class="finora-session-chevron" aria-hidden="true">⌄</span>
+    </button>
+    <button type="button" class="finora-session-logout" id="logoutBtn" title="Sair da FINORA">
+      <span>Sair</span>
+    </button>
+  </div>
+
   <div class="workspace-top-switch">
     <label for="workspaceTopSelect">Ambiente</label>
     <select id="workspaceTopSelect" onchange="switchFinoraWorkspace(this.value)"></select>
@@ -7970,5 +8151,29 @@ if(typeof _finoraOldRenderSimpleDashboard==='function'){
 }
 setTimeout(renderHomeCategoryDonut,0);
 </script>
+
+<script id="finora-v74-session-ui">
+(function(){
+  function finoraSessionInitials(){
+    const el=document.getElementById('loggedName');
+    const avatar=document.getElementById('userAvatarInitials');
+    if(!el||!avatar)return;
+    const parts=String(el.textContent||'Usuário').trim().split(/\s+/).filter(Boolean);
+    const initials=(parts.length>1?parts[0][0]+parts[parts.length-1][0]:parts[0]?.slice(0,2)||'U').toUpperCase();
+    avatar.textContent=initials;
+  }
+  function install(){
+    finoraSessionInitials();
+    const name=document.getElementById('loggedName');
+    if(name && !name.dataset.initialsObserver){
+      name.dataset.initialsObserver='1';
+      new MutationObserver(finoraSessionInitials).observe(name,{subtree:true,childList:true,characterData:true});
+    }
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);
+  else install();
+})();
+</script>
+
 </body>
 </html>
