@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v74-perfil-no-topo">
+<meta name="finora-version" content="v75-recupera-dados-ambiente">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3008,6 +3008,18 @@ body > .user-chip{
   }
 }
 
+
+/* FINORA v75 — indicador de disponibilidade dos dados */
+.finora-data-status{
+  display:none;
+  font-size:8px;
+  color:#60756b;
+  padding:4px 8px;
+  border-radius:999px;
+  background:#edf5f1;
+  border:1px solid #dbe8e1;
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -4967,7 +4979,10 @@ async function switchFinoraWorkspace(workspaceId){
   if($('simpleWorkspaceTitle'))$('simpleWorkspaceTitle').textContent=currentWorkspaceName;
   normalizeVariableReminders();
   ensureRecurringNextMonths();
-  if(cloudConfigured())await pullCloudState(false);
+  if(cloudConfigured()){
+    await pullCloudState(false);
+    await finoraRecoverWorkspaceDataIfEmpty();
+  }
   renderWorkspaceSelectors();
   renderFamilyAccess();
   render();
@@ -7221,6 +7236,85 @@ function migrateWorkspaceData(){
   cards.forEach(c=>{if(!c.workspaceId){c.workspaceId=currentWorkspaceId;c.account='family';cc=true}});
   if(cc)saveFinoraCards(cards);
 }
+
+async function finoraRecoverWorkspaceDataIfEmpty(){
+  try{
+    // Só entra em recuperação quando o ambiente atual realmente está sem lançamentos.
+    const localRows=data.filter(x=>sameWorkspace(x));
+    if(localRows.length)return false;
+    if(!cloudConfigured() || !currentWorkspaceId)return false;
+
+    const client=getCloudClient();
+    if(!client)return false;
+
+    // Primeiro confirma se o workspace atual tem estado remoto.
+    const {data:currentRow,error:currentErr}=await client
+      .from('finora_workspace_state')
+      .select('workspace_id,state,updated_at')
+      .eq('workspace_id',currentWorkspaceId)
+      .maybeSingle();
+
+    if(!currentErr && Array.isArray(currentRow?.state?.transactions) && currentRow.state.transactions.length){
+      await pullCloudState(false);
+      return data.some(x=>sameWorkspace(x));
+    }
+
+    // Compatibilidade para ambientes duplicados/migrados com o mesmo nome.
+    // RLS continua limitando a busca aos ambientes que o usuário pode acessar.
+    const {data:rows,error}=await client
+      .from('finora_workspace_state')
+      .select('workspace_id,state,updated_at');
+
+    if(error || !Array.isArray(rows))return false;
+
+    const targetName=String(currentWorkspaceName||'').trim().toLocaleLowerCase('pt-BR');
+    const candidates=rows
+      .filter(r=>{
+        const name=String(r?.state?.workspaceName||'').trim().toLocaleLowerCase('pt-BR');
+        const tx=Array.isArray(r?.state?.transactions)?r.state.transactions:[];
+        return name && name===targetName && tx.length>0;
+      })
+      .sort((a,b)=>
+        (b.state?.transactions?.length||0)-(a.state?.transactions?.length||0) ||
+        String(b.updated_at||'').localeCompare(String(a.updated_at||''))
+      );
+
+    const found=candidates[0];
+    if(!found || String(found.workspace_id)===String(currentWorkspaceId))return false;
+
+    const recoveredState=found.state||{};
+    const recoveredTx=(recoveredState.transactions||[]).map(x=>({
+      ...x,
+      workspaceId:currentWorkspaceId,
+      account:'family'
+    }));
+
+    const currentOther=data.filter(x=>!sameWorkspace(x));
+    data=[...currentOther,...recoveredTx];
+    localStorage.setItem(KEY,JSON.stringify(data));
+
+    // Cartões também acompanham a recuperação visual do mesmo ambiente.
+    if(Array.isArray(recoveredState.cards) && recoveredState.cards.length){
+      const currentCards=loadFinoraCards().filter(c=>c.workspaceId!==currentWorkspaceId);
+      const recoveredCards=recoveredState.cards.map(c=>({
+        ...c,
+        workspaceId:currentWorkspaceId,
+        account:'family'
+      }));
+      saveFinoraCards([...currentCards,...recoveredCards]);
+    }
+
+    // Publica o estado recuperado no workspace atual para normalizar futuras sessões.
+    try{ await pushCloudState(false); }catch(e){ console.warn('FINORA v75 recovery push',e); }
+
+    console.info('FINORA v75: dados do ambiente recuperados de uma referência autorizada com o mesmo nome.');
+    return recoveredTx.length>0;
+  }catch(e){
+    console.warn('FINORA v75 recovery',e);
+    return false;
+  }
+}
+
 async function openFinora(user){
   currentUser=user;
   account='family';
@@ -7246,6 +7340,7 @@ async function openFinora(user){
   resetForm();
   if(cloudConfigured()){
     await pullCloudState(false);
+    await finoraRecoverWorkspaceDataIfEmpty();
     await ensureOnlineWorkspaceName();
     // Um integrante que acabou de aceitar o convite publica imediatamente
     // seu vínculo e o status utilizado, depois de receber o estado atual.
