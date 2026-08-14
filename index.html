@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v80-extrato-bancario-saldos">
+<meta name="finora-version" content="v81-extrato-impressao-limpa-watermark">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3146,6 +3146,169 @@ body > .user-chip{
   }
 }
 
+
+/* ==========================================================
+   FINORA v81 — IMPRESSÃO DE EXTRATO LIMPA + MARCA D'ÁGUA
+   ========================================================== */
+.statement-print-title{
+  display:none;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:12px;
+  margin:0 0 10px;
+  padding-bottom:8px;
+  border-bottom:1px solid #dfe6e2;
+}
+.statement-print-title strong{
+  color:#123e30;
+  font:700 18px Georgia,"Times New Roman",serif;
+}
+.statement-print-title span{
+  color:#6f7f77;
+  font:8px Verdana,sans-serif;
+}
+.statement-opening{
+  position:relative;
+}
+.statement-opening:before{
+  content:"";
+}
+.statement-row.statement-opening-row{
+  background:#f3f7f4;
+  font-weight:700;
+}
+.statement-row.statement-opening-row .statement-amount{
+  color:#173f31!important;
+}
+.finora-print-watermark{
+  display:none;
+}
+
+/* Regra forte e explícita para impressão */
+@media print{
+  @page{
+    size:A4 portrait;
+    margin:14mm 11mm 14mm 11mm;
+  }
+
+  html,body{
+    background:#fff!important;
+  }
+
+  /* Esconde absolutamente tudo */
+  body *{
+    visibility:hidden!important;
+  }
+
+  /* Mostra somente o painel de relatórios e seu conteúdo */
+  #finoraReportsPanel,
+  #finoraReportsPanel *{
+    visibility:visible!important;
+  }
+
+  #finoraReportsPanel{
+    position:absolute!important;
+    inset:0 auto auto 0!important;
+    transform:none!important;
+    width:100%!important;
+    max-width:none!important;
+    max-height:none!important;
+    height:auto!important;
+    overflow:visible!important;
+    margin:0!important;
+    padding:0!important;
+    border:0!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    background:transparent!important;
+  }
+
+  /* Remove cabeçalho interativo e TODOS os filtros */
+  #finoraReportsPanel .finora-report-head,
+  #finoraReportsPanel .report-filters,
+  #finoraReportsPanel .report-tabs,
+  #finoraReportsPanel .report-actions,
+  #finoraReportsPanel .popup-close-rail,
+  #finoraReportsPanel .popup-modal-close,
+  #finoraReportsPanel > button,
+  #finoraReportsPanel select,
+  #finoraReportsPanel input,
+  #finoraReportsPanel label{
+    display:none!important;
+    visibility:hidden!important;
+  }
+
+  /* Mostra só Extrato */
+  #finoraReportsPanel .report-view{
+    display:none!important;
+  }
+  #finoraReportsPanel #reportStatement{
+    display:block!important;
+    visibility:visible!important;
+    position:relative!important;
+    z-index:2!important;
+    background:transparent!important;
+  }
+  #finoraReportsPanel #reportStatement *{
+    visibility:visible!important;
+  }
+
+  .statement-print-title{
+    display:flex!important;
+  }
+
+  .statement-period,
+  .statement-summary,
+  .statement-opening{
+    background:rgba(255,255,255,.92)!important;
+  }
+
+  .statement-list{
+    border-color:#dce4df!important;
+    background:transparent!important;
+  }
+
+  .statement-day{
+    background:rgba(242,246,243,.92)!important;
+  }
+
+  .statement-row{
+    background:rgba(255,255,255,.90)!important;
+  }
+
+  .statement-day-balance{
+    background:rgba(247,249,248,.92)!important;
+  }
+
+  .statement-row,
+  .statement-day,
+  .statement-day-balance,
+  .statement-opening{
+    break-inside:avoid!important;
+    page-break-inside:avoid!important;
+  }
+
+  /* Marca d'água repetida pela folha */
+  body:before{
+    content:"FINORA · suas finanças a qualquer hora   FINORA · suas finanças a qualquer hora   FINORA · suas finanças a qualquer hora   FINORA · suas finanças a qualquer hora   FINORA · suas finanças a qualquer hora   FINORA · suas finanças a qualquer hora   FINORA · suas finanças a qualquer hora   FINORA · suas finanças a qualquer hora   FINORA · suas finanças a qualquer hora   FINORA · suas finanças a qualquer hora   FINORA · suas finanças a qualquer hora   FINORA · suas finanças a qualquer hora";
+    visibility:visible!important;
+    display:block!important;
+    position:fixed!important;
+    inset:0!important;
+    z-index:0!important;
+    color:rgba(80,92,86,.075)!important;
+    font:700 12px Verdana,sans-serif!important;
+    line-height:5.6!important;
+    letter-spacing:.02em!important;
+    word-spacing:8px!important;
+    transform:rotate(-22deg) scale(1.15)!important;
+    transform-origin:center!important;
+    white-space:normal!important;
+    text-align:center!important;
+    pointer-events:none!important;
+  }
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -3463,6 +3626,10 @@ body > .user-chip{
     
   </div>
   <div id="reportStatement" class="report-view">
+    <div class="statement-print-title">
+      <strong>Extrato FINORA</strong>
+      <span id="statementPrintWorkspace">Ambiente</span>
+    </div>
     <div class="statement-period" id="statementPeriod">Período: —</div>
     <div class="statement-summary">
       <span id="statementCount">0 movimentações</span>
@@ -8558,14 +8725,35 @@ function renderReportStatement(rows){
   $('statementOpeningBalance').textContent=money(opening);
   $('statementRemaining').textContent=money(remaining);
   $('statementPeriod').textContent=reportPeriodLabel();
+  if($('statementPrintWorkspace'))$('statementPrintWorkspace').textContent=currentWorkspaceName||'Meu ambiente';
 
-  if(!rows.length){
-    $('statementList').innerHTML='<div class="empty">Nenhuma movimentação encontrada com os filtros selecionados.</div>';
+  // Ordem bancária: menor data para maior data.
+  const chronological=[...rows].sort((a,b)=>{
+    const da=reportISODate(referenceDate(a))||'9999-12-31';
+    const db=reportISODate(referenceDate(b))||'9999-12-31';
+    if(da!==db)return da.localeCompare(db);
+    return String(a.id||'').localeCompare(String(b.id||''));
+  });
+
+  const blocks=[];
+
+  // "Saldo anterior" também aparece como uma linha do extrato.
+  blocks.push(
+    `<div class="statement-row statement-opening-row">
+      <div>
+        <strong>Saldo anterior</strong>
+        <small>Saldo acumulado antes do período selecionado</small>
+      </div>
+      <div class="statement-amount">${money(opening)}</div>
+    </div>`
+  );
+
+  if(!chronological.length){
+    blocks.push('<div class="empty">Nenhuma movimentação encontrada com os filtros selecionados.</div>');
+    $('statementList').innerHTML=blocks.join('');
     return;
   }
 
-  // Extrato é exibido em ordem cronológica para que o saldo diário faça sentido.
-  const chronological=[...rows].sort((a,b)=>(referenceDate(a)||'').localeCompare(referenceDate(b)||''));
   const byDay=new Map();
   chronological.forEach(x=>{
     const iso=reportISODate(referenceDate(x))||'';
@@ -8574,17 +8762,25 @@ function renderReportStatement(rows){
   });
 
   let running=opening;
-  const blocks=[];
 
   for(const [iso,dayRows] of byDay.entries()){
     const dayLabel=iso?reportBRDate(iso):'Sem data';
-    blocks.push(`<div class="statement-day"><span class="day-label">${dayLabel}</span></div>`);
+    blocks.push(
+      `<div class="statement-day">
+        <span class="day-label">${dayLabel}</span>
+      </div>`
+    );
 
     dayRows.forEach(x=>{
       const val=Number(x.valor||0);
       const sign=x.tipo==='entrada'?'+':'−';
-      const meta=[reportPersonOf(x),x.categoria,reportPaymentOf(x),reportCardName(x),effectiveStatus(x)]
-        .filter(Boolean).join(' · ');
+      const meta=[
+        reportPersonOf(x),
+        x.categoria,
+        reportPaymentOf(x),
+        reportCardName(x),
+        effectiveStatus(x)
+      ].filter(Boolean).join(' · ');
 
       running+=reportSignedValue(x);
 
@@ -8631,25 +8827,37 @@ function exportFinoraReportCSV(){
 }
 function printFinoraReport(){
   const previous=finoraReportTab;
-  if(previous!=='statement'){
-    finoraReportTab='statement';
-    document.querySelectorAll('.report-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.reportTab==='statement'));
-    $('reportOverview').classList.remove('active');
-    $('reportBreakdown').classList.remove('active');
-    $('reportStatement').classList.add('active');
-    renderFinoraReports();
-  }
-  window.print();
-  if(previous!=='statement'){
-    setTimeout(()=>{
+
+  finoraReportTab='statement';
+  document.querySelectorAll('.report-tabs button').forEach(
+    b=>b.classList.toggle('active',b.dataset.reportTab==='statement')
+  );
+  $('reportOverview')?.classList.remove('active');
+  $('reportBreakdown')?.classList.remove('active');
+  $('reportStatement')?.classList.add('active');
+
+  renderFinoraReports();
+
+  document.body.classList.add('finora-printing-statement');
+
+  const restore=()=>{
+    document.body.classList.remove('finora-printing-statement');
+    if(previous!=='statement'){
       finoraReportTab=previous;
-      document.querySelectorAll('.report-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.reportTab===previous));
-      $('reportOverview').classList.toggle('active',previous==='overview');
-      $('reportStatement').classList.toggle('active',previous==='statement');
-      $('reportBreakdown').classList.toggle('active',!['overview','statement'].includes(previous));
+      document.querySelectorAll('.report-tabs button').forEach(
+        b=>b.classList.toggle('active',b.dataset.reportTab===previous)
+      );
+      $('reportOverview')?.classList.toggle('active',previous==='overview');
+      $('reportStatement')?.classList.toggle('active',previous==='statement');
+      $('reportBreakdown')?.classList.toggle('active',!['overview','statement'].includes(previous));
       renderFinoraReports();
-    },250);
-  }
+    }
+  };
+
+  const after=()=>{window.removeEventListener('afterprint',after);restore();};
+  window.addEventListener('afterprint',after,{once:true});
+
+  requestAnimationFrame(()=>requestAnimationFrame(()=>window.print()));
 }
 </script>
 
@@ -8736,6 +8944,21 @@ setTimeout(renderHomeCategoryDonut,0);
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);
   else install();
+})();
+</script>
+
+
+<script id="finora-v81-print-guard">
+(function(){
+  window.addEventListener('beforeprint',function(){
+    document.body.classList.add('finora-printing-statement');
+    try{
+      if(typeof renderFinoraReports==='function')renderFinoraReports();
+    }catch(e){console.warn('FINORA v81 print render',e)}
+  });
+  window.addEventListener('afterprint',function(){
+    document.body.classList.remove('finora-printing-statement');
+  });
 })();
 </script>
 
