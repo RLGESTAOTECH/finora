@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v65-corrige-login-integrantes">
+<meta name="finora-version" content="v66-cartao-cor-cpf">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3849,7 +3849,23 @@ async function saveFinoraCard(){
   if(last4&&last4.length!==4)return toast('Informe apenas os 4 últimos dígitos.');
   const cards=loadFinoraCards(),id=$('cardEditId').value||(crypto.randomUUID?crypto.randomUUID():String(Date.now()));
   const existing=cards.find(c=>c.id===id);
-  const row={...(existing||{}),id,account:'family',workspaceId:currentWorkspaceId,name,issuer,owner,last4,expiry,dueDay,brand,defaultCategory,cardColor,updatedAt:new Date().toISOString()};
+  const row={
+  ...(existing||{}),
+  id,
+  account:'family',
+  workspaceId:currentWorkspaceId,
+  name,
+  issuer,
+  owner,
+  last4,
+  expiry,
+  dueDay,
+  brand,
+  defaultCategory,
+  cardColor:cardColor||existing?.cardColor||existing?.color||'#0b3d2e',
+  color:cardColor||existing?.cardColor||existing?.color||'#0b3d2e',
+  updatedAt:new Date().toISOString()
+};
   const idx=cards.findIndex(c=>c.id===id);if(idx>=0)cards[idx]=row;else cards.push(row);
   saveFinoraCards(cards);saveCardTombstones(loadCardTombstones().filter(t=>t.id!==id));
   renderFinoraCards();fillLaunchCards();
@@ -3900,7 +3916,7 @@ function renderFinoraCards(){
   box.innerHTML=cards.length?cards.map(c=>{
     const brand=c.brand&&c.brand!=='auto'?c.brand:inferCardBrand(c.name,c.issuer);
     return `<div class="finora-card-item">
-      <div class="finora-card-visual" style="background:linear-gradient(135deg,${esc(c.cardColor||'#0b3d2e')} 0%,${esc(c.cardColor||'#0b3d2e')} 72%,rgba(255,255,255,.10) 72%)!important;">
+      <div class="finora-card-visual" style="--card-user-color:${esc(c.cardColor||c.color||'#0b3d2e')};background:linear-gradient(135deg,var(--card-user-color) 0%,var(--card-user-color) 76%,rgba(255,255,255,.11) 76%)!important;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div class="brandname">${esc(c.issuer||'CARTÃO')}</div>
           <div class="card-brand-logo">${cardBrandMarkup(brand)}</div>
@@ -5599,6 +5615,50 @@ async function migrateLocalLoginToSupabase(user,password){
   return await migrateLegacyProfileAfterAuth(user);
 }
 
+
+async function finoraResolveEmailByCpf(cpf){
+  const normalized=normalizeCPF(cpf);
+  if(!normalized)return null;
+
+  const cpfHash=await finoraHash(normalized);
+  const client=getAuthClient();
+  if(!client)return null;
+
+  // 1) Caminho principal: RPC por hash.
+  try{
+    const {data,error}=await client.rpc('finora_login_email_by_cpf',{p_cpf_hash:cpfHash});
+    if(!error && data){
+      if(typeof data==='string')return data.trim().toLowerCase();
+      if(Array.isArray(data) && data[0]?.email)return String(data[0].email).trim().toLowerCase();
+      if(data?.email)return String(data.email).trim().toLowerCase();
+    }
+  }catch(e){
+    console.debug('FINORA CPF RPC fallback',e);
+  }
+
+  // 2) Fallback de compatibilidade: consulta direta pelo hash, caso a policy permita.
+  try{
+    const {data,error}=await client
+      .from('finora_profiles')
+      .select('email')
+      .eq('cpf_hash',cpfHash)
+      .limit(1)
+      .maybeSingle();
+    if(!error && data?.email)return String(data.email).trim().toLowerCase();
+  }catch(e){}
+
+  // 3) Fallback local para contas já usadas neste navegador.
+  try{
+    const local=(loadFinoraUsers?.()||[]).find(u=>
+      String(u.cpf_hash||u.cpfHash||'')===cpfHash ||
+      normalizeCPF(u.cpf||u.cpf_masked||'')===normalized
+    );
+    if(local?.email)return String(local.email).trim().toLowerCase();
+  }catch(e){}
+
+  return null;
+}
+
 async function loginWithSupabase(identifier,password){
   const client=getAuthClient();
   if(!client)throw new Error('A configuração pública da FINORA ainda não foi publicada.');
@@ -5610,7 +5670,7 @@ async function loginWithSupabase(identifier,password){
     const cpf=normalizeCPF(identifier);
     if(cpf.length!==11)throw new Error('Informe um CPF válido ou utilize seu e-mail.');
     email=await authEmailFromCpf(cpf);
-    if(!email)throw new Error('CPF não encontrado. Entre com o e-mail e valide o CPF em Meu perfil para habilitar o acesso por CPF.');
+    if(!email)throw new Error('CPF não encontrado. Verifique se o CPF está vinculado ao seu perfil FINORA.');
   }
 
   const {data,error}=await client.auth.signInWithPassword({email,password});
