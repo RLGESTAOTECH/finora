@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v64-despesa-integrantes-ambiente">
+<meta name="finora-version" content="v65-corrige-login-integrantes">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -4936,24 +4936,44 @@ function launchMetaHtml(x){
 
 
 function expenseOwnerNames(){
-  const members=typeof familyMembersDirectory==='function'
-    ? familyMembersDirectory()
-    : [];
+  const names=[];
 
-  const names=members
-    .filter(m=>m && m.workspaceId===currentWorkspaceId)
-    .map(m=>String(m.name||'').trim())
-    .filter(Boolean);
+  // IMPORTANTE:
+  // esta função também pode ser chamada durante a inicialização da tela de login.
+  // Por isso ela não pode acessar currentUser antes de essa variável ser inicializada.
+  try{
+    if(typeof familyMembersDirectory==='function'){
+      (familyMembersDirectory()||[])
+        .filter(m=>m && m.workspaceId===currentWorkspaceId)
+        .forEach(m=>{
+          const name=String(m.name||'').trim();
+          if(name)names.push(name);
+        });
+    }
+  }catch(e){
+    console.debug('FINORA expenseOwnerNames: membros ainda não disponíveis na inicialização.');
+  }
 
-  // Garante que o próprio usuário também apareça mesmo antes de uma sincronização local.
-  if(currentUser?.name)names.push(String(currentUser.name).trim());
+  try{
+    if(typeof loadFinoraUsers==='function'){
+      (loadFinoraUsers()||[])
+        .filter(u=>!currentWorkspaceId || u.workspaceId===currentWorkspaceId)
+        .forEach(u=>{
+          const name=String(u?.name||'').trim();
+          if(name)names.push(name);
+        });
+    }
+  }catch(e){}
 
-  // Compatibilidade com cadastros locais antigos do mesmo ambiente.
-  (loadFinoraUsers?.()||[])
-    .filter(u=>u.workspaceId===currentWorkspaceId)
-    .forEach(u=>{
-      if(u?.name)names.push(String(u.name).trim());
-    });
+  // Mantém compatibilidade com a lista de pessoas já usada pela FINORA.
+  try{
+    if(typeof people==='function'){
+      (people()||[]).forEach(name=>{
+        name=String(name||'').trim();
+        if(name)names.push(name);
+      });
+    }
+  }catch(e){}
 
   return [...new Set(names)]
     .filter(n=>n && n!=='Família' && n!=='Família / compartilhada')
