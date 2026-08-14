@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v76-categoria-livre-mascara-moeda">
+<meta name="finora-version" content="v77-pessoa-estavel-categoria-livre-moeda">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3735,17 +3735,39 @@ function people(){
   return unique.length?[...unique,'Família']:['Família'];
 }
 function fillPeople(selected){
-  const opts=people().map(p=>`<option ${p===selected?'selected':''}>${p}</option>`).join('');
-  $('pessoa').innerHTML=opts;
+  const el=$('pessoa');
+  if(!el)return;
+
+  const names=people();
+  const previous=String(el.value||'').trim();
+  const desired=String(selected||previous||'').trim();
+
+  // Só remonta a lista se os nomes realmente mudaram.
+  const currentOptions=[...el.options].map(o=>o.value);
+  const sameList=currentOptions.length===names.length &&
+    currentOptions.every((v,i)=>v===names[i]);
+
+  if(!sameList){
+    el.innerHTML=names.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  }
+
+  // Prioridade: seleção explícita > valor que o usuário já escolheu > primeiro item.
+  if(desired && names.includes(desired))el.value=desired;
+  else if(previous && names.includes(previous))el.value=previous;
+  else if(names.length)el.value=names[0];
+
   const quick=$('entradaMesPessoa');
   if(quick){
     const keep=quick.value;
-    quick.innerHTML=people().map(p=>`<option>${p}</option>`).join('');
-    if(people().includes(keep)) quick.value=keep;
-    else quick.value=people()[0];
+    const qOptions=[...quick.options].map(o=>o.value);
+    const qSame=qOptions.length===names.length && qOptions.every((v,i)=>v===names[i]);
+    if(!qSame)quick.innerHTML=names.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+    if(names.includes(keep))quick.value=keep;
+    else if(names.length)quick.value=names[0];
   }
+
   const note=$('simonePayNote');
-  if(note) note.style.display=people().includes('Simone')?'inline':'none';
+  if(note)note.style.display=names.includes('Simone')?'inline':'none';
 }
 function effectiveStatus(x){
   if(x.status==='pago') return 'pago';
@@ -4743,14 +4765,21 @@ function merchantCategoryHint(text){
   return '';
 }
 function applyCardCategorySuggestion(){
+  const categoryEl=$('categoria');
+  if(!categoryEl)return;
+
+  // Categoria é livre: nunca sobrescrever algo que o usuário já digitou.
+  if(String(categoryEl.value||'').trim())return;
+
   const cardId=$('launchCard')?.value;
   if(!cardId)return;
   const c=accountCards().find(x=>x.id===cardId);
   if(!c)return;
+
   const desc=$('descricao')?.value||'',benef=$('beneficiario')?.value||'';
   const merchantHint=merchantCategoryHint(`${benef} ${desc}`);
-  if(merchantHint)$('categoria').value=merchantHint;
-  else if(c.defaultCategory)$('categoria').value=c.defaultCategory;
+  if(merchantHint)categoryEl.value=merchantHint;
+  else if(c.defaultCategory)categoryEl.value=c.defaultCategory;
 }
 
 async function shareCategoryImage(){
@@ -5359,7 +5388,7 @@ function applyLaunchMode(mode,{keepForm=false}={}){
     if(!keepForm)resetForm();
     $('tipo').value='entrada';
     updateTypeLabels();
-    if(!$('categoria').value)$('categoria').value='Renda'; $('descricao').placeholder='Ex.: Salário, aluguel recebido, reembolso...';
+    $('descricao').placeholder='Ex.: Salário, aluguel recebido, reembolso...';
     $('formTitle').textContent=$('editId').value?'Editar entrada':'Nova entrada';
     $('launchListTitle').textContent='Entradas registradas';
     $('launchModeBanner').innerHTML='<strong>Entrada / recebimento:</strong> registre salários, rendas, transferências recebidas e outros valores que entram no orçamento.';
@@ -5917,10 +5946,14 @@ function autoValorRecorrente(){
 });
 $('tipo').addEventListener('change',updateTypeLabels);
 $('pessoa')?.addEventListener('change',()=>{
+  const selectedPerson=$('pessoa')?.value||'';
   if($('tipo')?.value==='saida'){
     const current=$('expenseOwner')?.value||'';
-    if(!current || current==='Família / compartilhada')fillExpenseOwners($('pessoa').value);
+    if(!current || current==='Família / compartilhada'){
+      fillExpenseOwners(selectedPerson);
+    }
   }
+  // Não chamar fillPeople() aqui: isso evita voltar ao primeiro nome da lista.
 });
 $('forma')?.addEventListener('change',()=>{
   updatePaymentAccountField();
@@ -5929,6 +5962,7 @@ $('forma')?.addEventListener('change',()=>{
 
 $('entryForm').addEventListener('submit',async e=>{
   e.preventDefault();
+  if($('valor'))$('valor').value=formatBRLInput($('valor').value);
   const id=$('editId').value||crypto.randomUUID();
   const old=data.find(x=>x.id===id);
   let attachment=old?.attachment||null;
@@ -5961,7 +5995,7 @@ function editRow(id){
   const x=data.find(r=>r.id===id);if(!x)return;
   openSectionModal('simpleLaunchPanel');
   applyLaunchMode(x.tipo==='entrada'?'entrada':'saida',{keepForm:true});
-  $('editId').value=x.id;$('tipo').value=x.tipo;fillPeople(x.pessoa);fillExpenseOwners(x.expenseOwner||x.pessoa||'');$('descricao').value=x.descricao;
+  $('editId').value=x.id;$('tipo').value=x.tipo;fillPeople(x.pessoa);$('pessoa').value=x.pessoa||$('pessoa').value;fillExpenseOwners(x.expenseOwner||x.pessoa||'');$('descricao').value=x.descricao;
   $('categoria').value=x.categoria||'';$('essentialType').value=x.essentialType||inferEssentialType(x);$('valor').value=formatBRLInput(x.valor);$('dataLancamento').value=x.dataLancamento||today();
   $('vencimento').value=x.vencimento||'';$('beneficiario').value=x.beneficiario||'';$('parcelas').value=x.parcelas||'';fillLaunchCards(x.cardId||'');$('status').value=x.status;$('recorrente').value=x.recorrente||'nao';$('valorRecorrente').value=x.valorRecorrente||'mesmo';$('recRule').value=x.recRule||'fixo';$('forma').value=x.forma||'Boleto';$('observacao').value=x.observacao||'';
   fillPaymentAccounts(x.paymentAccount||'');
@@ -8324,6 +8358,39 @@ setTimeout(renderHomeCategoryDonut,0);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);
   else install();
+})();
+</script>
+
+
+<script id="finora-v77-person-guard">
+(function(){
+  function installPersonGuard(){
+    const el=document.getElementById('pessoa');
+    if(!el || el.dataset.personGuard==='1')return;
+    el.dataset.personGuard='1';
+    let last=el.value||'';
+
+    el.addEventListener('change',()=>{
+      last=el.value||last;
+      requestAnimationFrame(()=>{
+        // Se algum render legado remontar o select no mesmo ciclo, restaura a escolha.
+        const values=[...el.options].map(o=>o.value);
+        if(last && values.includes(last) && el.value!==last){
+          el.value=last;
+        }
+      });
+    });
+
+    new MutationObserver(()=>{
+      const values=[...el.options].map(o=>o.value);
+      if(last && values.includes(last) && el.value!==last){
+        el.value=last;
+      }
+    }).observe(el,{childList:true});
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installPersonGuard);
+  else installPersonGuard();
 })();
 </script>
 
