@@ -2376,6 +2376,77 @@ button[data-finora-delete="card"]:disabled{
 <script src="./finora-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<style id="finora-premium-v72">
+:root{
+  --finora-ink:#0b1713;
+  --finora-forest:#063d30;
+  --finora-forest-2:#0f5a46;
+  --finora-mint:#e9f2ed;
+  --finora-mint-2:#f5f8f6;
+  --finora-silver:#d9dfdc;
+  --finora-silver-2:#eef1ef;
+  --finora-white:#fff;
+  --finora-danger:#b94f49;
+  --finora-success:#1d7a57;
+  --finora-gold:#a78345;
+  --finora-shadow:0 18px 46px rgba(14,39,31,.10);
+  --finora-shadow-soft:0 8px 24px rgba(14,39,31,.06);
+}
+html,body{background:linear-gradient(180deg,#f8faf9 0%,#eef3f0 100%)!important;color:var(--finora-ink)!important}
+body{font-family:"Aptos","Trebuchet MS",Arial,sans-serif!important}
+button,input,select,textarea{font-family:inherit!important}
+aside,.sidebar,.side,.menu,.app-sidebar{
+  border-color:rgba(11,23,19,.08)!important;
+}
+.card,.panel,.box,.modal-content,.modal-card,.dialog,.sheet,
+[class*="card"],[class*="panel"]{
+  border-radius:18px!important;
+}
+.modal-content,.modal-card,.dialog,.sheet,[role="dialog"]{
+  box-shadow:var(--finora-shadow)!important;
+}
+input,select,textarea{
+  border-radius:13px!important;
+  border-color:#d5dfda!important;
+  background:#fff!important;
+  color:#13261e!important;
+  min-height:42px;
+}
+input:focus,select:focus,textarea:focus{
+  outline:none!important;
+  border-color:#7ca894!important;
+  box-shadow:0 0 0 3px rgba(15,90,70,.09)!important;
+}
+button,.btn{
+  border-radius:11px!important;
+  transition:transform .14s ease,box-shadow .14s ease,background .14s ease!important;
+}
+button:hover,.btn:hover{transform:translateY(-1px)}
+button:active,.btn:active{transform:translateY(0)}
+table{border-collapse:separate!important;border-spacing:0!important}
+th{
+  background:#f1f5f3!important;
+  color:#52665c!important;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  font-size:11px!important;
+}
+td,th{border-color:#e6ece9!important}
+h1,h2,h3,.title,.section-title{
+  color:#103d30!important;
+  letter-spacing:-.015em;
+}
+small,.muted,.helper,.hint{color:#728078!important}
+.finora-brand-logo-menu{max-width:190px!important;height:auto!important}
+.modal-close,.close,[data-close],button[aria-label="Fechar"],button[title="Fechar"]{
+  border-radius:999px!important;
+  background:#edf5f1!important;
+  color:#0b5843!important;
+  border:1px solid #d5e5dd!important;
+}
+</style>
+
 </head>
 <body>
 
@@ -7496,5 +7567,19 @@ if(typeof _finoraOldRenderSimpleDashboard==='function'){
 }
 setTimeout(renderHomeCategoryDonut,0);
 </script>
+
+<script id="finora-premium-v72-js">
+(function(){
+  function decorate(){
+    // Acrescenta classes sem interferir na lógica existente.
+    document.querySelectorAll('main section, main .card, main .panel').forEach(function(el){
+      if(!el.classList.contains('finora-premium-surface')) el.classList.add('finora-premium-surface');
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',decorate);
+  else decorate();
+})();
+</script>
+
 </body>
 </html>
