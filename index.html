@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v68-salvar-volta-cartoes">
+<meta name="finora-version" content="v69-exclusao-cartao-confiavel">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -2320,6 +2320,16 @@ button[data-finora-delete]{
   display:none!important;
 }
 
+
+/* FINORA v69 — exclusão confiável no primeiro clique */
+button[data-finora-delete="card"][data-deleting="1"],
+button[data-finora-delete="card"]:disabled{
+  opacity:.62!important;
+  cursor:wait!important;
+  pointer-events:none!important;
+  transform:none!important;
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -3897,44 +3907,53 @@ function editFinoraCard(id){
   $('cardEditId').value=c.id;$('cardName').value=c.name||'';$('cardIssuer').value=c.issuer||'';$('cardLast4').value=c.last4||'';$('cardExpiry').value=c.expiry||'';$('cardDueDay').value=c.dueDay||'';$('cardBrand').value=c.brand||'auto';$('cardDefaultCategory').value=c.defaultCategory||'';
   fillCardOwners();$('cardOwner').value=c.owner||people()[0];installCardColorPicker();setCardColor(c.cardColor||'#0b3d2e');toggleCardForm(true);
 }
-async function deleteFinoraCard(id){
+async function deleteFinoraCard(id, sourceButton=null){
   const card=loadFinoraCards().find(c=>String(c.id)===String(id)&&c.workspaceId===currentWorkspaceId);
-  if(!card)return toast('Cartão não encontrado ou já excluído.');
+  if(!card){
+    renderFinoraCards();
+    return toast('Cartão não encontrado ou já excluído.');
+  }
 
   if(!confirm(`Excluir o cartão "${card.name}"?\n\nEssa ação removerá o cartão deste ambiente.`))return;
 
+  if(sourceButton){
+    if(sourceButton.dataset.deleting==='1')return;
+    sourceButton.dataset.deleting='1';
+    sourceButton.disabled=true;
+    sourceButton.textContent='Excluindo...';
+  }
+
   try{
-    // 1. registra tombstone para impedir que o cartão volte após sincronização
     recordCardDeletion(card.id);
 
-    // 2. remove localmente e atualiza a tela imediatamente
     const remaining=loadFinoraCards().filter(c=>String(c.id)!==String(card.id));
     saveFinoraCards(remaining);
+
     renderFinoraCards();
     fillLaunchCards();
 
-    // 3. tenta sincronizar com a nuvem, mas não trata retorno falso como erro fatal.
-    //    Algumas versões de pushCloudState não retornam booleano.
-    if(cloudConfigured()){
-      try{
-        await pushCloudState(false);
-      }catch(syncErr){
-        console.warn('FINORA card delete: sincronização pendente',syncErr);
-        scheduleCloudPush();
-      }
-    }
-
-    // 4. valida localmente se realmente saiu da lista
     const stillExists=loadFinoraCards().some(c=>String(c.id)===String(card.id));
-    if(stillExists){
-      throw new Error('O cartão ainda aparece na lista local após a exclusão.');
-    }
+    if(stillExists)throw new Error('A exclusão local não foi confirmada.');
 
     toast('Cartão excluído com sucesso.');
+
+    if(cloudConfigured()){
+      Promise.resolve()
+        .then(()=>pushCloudState(false))
+        .catch(syncErr=>{
+          console.warn('FINORA v69: exclusão salva localmente; sincronização será repetida.',syncErr);
+          scheduleCloudPush();
+        });
+    }
   }catch(err){
-    console.error('FINORA delete card v67',err);
+    console.error('FINORA delete card v69',err);
     renderFinoraCards();
-    toast('Não foi possível concluir a exclusão do cartão. Tente novamente.');
+    toast('Não foi possível excluir o cartão. Tente novamente.');
+    if(sourceButton && sourceButton.isConnected){
+      sourceButton.disabled=false;
+      sourceButton.textContent='Excluir';
+      delete sourceButton.dataset.deleting;
+    }
   }
 }
 
@@ -3962,7 +3981,7 @@ function renderFinoraCards(){
       <small>Validade: ${esc(c.expiry||'—')} · Bandeira: ${esc(({visa:'Visa',mastercard:'Mastercard',elo:'Elo',amex:'American Express',hipercard:'Hipercard',outra:'Outra'})[brand]||'Outra')}</small>
       <small>Vencimento da fatura: ${c.dueDay?`dia ${c.dueDay}`:'não informado'}</small>
       <small>Categoria padrão: ${esc(c.defaultCategory||'Sem categoria')}</small>
-      <div class="finora-card-actions"><button onclick="editFinoraCard('${c.id}')">Editar</button><button onclick="deleteFinoraCard('${c.id}')">Excluir</button></div>
+      <div class="finora-card-actions"><button onclick="editFinoraCard('${c.id}')">Editar</button><button onclick="deleteFinoraCard(\'${c.id}\',this)">Excluir</button></div>
     </div>`;
   }).join(''):'<div class="empty" style="grid-column:1/-1;padding:20px">Nenhum cartão cadastrado.</div>';
 }
@@ -5210,6 +5229,8 @@ function installGlobalDestructiveActions(){
   document.addEventListener('click',async event=>{
     const btn=event.target.closest('button[data-finora-delete]');
     if(!btn)return;
+    if(event.__finoraDeleteHandled)return;
+    event.__finoraDeleteHandled=true;
     event.preventDefault();
     event.stopPropagation();
     if(btn.dataset.busy==='1')return;
@@ -5221,7 +5242,7 @@ function installGlobalDestructiveActions(){
       const id=btn.dataset.id;
       const email=btn.dataset.email||'';
       if(kind==='invite')await deleteFamilyInvite(id);
-      else if(kind==='card')await deleteFinoraCard(id);
+      else if(kind==='card')await deleteFinoraCard(id,btn);
       else if(kind==='transaction')await deleteRow(id);
       else if(kind==='member')await removeFamilyMember(id,email);
     }finally{
