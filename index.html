@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v67-cartoes-excluir-voltar">
+<meta name="finora-version" content="v68-salvar-volta-cartoes">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3839,7 +3839,10 @@ function toggleCardForm(force){
     closeSectionModal();
   }
 }
-function openCardPanel(){openSectionModal('finoraCardsPanel')}
+function openCardPanel(){
+  renderFinoraCards();
+  openSectionModal('finoraCardsPanel');
+}
 function scrollFinora(id){$(id)?.scrollIntoView({behavior:'smooth',block:'start'})}
 async function saveFinoraCard(){
   const name=$('cardName').value.trim(),issuer=$('cardIssuer').value.trim(),owner=$('cardOwner').value,last4=$('cardLast4').value.replace(/\D/g,''),expiry=$('cardExpiry').value.trim(),dueDay=Number($('cardDueDay').value||0),brandChoice=$('cardBrand').value,defaultCategory=$('cardDefaultCategory').value,cardColor=$('cardColor')?.value||'#0b3d2e';
@@ -3873,11 +3876,21 @@ async function saveFinoraCard(){
   catch(e){console.error(e);scheduleCloudPush();toast('Cartão salvo neste aparelho. A sincronização será repetida.')}
   ['cardEditId','cardName','cardIssuer','cardLast4','cardExpiry','cardDueDay'].forEach(fid=>$(fid).value='');
   $('cardDefaultCategory').value='';$('cardBrand').value='auto';setCardColor('#0b3d2e');toggleCardForm(false);
-  // Após salvar, retorna automaticamente para a tela anterior.
-  setTimeout(()=>{
-    openSectionModal('cardsPanel');
+
+  // v68: após salvar, permanecer no fluxo de Cartões cadastrados.
+  requestAnimationFrame(()=>{
     renderFinoraCards();
-  },60);
+    openSectionModal('finoraCardsPanel');
+  });
+
+  // fallback de segurança caso outro render feche o modal no mesmo ciclo
+  setTimeout(()=>{
+    if(activeSectionModalId!=='finoraCardsPanel'){
+      renderFinoraCards();
+      openSectionModal('finoraCardsPanel');
+    }
+  },140);
+  // Após salvar, retorna automaticamente para a tela anterior.
 }
 function editFinoraCard(id){
   const c=loadFinoraCards().find(x=>x.id===id);if(!c)return;
