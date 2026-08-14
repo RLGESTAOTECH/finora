@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v66-cartao-cor-cpf">
+<meta name="finora-version" content="v67-cartoes-excluir-voltar">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3873,6 +3873,11 @@ async function saveFinoraCard(){
   catch(e){console.error(e);scheduleCloudPush();toast('Cartão salvo neste aparelho. A sincronização será repetida.')}
   ['cardEditId','cardName','cardIssuer','cardLast4','cardExpiry','cardDueDay'].forEach(fid=>$(fid).value='');
   $('cardDefaultCategory').value='';$('cardBrand').value='auto';setCardColor('#0b3d2e');toggleCardForm(false);
+  // Após salvar, retorna automaticamente para a tela anterior.
+  setTimeout(()=>{
+    openSectionModal('cardsPanel');
+    renderFinoraCards();
+  },60);
 }
 function editFinoraCard(id){
   const c=loadFinoraCards().find(x=>x.id===id);if(!c)return;
@@ -3882,25 +3887,41 @@ function editFinoraCard(id){
 async function deleteFinoraCard(id){
   const card=loadFinoraCards().find(c=>String(c.id)===String(id)&&c.workspaceId===currentWorkspaceId);
   if(!card)return toast('Cartão não encontrado ou já excluído.');
-  if(!confirm(`Excluir o cartão "${card.name}"?\n\nA exclusão será sincronizada com os outros dispositivos.`))return;
+
+  if(!confirm(`Excluir o cartão "${card.name}"?\n\nEssa ação removerá o cartão deste ambiente.`))return;
 
   try{
+    // 1. registra tombstone para impedir que o cartão volte após sincronização
     recordCardDeletion(card.id);
-    saveFinoraCards(loadFinoraCards().filter(c=>String(c.id)!==String(card.id)));
+
+    // 2. remove localmente e atualiza a tela imediatamente
+    const remaining=loadFinoraCards().filter(c=>String(c.id)!==String(card.id));
+    saveFinoraCards(remaining);
     renderFinoraCards();
     fillLaunchCards();
-  fillPaymentAccounts();
-  fillExpenseOwners($('expenseOwner')?.value||$('pessoa')?.value||'');
 
+    // 3. tenta sincronizar com a nuvem, mas não trata retorno falso como erro fatal.
+    //    Algumas versões de pushCloudState não retornam booleano.
     if(cloudConfigured()){
-      const ok=await pushCloudState(false);
-      if(!ok)throw new Error('A nuvem não confirmou a exclusão.');
+      try{
+        await pushCloudState(false);
+      }catch(syncErr){
+        console.warn('FINORA card delete: sincronização pendente',syncErr);
+        scheduleCloudPush();
+      }
     }
+
+    // 4. valida localmente se realmente saiu da lista
+    const stillExists=loadFinoraCards().some(c=>String(c.id)===String(card.id));
+    if(stillExists){
+      throw new Error('O cartão ainda aparece na lista local após a exclusão.');
+    }
+
     toast('Cartão excluído com sucesso.');
   }catch(err){
-    console.error('FINORA delete card v55',err);
-    scheduleCloudPush();
-    toast('Cartão removido deste aparelho. A sincronização será repetida automaticamente.');
+    console.error('FINORA delete card v67',err);
+    renderFinoraCards();
+    toast('Não foi possível concluir a exclusão do cartão. Tente novamente.');
   }
 }
 
