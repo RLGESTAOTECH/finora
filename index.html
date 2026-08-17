@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v93-metas-alertas-cockpit">
+<meta name="finora-version" content="v94-metas-cockpit-relatorio">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -5240,6 +5240,159 @@ body.finora-v88-sidebar-collapsed .shell{
   .finora-v93-budget-status,.finora-v93-settings-grid{grid-template-columns:1fr}
 }
 
+
+/* ==========================================================
+   FINORA v94 — correções de cockpit + metas + relatório
+   ========================================================== */
+
+/* Ocultação robusta contra regras antigas com !important */
+.finora-v94-force-hide{
+  display:none!important;
+}
+
+/* Nova entrada: meta ao lado do campo Pessoa */
+.finora-v94-goal-entry{
+  display:none;
+}
+.finora-v94-goal-entry.visible{
+  display:block!important;
+}
+.finora-v94-goal-check{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:40px;
+  padding:8px 10px;
+  border:1px solid #d8e5de;
+  border-radius:10px;
+  background:#f5faf7;
+  color:#174839;
+  font-size:9px;
+  font-weight:750;
+  box-sizing:border-box;
+}
+.finora-v94-goal-check input{
+  width:17px;
+  height:17px;
+  accent-color:#08784c;
+}
+#goalUseSelect{
+  display:none;
+  margin-top:6px;
+}
+#goalUseSelect.visible{
+  display:block!important;
+}
+
+/* Relatório de metas */
+.finora-v94-goal-report-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+  padding:12px 14px;
+  border:1px solid #dfe9e3;
+  border-radius:12px;
+  background:linear-gradient(135deg,#f3faf6,#fbfdfc);
+}
+.finora-v94-goal-report-head strong{
+  display:block;
+  color:#084a35;
+  font-size:12px;
+}
+.finora-v94-goal-report-head small{
+  display:block;
+  margin-top:3px;
+  color:#687970;
+  font-size:8.5px;
+}
+.finora-v94-goal-summary{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:9px;
+  margin-bottom:12px;
+}
+.finora-v94-goal-summary>div{
+  padding:12px;
+  border:1px solid #e0e8e3;
+  border-radius:11px;
+  background:#fff;
+}
+.finora-v94-goal-summary span{
+  display:block;
+  color:#718078;
+  font-size:8px;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.finora-v94-goal-summary strong{
+  display:block;
+  margin-top:5px;
+  color:#0b4634;
+  font-size:16px;
+}
+.finora-v94-goal-table-wrap{
+  overflow:auto;
+  border:1px solid #e1e8e4;
+  border-radius:12px;
+}
+.finora-v94-goal-table{
+  width:100%;
+  border-collapse:collapse;
+  min-width:790px;
+  font-size:9px;
+}
+.finora-v94-goal-table th{
+  padding:9px 10px;
+  background:#f3f7f5;
+  color:#61736a;
+  text-align:left;
+  font-size:8px;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.finora-v94-goal-table td{
+  padding:10px;
+  border-top:1px solid #edf1ef;
+  color:#29483b;
+  vertical-align:middle;
+}
+.finora-v94-goal-table td.num,
+.finora-v94-goal-table th.num{
+  text-align:right;
+}
+.finora-v94-goal-progress{
+  min-width:150px;
+}
+.finora-v94-goal-progress-track{
+  height:8px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#e8efeb;
+}
+.finora-v94-goal-progress-track i{
+  display:block;
+  height:100%;
+  border-radius:999px;
+  background:linear-gradient(90deg,#0b8050,#31a76f);
+}
+.finora-v94-goal-progress small{
+  display:block;
+  margin-top:4px;
+  color:#66786f;
+  font-size:7.5px;
+}
+
+/* Quando todos os painéis inferiores forem ocultos, sem espaços artificiais */
+.finora-v94-no-bottom{
+  display:none!important;
+}
+
+@media(max-width:850px){
+  .finora-v94-goal-summary{grid-template-columns:1fr 1fr}
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -5557,6 +5710,7 @@ body.finora-v88-sidebar-collapsed .shell{
     <button data-report-tab="person" onclick="setReportTab('person',this)">Por pessoa</button>
     <button data-report-tab="payment" onclick="setReportTab('payment',this)">Formas de pagamento</button>
     <button data-report-tab="cards" onclick="setReportTab('cards',this)">Cartões</button>
+    <button data-report-tab="goals" onclick="setReportTab('goals',this)">Metas</button>
   </div>
   <div id="reportOverview" class="report-view active">
     <div class="report-kpis">
@@ -5585,6 +5739,15 @@ body.finora-v88-sidebar-collapsed .shell{
     <div class="statement-list" id="statementList"></div>
   </div>
   <div id="reportBreakdown" class="report-view"><div class="report-breakdown" id="reportBreakdownRows"></div></div>
+  <div id="reportGoals" class="report-view">
+    <div class="finora-v94-goal-report-head">
+      <div>
+        <strong>Relatório de metas</strong>
+        <small>Acompanhamento consolidado das metas do ambiente.</small>
+      </div>
+    </div>
+    <div id="reportGoalsBody"></div>
+  </div>
 </section>
 
 <section class="popup-only-panel finora-cards-panel" id="finoraCardsPanel">
@@ -5824,6 +5987,17 @@ body.finora-v88-sidebar-collapsed .shell{
     <div class="field">
       <label>Pessoa</label>
       <select id="pessoa" required></select>
+    </div>
+    <div class="field finora-v94-goal-entry" id="goalUseField">
+      <label>Utilizar esta entrada em uma meta?</label>
+      <label class="finora-v94-goal-check">
+        <input type="checkbox" id="goalUseCheck">
+        <span>Sim, vincular a uma meta cadastrada</span>
+      </label>
+      <select id="goalUseSelect" aria-label="Meta vinculada">
+        <option value="">Selecione a meta</option>
+      </select>
+      <div class="file-note">O valor desta entrada será somado ao acumulado da meta selecionada.</div>
     </div>
     <div class="field expense-owner-field" id="expenseOwnerField">
       <label>Despesa de</label>
@@ -12847,6 +13021,399 @@ setTimeout(renderHomeCategoryDonut,0);
     refreshGoalLinkField();
     applyCockpit();
   },0);
+})();
+</script>
+
+
+<script id="finora-v94-fixes">
+(function(){
+  const V94_DEFAULT_COCKPIT={
+    chartVisible:true,
+    chartType:'pie',
+    chartLegend:true,
+    quickVisible:true,
+    recentVisible:true,
+    recentOrder:'desc',
+    recentPaid:true,
+    recentPending:true,
+    recentPayments:[],
+    recentMin:'',
+    recentMax:'',
+    upcomingVisible:true
+  };
+
+  function v94Esc(s=''){
+    return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function v94Money(v){
+    return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  }
+  function v94Feature(){
+    const s=loadFinoraFeatureState();
+    s.cockpit={...V94_DEFAULT_COCKPIT,...(s.cockpit||{})};
+    return s;
+  }
+
+  // ----------------------------------------------------------
+  // META NA NOVA ENTRADA
+  // ----------------------------------------------------------
+  function v94GoalCategory(g){return `Meta: ${g.name}`;}
+
+  function v94RefreshGoalEntry(){
+    const field=document.getElementById('goalUseField');
+    const check=document.getElementById('goalUseCheck');
+    const select=document.getElementById('goalUseSelect');
+    if(!field||!check||!select)return;
+
+    const goals=(loadFinoraFeatureState().goals||[]);
+    const isIncome=document.getElementById('tipo')?.value==='entrada';
+    const old=select.value;
+
+    select.innerHTML='<option value="">Selecione a meta</option>'+
+      goals.map(g=>`<option value="${v94Esc(g.id)}">${v94Esc(g.name)}</option>`).join('');
+
+    if(goals.some(g=>String(g.id)===String(old)))select.value=old;
+
+    field.classList.toggle('visible',isIncome&&goals.length>0);
+    if(!isIncome||!goals.length){
+      check.checked=false;
+      select.classList.remove('visible');
+      select.value='';
+    }else{
+      select.classList.toggle('visible',check.checked);
+    }
+  }
+
+  document.getElementById('goalUseCheck')?.addEventListener('change',e=>{
+    document.getElementById('goalUseSelect')?.classList.toggle('visible',e.target.checked);
+  });
+  document.getElementById('tipo')?.addEventListener('change',()=>setTimeout(v94RefreshGoalEntry,0));
+
+  // ----------------------------------------------------------
+  // META SEMPRE DISPONÍVEL NA CATEGORIA DE NOVA DESPESA
+  // ----------------------------------------------------------
+  function v94RefreshExpenseCategories(){
+    const select=document.getElementById('categoriaExpense');
+    if(!select)return;
+
+    const s=loadFinoraFeatureState();
+    const names=[];
+    (s.categories||[]).filter(c=>c.active).forEach(c=>{
+      if(!names.includes(c.name))names.push(c.name);
+    });
+    (s.goals||[]).forEach(g=>{
+      if(g.categoryDisabled)return;
+      const name=v94GoalCategory(g);
+      if(!names.includes(name))names.push(name);
+    });
+
+    const old=select.value;
+    select.innerHTML='<option value="">Selecione uma categoria</option>'+
+      names.map(n=>`<option value="${v94Esc(n)}">${v94Esc(n)}</option>`).join('');
+    if(names.includes(old))select.value=old;
+  }
+
+  function v94RefreshLaunchControls(){
+    v94RefreshGoalEntry();
+    v94RefreshExpenseCategories();
+  }
+
+  // modal de lançamento: reaplica após a lógica antiga terminar
+  const v94OldOpenLaunch=window.openLaunchModal;
+  if(typeof v94OldOpenLaunch==='function'){
+    window.openLaunchModal=function(mode='list'){
+      const r=v94OldOpenLaunch.apply(this,arguments);
+      setTimeout(v94RefreshLaunchControls,0);
+      setTimeout(v94RefreshLaunchControls,80);
+      return r;
+    };
+  }
+
+  // updateTypeLabels pode reconfigurar campos; reaplicamos categoria/meta
+  const v94OldUpdateTypeLabels=window.updateTypeLabels;
+  if(typeof v94OldUpdateTypeLabels==='function'){
+    window.updateTypeLabels=function(){
+      const r=v94OldUpdateTypeLabels.apply(this,arguments);
+      setTimeout(v94RefreshLaunchControls,0);
+      return r;
+    };
+  }
+
+  // edição: recupera associação da meta
+  const v94OldEditRow=window.editRow;
+  if(typeof v94OldEditRow==='function'){
+    window.editRow=function(id){
+      const row=(data||[]).find(x=>String(x.id)===String(id));
+      const r=v94OldEditRow.apply(this,arguments);
+      setTimeout(()=>{
+        v94RefreshLaunchControls();
+        if(row?.tipo==='entrada'&&row.goalId){
+          const cb=document.getElementById('goalUseCheck');
+          const sel=document.getElementById('goalUseSelect');
+          if(cb)cb.checked=true;
+          if(sel){sel.value=row.goalId;sel.classList.add('visible');}
+        }
+      },50);
+      return r;
+    };
+  }
+
+  // ----------------------------------------------------------
+  // COCKPIT: hide/show robusto + restauração real do padrão
+  // ----------------------------------------------------------
+  function v94RenderRecent(c){
+    const tbody=document.getElementById('v84RecentRows');
+    if(!tbody)return;
+    const min=c.recentMin===''?null:Number(c.recentMin);
+    const max=c.recentMax===''?null:Number(c.recentMax);
+
+    let rows=(data||[]).filter(x=>sameWorkspace(x)&&hasKnownValue(x));
+    rows=rows.filter(x=>{
+      const st=effectiveStatus(x);
+      const paid=st==='pago';
+      if(paid&&!c.recentPaid)return false;
+      if(!paid&&!c.recentPending)return false;
+
+      const payment=typeof reportPaymentOf==='function'?reportPaymentOf(x):(x.forma||'');
+      if(c.recentPayments?.length&&!c.recentPayments.includes(payment))return false;
+
+      const value=Number(x.valor||0);
+      if(min!==null&&value<min)return false;
+      if(max!==null&&value>max)return false;
+      return true;
+    });
+
+    rows.sort((a,b)=>{
+      const da=(typeof rowDate==='function'?rowDate(a):(a.vencimento||a.dataLancamento||''));
+      const db=(typeof rowDate==='function'?rowDate(b):(b.vencimento||b.dataLancamento||''));
+      return c.recentOrder==='asc'?da.localeCompare(db):db.localeCompare(da);
+    });
+
+    rows=rows.slice(0,5);
+    tbody.innerHTML=rows.length?rows.map(x=>{
+      const st=effectiveStatus(x);
+      const person=typeof reportPersonOf==='function'?reportPersonOf(x):(x.pessoa||'—');
+      const payment=typeof reportPaymentOf==='function'?reportPaymentOf(x):(x.forma||'—');
+      return `<tr>
+        <td>${brDate(rowDate(x))}</td>
+        <td>${v94Esc(x.descricao||'Movimentação')}</td>
+        <td>${v94Esc(x.categoria||'Outros')}</td>
+        <td>${v94Esc(person||'—')}</td>
+        <td>${v94Esc(payment||'—')}</td>
+        <td class="value ${x.tipo==='entrada'?'in':'out'}">${x.tipo==='entrada'?'+':'−'} ${v94Money(x.valor)}</td>
+        <td><span class="finora-v84-status">${st==='pago'?'Pago':st==='atrasado'?'Atrasado':'Pendente'}</span></td>
+      </tr>`;
+    }).join(''):'<tr><td colspan="7">Nenhum lançamento corresponde aos filtros do cockpit.</td></tr>';
+  }
+
+  function v94ApplyCockpit(){
+    const c=v94Feature().cockpit;
+
+    const chart=document.getElementById('finoraHomeCategoryCard');
+    const quick=document.querySelector('#v84DashboardGrid .finora-v84-quick, .finora-v84-quick');
+    const bottom=document.getElementById('v84BottomGrid');
+    const recent=bottom?.children?.[0]||null;
+    const upcoming=bottom?.children?.[1]||null;
+
+    chart?.classList.toggle('finora-v94-force-hide',!c.chartVisible);
+    quick?.classList.toggle('finora-v94-force-hide',!c.quickVisible);
+    recent?.classList.toggle('finora-v94-force-hide',!c.recentVisible);
+    upcoming?.classList.toggle('finora-v94-force-hide',!c.upcomingVisible);
+
+    if(chart){
+      chart.classList.toggle('v93-hide-legend',!c.chartLegend);
+      chart.classList.toggle('v93-chart-bars',c.chartType==='bars');
+
+      const pie=chart.querySelector('.report-donut');
+      if(pie){
+        if(c.chartType==='donut'){
+          pie.style.webkitMask='radial-gradient(circle at center, transparent 0 30%, #000 31%)';
+          pie.style.mask='radial-gradient(circle at center, transparent 0 30%, #000 31%)';
+        }else{
+          pie.style.webkitMask='none';
+          pie.style.mask='none';
+        }
+      }
+      if(c.chartType==='bars'&&typeof renderBarChart==='function'){
+        try{renderBarChart()}catch(e){}
+      }
+    }
+
+    if(recent&&c.recentVisible)v94RenderRecent(c);
+
+    if(bottom){
+      const visible=[...bottom.children].filter(x=>!x.classList.contains('finora-v94-force-hide')).length;
+      bottom.classList.toggle('finora-v94-no-bottom',visible===0);
+      bottom.style.gridTemplateColumns=visible===1?'1fr':'';
+    }
+  }
+  window.applyFinoraCockpit=v94ApplyCockpit;
+
+  // Sempre reaplica depois do dashboard antigo recriar/atualizar elementos
+  const v94BaseDashboard=window.renderV84Dashboard;
+  if(typeof v94BaseDashboard==='function'){
+    window.renderV84Dashboard=function(){
+      const r=v94BaseDashboard.apply(this,arguments);
+      setTimeout(v94ApplyCockpit,0);
+      return r;
+    };
+  }
+
+  // Corrige botões de Configurações já renderizados pela v93
+  function v94BindSettingsButtons(){
+    const save=document.getElementById('v93SaveCockpit');
+    const reset=document.getElementById('v93ResetCockpit');
+    if(save&&!save.dataset.v94Bound){
+      save.dataset.v94Bound='1';
+      save.addEventListener('click',()=>setTimeout(v94ApplyCockpit,30));
+    }
+    if(reset&&!reset.dataset.v94Bound){
+      reset.dataset.v94Bound='1';
+      reset.addEventListener('click',()=>{
+        setTimeout(()=>{
+          const s=loadFinoraFeatureState();
+          s.cockpit={...V94_DEFAULT_COCKPIT};
+          s.updatedAt=new Date().toISOString();
+          saveFinoraFeatureState(s);
+          v94ApplyCockpit();
+
+          // garante que o padrão visual reapareça imediatamente
+          document.getElementById('finoraHomeCategoryCard')?.classList.remove('finora-v94-force-hide','v93-hide-legend','v93-chart-bars');
+          document.querySelector('.finora-v84-quick')?.classList.remove('finora-v94-force-hide');
+          const bottom=document.getElementById('v84BottomGrid');
+          if(bottom){
+            bottom.classList.remove('finora-v94-no-bottom');
+            [...bottom.children].forEach(x=>x.classList.remove('finora-v94-force-hide'));
+            bottom.style.gridTemplateColumns='';
+          }
+          try{renderHomeCategoryDonut()}catch(e){}
+          try{window.renderV84Dashboard()}catch(e){}
+        },40);
+      });
+    }
+  }
+
+  const v94OldUtility=window.openFinoraUtilityPanel;
+  if(typeof v94OldUtility==='function'){
+    window.openFinoraUtilityPanel=function(type){
+      const r=v94OldUtility.apply(this,arguments);
+      if(type==='settings')setTimeout(v94BindSettingsButtons,0);
+      return r;
+    };
+  }
+
+  // ----------------------------------------------------------
+  // RELATÓRIO DE METAS
+  // ----------------------------------------------------------
+  function v94GoalMovement(g){
+    const category=v94GoalCategory(g);
+    return (data||[]).filter(x=>{
+      if(!sameWorkspace(x)||!hasKnownValue(x))return false;
+      if(x.tipo==='entrada'&&String(x.goalId||'')===String(g.id))return true;
+      if(x.tipo==='saida'&&x.categoria===category)return true;
+      return false;
+    }).reduce((s,x)=>s+Number(x.valor||0),0);
+  }
+
+  function v94GoalAccumulated(g){
+    return Number(g.saved||0)+v94GoalMovement(g);
+  }
+
+  function v94RenderGoalReport(){
+    const body=document.getElementById('reportGoalsBody');
+    if(!body)return;
+
+    const goals=loadFinoraFeatureState().goals||[];
+    const totalTarget=goals.reduce((s,g)=>s+Number(g.target||0),0);
+    const totalAccum=goals.reduce((s,g)=>s+v94GoalAccumulated(g),0);
+    const totalRemaining=Math.max(0,totalTarget-totalAccum);
+    const avgPct=totalTarget>0?Math.min(100,totalAccum/totalTarget*100):0;
+
+    body.innerHTML=`
+      <div class="finora-v94-goal-summary">
+        <div><span>Metas cadastradas</span><strong>${goals.length}</strong></div>
+        <div><span>Total planejado</span><strong>${v94Money(totalTarget)}</strong></div>
+        <div><span>Total acumulado</span><strong>${v94Money(totalAccum)}</strong></div>
+        <div><span>Progresso consolidado</span><strong>${avgPct.toFixed(1).replace('.',',')}%</strong></div>
+      </div>
+      <div class="finora-v94-goal-table-wrap">
+        <table class="finora-v94-goal-table">
+          <thead><tr>
+            <th>Meta</th>
+            <th class="num">Valor-alvo</th>
+            <th class="num">Acumulado</th>
+            <th class="num">Falta</th>
+            <th>Prazo</th>
+            <th>Progresso</th>
+          </tr></thead>
+          <tbody>
+            ${goals.length?goals.map(g=>{
+              const accumulated=v94GoalAccumulated(g);
+              const target=Number(g.target||0);
+              const remaining=Math.max(0,target-accumulated);
+              const pct=target>0?Math.max(0,Math.min(100,accumulated/target*100)):0;
+              const deadline=g.deadline?new Date(g.deadline+'T12:00:00').toLocaleDateString('pt-BR'):'Sem prazo';
+              return `<tr>
+                <td><strong>${v94Esc(g.name)}</strong><br><small>${v94Esc(v94GoalCategory(g))}</small></td>
+                <td class="num">${v94Money(target)}</td>
+                <td class="num"><strong>${v94Money(accumulated)}</strong></td>
+                <td class="num">${v94Money(remaining)}</td>
+                <td>${deadline}</td>
+                <td>
+                  <div class="finora-v94-goal-progress">
+                    <div class="finora-v94-goal-progress-track"><i style="width:${pct}%"></i></div>
+                    <small>${pct.toFixed(1).replace('.',',')}% atingido</small>
+                  </div>
+                </td>
+              </tr>`;
+            }).join(''):`<tr><td colspan="6">Nenhuma meta cadastrada neste ambiente.</td></tr>`}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  const v94OldSetReportTab=window.setReportTab;
+  window.setReportTab=function(tab,btn){
+    if(tab!=='goals')return v94OldSetReportTab.apply(this,arguments);
+
+    finoraReportTab='goals';
+    document.querySelectorAll('.report-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.reportTab==='goals'));
+    document.getElementById('reportOverview')?.classList.remove('active');
+    document.getElementById('reportStatement')?.classList.remove('active');
+    document.getElementById('reportBreakdown')?.classList.remove('active');
+    document.getElementById('reportGoals')?.classList.add('active');
+    v94RenderGoalReport();
+  };
+
+  const v94OldRenderReports=window.renderFinoraReports;
+  window.renderFinoraReports=function(){
+    const r=v94OldRenderReports.apply(this,arguments);
+    const goals=document.getElementById('reportGoals');
+    if(finoraReportTab==='goals'){
+      document.getElementById('reportOverview')?.classList.remove('active');
+      document.getElementById('reportStatement')?.classList.remove('active');
+      document.getElementById('reportBreakdown')?.classList.remove('active');
+      goals?.classList.add('active');
+      v94RenderGoalReport();
+    }else{
+      goals?.classList.remove('active');
+    }
+    return r;
+  };
+
+  // ----------------------------------------------------------
+  // Inicialização
+  // ----------------------------------------------------------
+  function bootV94(){
+    v94RefreshLaunchControls();
+    v94ApplyCockpit();
+    v94BindSettingsButtons();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bootV94,{once:true});
+  else bootV94();
+
+  // segurança para sincronização/alterações externas
+  setTimeout(bootV94,100);
 })();
 </script>
 
