@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v91-metas-integradas-categorias">
+<meta name="finora-version" content="v92-saldos-coerentes-faq">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -4827,6 +4827,117 @@ body.finora-v88-sidebar-collapsed .shell{
   .finora-v90-goal-form{grid-template-columns:1fr}
 }
 
+
+/* ==========================================================
+   FINORA v92 — alinhamento do período + FAQ
+   ========================================================== */
+.finora-v90-monthnav{
+  align-items:end!important;
+}
+.finora-v90-yearbox{
+  align-self:end!important;
+}
+.finora-v90-monthbuttons{
+  align-self:end!important;
+}
+.finora-v90-yearbox select,
+.finora-v90-monthbuttons button{
+  height:38px!important;
+  min-height:38px!important;
+  box-sizing:border-box!important;
+}
+
+/* FAQ */
+.finora-v92-faq{
+  display:grid;
+  gap:12px;
+}
+.finora-v92-faq-intro{
+  padding:13px 15px;
+  border:1px solid #dce9e2;
+  border-radius:12px;
+  background:linear-gradient(135deg,#f3faf6,#fbfdfc);
+  color:#40594e;
+  font-size:10px;
+  line-height:1.6;
+}
+.finora-v92-faq-search{
+  position:sticky;
+  top:0;
+  z-index:2;
+  padding:8px 0;
+  background:#fff;
+}
+.finora-v92-faq-search input{
+  width:100%;
+  min-height:42px;
+  border:1px solid #dbe5df;
+  border-radius:10px;
+  padding:0 13px;
+  background:#fff;
+  color:#153a2e;
+  font-size:10px;
+  box-sizing:border-box;
+}
+.finora-v92-faq-group{
+  display:grid;
+  gap:7px;
+}
+.finora-v92-faq-group h3{
+  margin:4px 0 1px;
+  color:#064531;
+  font-size:12px;
+  font-weight:850;
+}
+.finora-v92-faq-item{
+  border:1px solid #e0e8e3;
+  border-radius:11px;
+  background:#fff;
+  overflow:hidden;
+}
+.finora-v92-faq-item summary{
+  list-style:none;
+  position:relative;
+  padding:11px 38px 11px 13px;
+  cursor:pointer;
+  color:#153d30;
+  font-size:10px;
+  font-weight:800;
+}
+.finora-v92-faq-item summary::-webkit-details-marker{display:none}
+.finora-v92-faq-item summary:after{
+  content:"+";
+  position:absolute;
+  right:13px;
+  top:50%;
+  transform:translateY(-50%);
+  width:20px;
+  height:20px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:#edf6f1;
+  color:#0b7047;
+  font-size:14px;
+}
+.finora-v92-faq-item[open] summary:after{content:"−"}
+.finora-v92-faq-answer{
+  padding:0 13px 12px;
+  color:#5d6f66;
+  font-size:9.5px;
+  line-height:1.65;
+}
+.finora-v92-faq-answer strong{color:#264c3d}
+.finora-v92-faq-empty{
+  display:none;
+  padding:16px;
+  border:1px dashed #cbdad2;
+  border-radius:11px;
+  color:#65766d;
+  text-align:center;
+  font-size:10px;
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -4884,7 +4995,7 @@ body.finora-v88-sidebar-collapsed .shell{
     <button type="button" onclick="openFinoraUtilityPanel('payments')"><span class="ico">▤</span>Formas de pagamento</button>
     <button type="button" onclick="openSectionModal('simpleAlertsPanel')"><span class="ico">♧</span>Lembretes</button>
     <button type="button" onclick="openFinoraUtilityPanel('settings')"><span class="ico">⚙</span>Configurações</button>
-    <button type="button" onclick="openFinoraUtilityPanel('help')"><span class="ico">?</span>Ajuda</button>
+    <button type="button" onclick="openFinoraUtilityPanel('faq')"><span class="ico">?</span>FAQ</button>
     <button type="button" onclick="document.getElementById('logoutBtn')?.click()"><span class="ico">↪</span>Sair</button>
   </nav>
   <div class="finora-sidebar-reserve finora-v84-hide-reserve">
@@ -10703,8 +10814,8 @@ setTimeout(renderHomeCategoryDonut,0);
       kpis.innerHTML=`
         <div class="simple-kpi income"><span>Entradas</span><strong id="simpleEntradas">R$ 0,00</strong><small>no período</small><small id="simpleAReceber" style="display:none">A receber: R$ 0,00</small></div>
         <div class="simple-kpi expense"><span>Saídas</span><strong id="simpleDespesas">R$ 0,00</strong><small>no período</small><small id="simpleAPagar" style="display:none">A pagar: R$ 0,00</small></div>
-        <div class="simple-kpi reserve"><span>Saldo do período</span><strong id="simpleSaldo">R$ 0,00</strong><small>resultado</small><span id="simpleReserva" style="display:none">R$ 0,00</span></div>
-        <div class="simple-kpi balance"><span>Saldo geral</span><strong id="v84SaldoGeral">R$ 0,00</strong><small>em todas as contas</small></div>`;
+        <div class="simple-kpi reserve"><span>Saldo do período</span><strong id="simpleSaldo">R$ 0,00</strong><small>entradas − saídas do mês</small><span id="simpleReserva" style="display:none">R$ 0,00</span></div>
+        <div class="simple-kpi balance"><span>Saldo geral</span><strong id="v84SaldoGeral">R$ 0,00</strong><small>acumulado até o mês selecionado</small></div>`;
     }
 
     const grid=document.createElement('div');
@@ -10891,7 +11002,12 @@ setTimeout(renderHomeCategoryDonut,0);
     const income=monthRows.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0);
     const expense=monthRows.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0);
     const period=income-expense;
-    const totalBalance=all.reduce((s,x)=>s+(x.tipo==='entrada'?1:-1)*Number(x.valor||0),0);
+    const selectedMonth=(document.getElementById('filtroMes')?.value||currentMonth());
+    const balanceRows=all.filter(x=>{
+      const rm=(typeof recordMonth==='function'?recordMonth(x):'');
+      return rm && rm<=selectedMonth;
+    });
+    const totalBalance=balanceRows.reduce((s,x)=>s+(x.tipo==='entrada'?1:-1)*Number(x.valor||0),0);
 
     const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=moneyV84(v)};
     set('v84SaldoGeral',totalBalance);
@@ -11767,6 +11883,164 @@ setTimeout(renderHomeCategoryDonut,0);
 
   v91SyncGoalCategories();
   setTimeout(()=>refreshFinoraV90Controls(),0);
+})();
+</script>
+
+
+<script id="finora-v92-faq-and-balance">
+(function(){
+  const faqGroups=[
+    {
+      title:'Visão geral e saldos',
+      items:[
+        ['O que significa Entradas?','É a soma das movimentações de entrada do mês selecionado, como salários, rendas, reembolsos, transferências recebidas e outros recebimentos.'],
+        ['O que significa Saídas?','É a soma das despesas/saídas com valor definido no mês selecionado. As saídas alimentam totais, relatórios, extrato e o gráfico de despesas por categoria.'],
+        ['Qual é a diferença entre Saldo do período e Saldo geral?','<strong>Saldo do período</strong> é Entradas menos Saídas somente do mês selecionado. <strong>Saldo geral</strong> é o acumulado de todas as entradas menos todas as saídas desde o primeiro lançamento até o fim do mês selecionado. Movimentações futuras não reduzem o saldo geral do mês atual.'],
+        ['Por que Saldo do período e Saldo geral podem ser iguais?','Quando não existem movimentações em meses anteriores nem saldo histórico, os dois naturalmente ficam iguais. A diferença só aparece quando existe resultado acumulado de meses anteriores.'],
+        ['Lançamentos futuros entram no Saldo geral?','Somente quando você navegar para o mês em que eles pertencem. Parcelas ou recorrências futuras não devem reduzir o Saldo geral de um mês anterior.'],
+        ['Como navegar entre os meses?','Escolha o ano no combo e clique em JAN, FEV, MAR e assim por diante. O painel, gráfico e demais controles mensais passam a usar o mês selecionado.']
+      ]
+    },
+    {
+      title:'Lançamentos',
+      items:[
+        ['Quando devo usar Nova entrada?','Use para qualquer valor que entra no orçamento: salário, renda, aluguel recebido, reembolso, transferência recebida e outros créditos.'],
+        ['Quando devo usar Nova despesa / saída?','Use para qualquer valor que sai do orçamento: contas, compras, cartão, PIX, débito, boleto, transferências, dinheiro e demais despesas.'],
+        ['Para que serve o campo Pessoa?','Identifica quem realizou ou recebeu a movimentação dentro do ambiente financeiro.'],
+        ['Para que serve “Despesa de”?','Indica de quem é a despesa. Você pode selecionar um integrante ou Família / compartilhada quando o gasto pertence ao grupo.'],
+        ['O que é Categoria?','É a classificação financeira da movimentação. Ela organiza relatórios e, nas despesas, alimenta o gráfico de despesas por categoria. Somente categorias ativas aparecem nos novos lançamentos.'],
+        ['O que é Forma de pagamento?','Identifica como a despesa foi paga, como PIX, débito, transferência, dinheiro, boleto ou cartão de crédito. As opções disponíveis são controladas em Formas de pagamento.'],
+        ['Quando devo informar Conta / origem do pagamento?','Principalmente em PIX, débito e transferência, para registrar de qual conta ou instituição o valor saiu.'],
+        ['O que significa Status?','Mostra a situação financeira do lançamento, como Pago, Pendente, Recebido ou A receber. O status também influencia alertas e vencimentos.'],
+        ['O que é Recorrência?','Permite representar despesas ou entradas que se repetem. Itens recorrentes também ajudam a FINORA a construir o planejamento orçamentário.'],
+        ['O que é Valor no próximo mês?','Define como uma recorrência será tratada no mês seguinte: manter o mesmo valor ou deixar o valor para definição posterior.'],
+        ['O lançamento rápido aparece nos outros controles?','Sim. Entradas e despesas salvas pelo Lançamento rápido entram nos mesmos dados da FINORA e refletem em Últimos lançamentos, relatórios, extrato, totais e gráfico por categoria.']
+      ]
+    },
+    {
+      title:'Cartões',
+      items:[
+        ['Para que serve o cadastro de cartões?','Permite identificar emissor, titular, final, validade, vencimento da fatura, bandeira, categoria padrão e cor visual do cartão.'],
+        ['A FINORA guarda o número completo ou CVV do cartão?','Não. O cadastro foi desenhado para usar somente informações necessárias ao controle financeiro, como final do cartão e dados de organização.'],
+        ['Como funcionam os alertas de fatura?','A FINORA usa o dia de vencimento do cartão e procura valores conhecidos associados ao cartão naquele mês. Quando encontra uma despesa/fatura vinculada, mostra o valor no alerta.'],
+        ['Por que uma fatura pode aparecer como Valor a definir?','Isso acontece quando existe previsão da fatura, mas ainda não há um lançamento com valor conhecido associado àquele cartão e mês.'],
+        ['A categoria padrão do cartão substitui a categoria do gasto?','Ela funciona como referência/padrão. A categorização do lançamento continua sendo importante para relatórios e para o gráfico de despesas.']
+      ]
+    },
+    {
+      title:'Categorias e formas de pagamento',
+      items:[
+        ['Como ativar ou desativar uma categoria?','Abra Categorias e marque ou desmarque o check correspondente. Apenas categorias ativas aparecem nas opções de novos lançamentos. Registros históricos continuam preservados.'],
+        ['Posso criar uma categoria nova?','Sim. Em Categorias, informe o nome na área de criação e clique em Adicionar e ativar.'],
+        ['O que acontece quando cadastro uma Meta?','A FINORA cria automaticamente uma categoria no formato “Meta: nome da meta”. Despesas lançadas nessa categoria são contabilizadas no acumulado da meta.'],
+        ['Como ativar ou desativar uma forma de pagamento?','Abra Formas de pagamento e use os checks. As formas ativas aparecem nos formulários de lançamento.'],
+        ['Posso criar uma forma de pagamento personalizada?','Sim. Informe o nome na área de criação de Formas de pagamento e adicione-a. Ela já nasce ativa.']
+      ]
+    },
+    {
+      title:'Orçamentos',
+      items:[
+        ['Como a FINORA calcula o orçamento recomendado?','A base usa despesas marcadas como recorrentes mensais mais a média das despesas variáveis dos três meses anteriores. Sobre essa base é adicionada uma margem de segurança de 10%.'],
+        ['O orçamento altera meus lançamentos?','Não. O orçamento é uma referência de planejamento e análise. Ele não modifica nem cria lançamentos automaticamente.'],
+        ['O que significa Despesas fixas?','São as despesas identificadas como recorrentes mensais no período analisado.'],
+        ['O que significa Média variável?','É uma estimativa baseada nas despesas não recorrentes dos três meses anteriores. Quando não há histórico suficiente, a FINORA usa o comportamento variável já registrado no mês.'],
+        ['O que é Saldo orçamentário?','É a diferença entre o orçamento recomendado e o total realizado no mês. Um valor positivo indica espaço dentro do orçamento; um valor negativo indica estouro da referência.']
+      ]
+    },
+    {
+      title:'Metas',
+      items:[
+        ['Que tipo de meta posso cadastrar?','Qualquer objetivo financeiro: reserva de emergência, viagem, quitar dívida, aquisição, reforma, educação ou outro sonho/projeto.'],
+        ['Quais informações uma meta possui?','Nome, valor-alvo, valor já acumulado, aporte mensal planejado e prazo.'],
+        ['Como funciona o acumulado de uma meta?','O acumulado combina aportes manuais registrados na própria meta com despesas lançadas na categoria automática “Meta: nome da meta”.'],
+        ['Como acompanho o progresso?','Cada meta apresenta percentual e barra de progresso. O relatório de metas também consolida valor planejado, acumulado e aportes mensais.'],
+        ['O que significa “Para cumprir o prazo”?','É uma estimativa mensal baseada no valor ainda necessário e na quantidade de meses até o prazo informado.']
+      ]
+    },
+    {
+      title:'Relatórios e Extrato',
+      items:[
+        ['Para que serve Relatórios?','Permite analisar as movimentações por período, pessoa, categoria, forma de pagamento, cartão, status e tipo de movimentação.'],
+        ['O que é o Extrato?','É uma visualização cronológica de créditos e débitos, semelhante a um extrato bancário, incluindo saldos para facilitar a leitura financeira.'],
+        ['Os filtros aparecem na impressão do Extrato?','Não devem aparecer. A impressão é preparada para apresentar o conteúdo financeiro, período e saldos, sem os controles de filtro.'],
+        ['Posso exportar dados?','Sim. A FINORA possui recursos de exportação CSV em áreas de relatórios/lançamentos.'],
+        ['As categorias personalizadas aparecem nos relatórios?','Sim. Depois de utilizadas nos lançamentos, passam a compor os mesmos relatórios e agrupamentos das categorias padrão.']
+      ]
+    },
+    {
+      title:'Alertas e vencimentos',
+      items:[
+        ['O que aparece em Alertas?','Vencimentos, gastos pendentes, previsões e faturas de cartão, organizados por mês e categoria.'],
+        ['Como o valor de uma fatura aparece no alerta?','Quando existe uma movimentação com valor conhecido associada ao cartão específico no mesmo mês, a FINORA usa esse valor no alerta.'],
+        ['O que significa Valores ainda a definir?','São previsões/recorrências que existem no planejamento, mas ainda não possuem valor conhecido.'],
+        ['O que aparece em Próximos vencimentos?','Despesas futuras com vencimento definido e que ainda não estão concluídas/pagas.']
+      ]
+    },
+    {
+      title:'Acessos, ambientes e sincronização',
+      items:[
+        ['O que é um Ambiente?','É um espaço financeiro separado. Cada ambiente mantém seus próprios integrantes, lançamentos, cartões e configurações.'],
+        ['Qual é a diferença entre Administrador e Integrante?','O Administrador cria e gerencia o ambiente e os acessos. O Integrante entra por convite e acessa o ambiente que lhe foi permitido.'],
+        ['Como funcionam os convites?','O administrador informa o e-mail do familiar e o ambiente permitido. O convidado conclui o cadastro pelo link/código recebido.'],
+        ['Posso ter mais de um ambiente?','Sim. Ambientes permitem separar, por exemplo, finanças familiares, pessoais ou de outros grupos.'],
+        ['Para que serve a Sincronização?','Mantém o estado financeiro do ambiente na nuvem para permitir acesso consistente entre dispositivos e integrantes autorizados.'],
+        ['Alterações em categorias, formas e metas são sincronizadas?','Sim. Essas configurações fazem parte do estado compartilhado do ambiente e acompanham a sincronização da FINORA.']
+      ]
+    },
+    {
+      title:'Segurança e manutenção',
+      items:[
+        ['Posso entrar com e-mail ou CPF?','Sim, desde que o CPF esteja corretamente vinculado ao perfil FINORA.'],
+        ['O que é Backup?','É uma cópia dos dados que pode ser usada como proteção adicional ou restauração.'],
+        ['O que faz Restaurar backup?','Recarrega informações a partir de um backup anteriormente gerado. Use com atenção para não substituir informações mais recentes.'],
+        ['O que significa Limpar esta conta?','É uma ação destrutiva destinada a apagar dados da conta/ambiente. Utilize somente quando tiver certeza e, preferencialmente, após gerar backup.']
+      ]
+    }
+  ];
+
+  function faqHTML(){
+    return `<div class="finora-v92-faq">
+      <div class="finora-v92-faq-intro"><strong>Central de dúvidas FINORA</strong><br>Consulte abaixo as principais regras da plataforma, o significado dos campos e como cada recurso afeta seus controles financeiros. Use a busca para localizar um assunto rapidamente.</div>
+      <div class="finora-v92-faq-search"><input id="finoraV92FaqSearch" type="search" placeholder="Buscar na FAQ: saldo, cartão, meta, categoria, orçamento..."></div>
+      <div id="finoraV92FaqResults">
+        ${faqGroups.map(group=>`<section class="finora-v92-faq-group"><h3>${group.title}</h3>${group.items.map(([q,a])=>`<details class="finora-v92-faq-item" data-faq-text="${(q+' '+a.replace(/<[^>]+>/g,'')).replace(/"/g,'&quot;')}"><summary>${q}</summary><div class="finora-v92-faq-answer">${a}</div></details>`).join('')}</section>`).join('')}
+      </div>
+      <div class="finora-v92-faq-empty" id="finoraV92FaqEmpty">Nenhuma pergunta encontrada para esta busca.</div>
+    </div>`;
+  }
+
+  function renderFAQ(){
+    document.getElementById('finoraUtilityTitle').textContent='FAQ';
+    document.getElementById('finoraUtilitySubtitle').textContent='Perguntas frequentes e guia de uso da FINORA';
+    document.getElementById('finoraUtilityBody').innerHTML=faqHTML();
+    const search=document.getElementById('finoraV92FaqSearch');
+    const empty=document.getElementById('finoraV92FaqEmpty');
+    search?.addEventListener('input',()=>{
+      const q=search.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+      let visible=0;
+      document.querySelectorAll('.finora-v92-faq-item').forEach(item=>{
+        const text=(item.dataset.faqText||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        const show=!q||text.includes(q);
+        item.style.display=show?'':'none';
+        if(show)visible++;
+      });
+      document.querySelectorAll('.finora-v92-faq-group').forEach(group=>{
+        const any=[...group.querySelectorAll('.finora-v92-faq-item')].some(x=>x.style.display!=='none');
+        group.style.display=any?'':'none';
+      });
+      if(empty)empty.style.display=visible?'none':'block';
+    });
+  }
+
+  const previousUtility=window.openFinoraUtilityPanel;
+  window.openFinoraUtilityPanel=function(type){
+    if(type==='faq'){
+      openSectionModal('finoraUtilityPanel');
+      renderFAQ();
+      return;
+    }
+    return previousUtility?previousUtility(type):undefined;
+  };
 })();
 </script>
 
