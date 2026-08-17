@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v85-dashboard-estavel-lancamento-rapido">
+<meta name="finora-version" content="v86-modais-restaurados">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3854,6 +3854,32 @@ body.finora-v84-dark .finora-v84-panel-head h3{color:#f2f7f4!important}
   opacity:.72!important;
   cursor:wait!important;
   filter:saturate(.75)!important;
+}
+
+
+/* FINORA v86 — restauração dos modais legados */
+body > .popup-only-panel.section-modal-active{
+  display:block!important;
+  position:fixed!important;
+  left:50%!important;
+  top:50%!important;
+  transform:translate(-50%,-50%)!important;
+  z-index:12001!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+body > #simpleLaunchPanel.section-modal-active{
+  display:block!important;
+}
+body > #finoraCardsPanel.section-modal-active,
+body > #finoraReportsPanel.section-modal-active,
+body > #finoraFamilyAccess.section-modal-active,
+body > #finoraMonthlySheet.section-modal-active,
+body > #finoraCategories.section-modal-active,
+body > #simpleAlertsPanel.section-modal-active,
+body > #cardFormPanel.section-modal-active,
+body > #finoraUtilityPanel.section-modal-active{
+  display:block!important;
 }
 
 </style>
@@ -9891,6 +9917,61 @@ setTimeout(renderHomeCategoryDonut,0);
 
   // Refresh dynamic dashboard periodically and after common app events.
   setInterval(()=>{try{renderV84Dashboard()}catch(e){}},5000);
+})();
+</script>
+
+
+<script id="finora-v86-modal-restore">
+(function(){
+  const popupIds=[
+    'finoraFamilyAccess',
+    'finoraMonthlySheet',
+    'finoraCategories',
+    'finoraReportsPanel',
+    'finoraCardsPanel',
+    'cardFormPanel'
+  ];
+
+  function restorePopupHosts(){
+    popupIds.forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el)return;
+      // A v84 ocultou .simple-sheet inteira. Se o popup continuar dentro dela,
+      // o backdrop abre mas a janela fica invisível.
+      const hiddenParent=el.closest('.simple-sheet');
+      if(hiddenParent){
+        document.body.appendChild(el);
+      }
+    });
+  }
+
+  function installModalGuard(){
+    restorePopupHosts();
+
+    // Garante que o modal solicitado fique acima do backdrop, mesmo após re-render.
+    const original=window.openSectionModal;
+    if(typeof original==='function' && !original.__v86patched){
+      const patched=function(id){
+        restorePopupHosts();
+        const result=original.call(this,id);
+        const el=document.getElementById(id);
+        if(el && el.classList.contains('section-modal-active')){
+          el.style.setProperty('z-index','12001','important');
+          el.style.setProperty('visibility','visible','important');
+          el.style.setProperty('opacity','1','important');
+        }
+        return result;
+      };
+      patched.__v86patched=true;
+      window.openSectionModal=patched;
+    }
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',installModalGuard,{once:true});
+  }else{
+    installModalGuard();
+  }
 })();
 </script>
 
