@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v90-planejamento-categorias-metas">
+<meta name="finora-version" content="v91-metas-integradas-categorias">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -10701,10 +10701,10 @@ setTimeout(renderHomeCategoryDonut,0);
     const kpis=home.querySelector('.simple-kpis');
     if(kpis){
       kpis.innerHTML=`
-        <div class="simple-kpi balance"><span>Saldo geral</span><strong id="v84SaldoGeral">R$ 0,00</strong><small>em todas as contas</small></div>
         <div class="simple-kpi income"><span>Entradas</span><strong id="simpleEntradas">R$ 0,00</strong><small>no período</small><small id="simpleAReceber" style="display:none">A receber: R$ 0,00</small></div>
         <div class="simple-kpi expense"><span>Saídas</span><strong id="simpleDespesas">R$ 0,00</strong><small>no período</small><small id="simpleAPagar" style="display:none">A pagar: R$ 0,00</small></div>
-        <div class="simple-kpi reserve"><span>Saldo do período</span><strong id="simpleSaldo">R$ 0,00</strong><small>resultado</small><span id="simpleReserva" style="display:none">R$ 0,00</span></div>`;
+        <div class="simple-kpi reserve"><span>Saldo do período</span><strong id="simpleSaldo">R$ 0,00</strong><small>resultado</small><span id="simpleReserva" style="display:none">R$ 0,00</span></div>
+        <div class="simple-kpi balance"><span>Saldo geral</span><strong id="v84SaldoGeral">R$ 0,00</strong><small>em todas as contas</small></div>`;
     }
 
     const grid=document.createElement('div');
@@ -11678,6 +11678,95 @@ setTimeout(renderHomeCategoryDonut,0);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
+
+  // FINORA v91 — cada meta também é uma categoria disponível em Nova despesa / saída.
+  function v91GoalCategoryName(g){return `Meta: ${g.name}`;}
+  function v91SyncGoalCategories(){
+    const s=loadFinoraFeatureState();
+    let changed=false;
+    const goalIds=new Set(s.goals.map(g=>String(g.id)));
+    s.goals.forEach(g=>{
+      let c=s.categories.find(x=>String(x.goalId||'')===String(g.id));
+      if(!c){
+        c={name:v91GoalCategoryName(g),active:true,system:false,goalId:g.id,goalCategory:true};
+        s.categories.push(c);changed=true;
+      }else{
+        const desired=v91GoalCategoryName(g);
+        if(c.name!==desired){c.name=desired;changed=true;}
+        if(!c.goalCategory){c.goalCategory=true;changed=true;}
+      }
+    });
+    const before=s.categories.length;
+    s.categories=s.categories.filter(c=>!c.goalCategory||goalIds.has(String(c.goalId)));
+    if(s.categories.length!==before)changed=true;
+    if(changed){s.updatedAt=new Date().toISOString();saveFinoraFeatureState(s);}
+    return s;
+  }
+  function v91GoalMovementTotal(g){
+    const names=new Set([v91GoalCategoryName(g)]);
+    const linked=loadFinoraFeatureState().categories.find(c=>String(c.goalId||'')===String(g.id));
+    if(linked)names.add(linked.name);
+    return data.filter(x=>sameWorkspace(x)&&x.tipo==='saida'&&hasKnownValue(x)&&names.has(x.categoria))
+      .reduce((sum,x)=>sum+Number(x.valor||0),0);
+  }
+  function v91GoalTotal(g){return Number(g.saved||0)+v91GoalMovementTotal(g);}
+
+  // Atualiza combos de categoria sem alterar a lógica de formas de pagamento.
+  window.refreshFinoraV90Controls=function(){
+    const s=v91SyncGoalCategories();
+    const cats=s.categories.filter(x=>x.active).map(x=>x.name);
+    const pays=s.payments.filter(x=>x.active).map(x=>x.name);
+    repopulateSelect(document.getElementById('categoriaExpense'),cats,{emptyLabel:'Selecione uma categoria'});
+    repopulateSelect(document.getElementById('cardDefaultCategory'),cats,{emptyLabel:'Sem categoria padrão'});
+    repopulateSelect(document.getElementById('forma'),pays);
+    repopulateSelect(document.getElementById('v84QuickPayment'),pays,{emptyLabel:'Selecione'});
+    const qc=document.getElementById('v84QuickCategory');
+    if(qc&&document.getElementById('v84QuickExpense')?.classList.contains('active')){
+      repopulateSelect(qc,cats,{emptyLabel:'Selecione'});
+    }
+  };
+
+  // Metas: acumulado = aporte manual + toda saída lançada na categoria automática da meta.
+  const v91BaseRenderGoals=renderGoals;
+  renderGoals=function(){
+    v91SyncGoalCategories();
+    const original=loadFinoraFeatureState();
+    const id=currentWorkspaceId||'default';
+    const all=v90AllStore();
+    const persisted=all[id]?JSON.parse(JSON.stringify(all[id])):null;
+    if(persisted){
+      const view=JSON.parse(JSON.stringify(persisted));
+      view.goals=(view.goals||[]).map(g=>({...g,saved:v91GoalTotal(g)}));
+      all[id]=view;localStorage.setItem(V90_KEY,JSON.stringify(all));
+    }
+    try{v91BaseRenderGoals();}
+    finally{
+      if(persisted){
+        const restore=v90AllStore();restore[id]=persisted;localStorage.setItem(V90_KEY,JSON.stringify(restore));
+      }
+    }
+    // A barra de progresso já existe no card; acrescentamos a composição do acumulado.
+    const cards=document.querySelectorAll('.finora-v90-goal');
+    cards.forEach((card,i)=>{
+      const g=original.goals[i];if(!g)return;
+      const auto=v91GoalMovementTotal(g);
+      const note=document.createElement('div');
+      note.style.cssText='margin-top:7px;font-size:8px;color:#617269';
+      note.textContent=`Acumulado automático: ${v90Money(g.saved||0)} em aportes + ${v90Money(auto)} em despesas da categoria “${v91GoalCategoryName(g)}”.`;
+      const actions=card.querySelector('.finora-v90-goal-actions');
+      if(actions)card.insertBefore(note,actions);else card.appendChild(note);
+    });
+  };
+
+  // Sincroniza categoria logo após cadastrar ou excluir uma meta.
+  document.addEventListener('click',e=>{
+    if(e.target?.id==='v90GoalSave'||e.target?.matches?.('[data-v90-goal-del]')){
+      setTimeout(()=>{v91SyncGoalCategories();refreshFinoraV90Controls();},20);
+    }
+  },true);
+
+  v91SyncGoalCategories();
+  setTimeout(()=>refreshFinoraV90Controls(),0);
 })();
 </script>
 
