@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v92-saldos-coerentes-faq">
+<meta name="finora-version" content="v93-metas-alertas-cockpit">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -4938,6 +4938,308 @@ body.finora-v88-sidebar-collapsed .shell{
   font-size:10px;
 }
 
+
+/* ==========================================================
+   FINORA v93 — metas, cadastros, orçamento e cockpit
+   ========================================================== */
+.finora-v93-goal-link{
+  display:none;
+  align-self:start;
+}
+.finora-v93-goal-link.visible{display:block}
+.finora-v93-goal-check{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:38px;
+  padding:7px 10px;
+  border:1px solid #dbe6e0;
+  border-radius:10px;
+  background:#f6faf8;
+  color:#174638;
+  font-size:9px;
+  font-weight:750;
+}
+.finora-v93-goal-check input{
+  width:17px;height:17px;accent-color:#08754a;
+}
+.finora-v93-goal-select{
+  display:none;
+  margin-top:6px;
+}
+.finora-v93-goal-select.visible{display:block}
+
+/* Gerenciamento de categorias / pagamentos */
+.finora-v93-manager{
+  display:grid;
+  gap:10px;
+}
+.finora-v93-manager-row{
+  display:grid;
+  grid-template-columns:34px minmax(0,1fr) auto auto;
+  gap:8px;
+  align-items:center;
+  min-height:50px;
+  padding:8px 10px;
+  border:1px solid #e1e9e4;
+  border-radius:11px;
+  background:#fff;
+}
+.finora-v93-manager-row input[type=checkbox]{
+  width:17px;height:17px;accent-color:#0a7e50;
+}
+.finora-v93-manager-name{
+  color:#173f32;
+  font-size:10px;
+  font-weight:750;
+}
+.finora-v93-manager-kind{
+  padding:4px 7px;
+  border-radius:999px;
+  background:#f0f6f3;
+  color:#6c7d74;
+  font-size:7.5px;
+}
+.finora-v93-trash{
+  width:32px!important;
+  height:32px!important;
+  min-height:32px!important;
+  padding:0!important;
+  display:grid!important;
+  place-items:center!important;
+  border:1px solid #f0cecb!important;
+  border-radius:8px!important;
+  background:#fff7f6!important;
+  color:#bd3c35!important;
+  font-size:14px!important;
+  cursor:pointer!important;
+}
+.finora-v93-trash:hover{background:#ffebe9!important}
+
+/* Orçamento contábil */
+.finora-v93-budget-accounting{
+  display:grid;
+  gap:10px;
+}
+.finora-v93-budget-status{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:9px;
+}
+.finora-v93-budget-cell{
+  padding:12px;
+  border:1px solid #e0e8e3;
+  border-radius:12px;
+  background:#fff;
+}
+.finora-v93-budget-cell span{
+  display:block;
+  color:#6d7e75;
+  font-size:8px;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+.finora-v93-budget-cell strong{
+  display:block;
+  margin-top:5px;
+  color:#083f30;
+  font-size:16px;
+}
+.finora-v93-budget-cell.good strong{color:#087448}
+.finora-v93-budget-cell.warn strong{color:#be7407}
+.finora-v93-budget-cell.bad strong{color:#c53333}
+.finora-v93-budget-meter{
+  height:14px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#e9efec;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.05);
+}
+.finora-v93-budget-meter i{
+  display:block;
+  height:100%;
+  border-radius:999px;
+  background:linear-gradient(90deg,#158653,#32aa72);
+}
+.finora-v93-budget-meter i.over{
+  background:linear-gradient(90deg,#d99014,#d33d35);
+}
+.finora-v93-budget-caption{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  color:#65766d;
+  font-size:8.5px;
+}
+.finora-v93-projection{
+  width:100%;
+  border-collapse:collapse;
+  font-size:9px;
+}
+.finora-v93-projection th{
+  padding:8px 9px;
+  background:#f3f7f5;
+  color:#5e7167;
+  text-align:left;
+  font-size:8px;
+}
+.finora-v93-projection td{
+  padding:8px 9px;
+  border-bottom:1px solid #edf1ef;
+}
+.finora-v93-projection td:not(:first-child),
+.finora-v93-projection th:not(:first-child){text-align:right}
+
+/* FAQ dentro do orçamento */
+.finora-v93-budget-faq{
+  border:1px solid #dde8e2;
+  border-radius:12px;
+  overflow:hidden;
+}
+.finora-v93-budget-faq h4{
+  margin:0;
+  padding:11px 13px;
+  background:#f2f8f5;
+  color:#0b5038;
+  font-size:11px;
+}
+.finora-v93-budget-faq details{
+  border-top:1px solid #edf1ef;
+}
+.finora-v93-budget-faq summary{
+  padding:10px 13px;
+  cursor:pointer;
+  color:#24483a;
+  font-size:9px;
+  font-weight:750;
+}
+.finora-v93-budget-faq p{
+  margin:0;
+  padding:0 13px 11px;
+  color:#607168;
+  font-size:9px;
+  line-height:1.6;
+}
+
+/* Cockpit */
+.finora-v93-settings{
+  display:grid;
+  gap:14px;
+}
+.finora-v93-settings-section{
+  padding:13px;
+  border:1px solid #dfe8e3;
+  border-radius:13px;
+  background:#fff;
+}
+.finora-v93-settings-section h3{
+  margin:0 0 4px;
+  color:#0b4634;
+  font-size:11px;
+}
+.finora-v93-settings-section>p{
+  margin:0 0 11px;
+  color:#718078;
+  font-size:8.5px;
+  line-height:1.5;
+}
+.finora-v93-settings-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+}
+.finora-v93-setting{
+  display:grid;
+  gap:5px;
+}
+.finora-v93-setting>label{
+  color:#53685d;
+  font-size:8px;
+  font-weight:750;
+}
+.finora-v93-setting select,
+.finora-v93-setting input[type=number]{
+  min-height:38px;
+  border:1px solid #dce5e0;
+  border-radius:9px;
+  background:#fff;
+}
+.finora-v93-switch{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:38px;
+  color:#274d3d;
+  font-size:9px;
+  font-weight:700;
+}
+.finora-v93-switch input{
+  width:17px;height:17px;accent-color:#08784c;
+}
+.finora-v93-paychecks{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.finora-v93-paychecks label{
+  display:flex;
+  gap:5px;
+  align-items:center;
+  padding:6px 8px;
+  border:1px solid #e1e8e4;
+  border-radius:999px;
+  font-size:8px;
+  color:#3f5c50;
+}
+.finora-v93-paychecks input{accent-color:#08784c}
+.finora-v93-settings-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:7px;
+}
+.finora-v93-settings-actions button{
+  min-height:38px;
+  padding:0 14px;
+  border-radius:9px;
+  border:1px solid #d9e4de;
+  background:#fff;
+  color:#1a4a38;
+  font-size:9px;
+  font-weight:800;
+}
+.finora-v93-settings-actions .primary{
+  background:#075f42;
+  border-color:#075f42;
+  color:#fff;
+}
+
+/* modos de gráfico configuráveis */
+.finora-home-category-card.v93-hide-legend .report-legend{display:none!important}
+.finora-home-category-card.v93-hide-legend .finora-home-donut-layout{
+  grid-template-columns:1fr!important;
+}
+.finora-v93-bar-chart{
+  display:none;
+  min-height:250px;
+  padding:8px 4px 0;
+}
+.finora-home-category-card.v93-chart-bars .report-donut{display:none!important}
+.finora-home-category-card.v93-chart-bars .finora-v93-bar-chart{display:grid!important;gap:8px}
+.finora-v93-bar-row{
+  display:grid;
+  grid-template-columns:minmax(100px,170px) minmax(100px,1fr) 84px;
+  gap:8px;
+  align-items:center;
+}
+.finora-v93-bar-name{font-size:9px;color:#24483a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.finora-v93-bar-track{height:15px;border-radius:999px;background:#edf2ef;overflow:hidden}
+.finora-v93-bar-track i{display:block;height:100%;border-radius:999px}
+.finora-v93-bar-value{text-align:right;font-size:8.5px;font-weight:800;color:#173f32}
+
+@media(max-width:800px){
+  .finora-v93-budget-status,.finora-v93-settings-grid{grid-template-columns:1fr}
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -8016,6 +8318,7 @@ $('entryForm').addEventListener('submit',async e=>{
     vencimento:vencVal,status:$('status').value,recorrente:recorrenciaVal,recRule:recRuleVal,
     valorRecorrente:$('valorRecorrente').value,valorPendente:false,beneficiario:$('beneficiario').value.trim(),parcelas:$('parcelas').value.trim(),cardId:$('launchCard')?.value||'',forma:$('forma').value,
     paymentAccount:paymentNeedsAccount($('forma').value)?$('paymentAccount').value.trim():'',
+    goalId:($('tipo').value==='entrada' && $('goalUseCheck')?.checked)?($('goalUseSelect')?.value||''):(old?.goalId||''),
     observacao:$('observacao').value.trim(),attachment,createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
   const idx=data.findIndex(x=>x.id===id); if(idx>=0)data[idx]=row;else data.push(row);
   try{save()}catch(err){toast('Arquivo muito grande para o navegador. Remova o anexo.');return}
@@ -11802,6 +12105,7 @@ setTimeout(renderHomeCategoryDonut,0);
     let changed=false;
     const goalIds=new Set(s.goals.map(g=>String(g.id)));
     s.goals.forEach(g=>{
+      if(g.categoryDisabled)return;
       let c=s.categories.find(x=>String(x.goalId||'')===String(g.id));
       if(!c){
         c={name:v91GoalCategoryName(g),active:true,system:false,goalId:g.id,goalCategory:true};
@@ -11822,8 +12126,12 @@ setTimeout(renderHomeCategoryDonut,0);
     const names=new Set([v91GoalCategoryName(g)]);
     const linked=loadFinoraFeatureState().categories.find(c=>String(c.goalId||'')===String(g.id));
     if(linked)names.add(linked.name);
-    return data.filter(x=>sameWorkspace(x)&&x.tipo==='saida'&&hasKnownValue(x)&&names.has(x.categoria))
-      .reduce((sum,x)=>sum+Number(x.valor||0),0);
+    return data.filter(x=>{
+      if(!sameWorkspace(x)||!hasKnownValue(x))return false;
+      if(x.tipo==='saida' && names.has(x.categoria))return true;
+      if(x.tipo==='entrada' && String(x.goalId||'')===String(g.id))return true;
+      return false;
+    }).reduce((sum,x)=>sum+Number(x.valor||0),0);
   }
   function v91GoalTotal(g){return Number(g.saved||0)+v91GoalMovementTotal(g);}
 
@@ -11868,7 +12176,7 @@ setTimeout(renderHomeCategoryDonut,0);
       const auto=v91GoalMovementTotal(g);
       const note=document.createElement('div');
       note.style.cssText='margin-top:7px;font-size:8px;color:#617269';
-      note.textContent=`Acumulado automático: ${v90Money(g.saved||0)} em aportes + ${v90Money(auto)} em despesas da categoria “${v91GoalCategoryName(g)}”.`;
+      note.textContent=`Acumulado: ${v90Money(g.saved||0)} em aportes manuais + ${v90Money(auto)} em movimentações vinculadas à meta.`;
       const actions=card.querySelector('.finora-v90-goal-actions');
       if(actions)card.insertBefore(note,actions);else card.appendChild(note);
     });
@@ -12041,6 +12349,504 @@ setTimeout(renderHomeCategoryDonut,0);
     }
     return previousUtility?previousUtility(type):undefined;
   };
+})();
+</script>
+
+
+<script id="finora-v93-features">
+(function(){
+  const V93_DEFAULT_COCKPIT={
+    chartVisible:true,
+    chartType:'pie',
+    chartLegend:true,
+    quickVisible:true,
+    recentVisible:true,
+    recentOrder:'desc',
+    recentPaid:true,
+    recentPending:true,
+    recentPayments:[],
+    recentMin:'',
+    recentMax:'',
+    upcomingVisible:true
+  };
+
+  function v93Feature(){
+    const s=loadFinoraFeatureState();
+    s.cockpit={...V93_DEFAULT_COCKPIT,...(s.cockpit||{})};
+    return s;
+  }
+  function v93SaveFeature(s){
+    s.updatedAt=new Date().toISOString();
+    saveFinoraFeatureState(s);
+  }
+  function v93Money(v){
+    return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  }
+  function v93Esc(s=''){
+    return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function v93MonthShift(month,delta){
+    const [y,m]=month.split('-').map(Number);
+    const d=new Date(y,m-1+delta,1);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  }
+
+  // ----------------------------------------------------------
+  // Meta no formulário de Nova entrada
+  // ----------------------------------------------------------
+  function ensureGoalLinkField(){
+    const pessoa=document.getElementById('pessoa');
+    if(!pessoa)return;
+    const personField=pessoa.closest('.field');
+    if(!personField)return;
+    let field=document.getElementById('goalUseField');
+    if(!field){
+      field=document.createElement('div');
+      field.id='goalUseField';
+      field.className='field finora-v93-goal-link';
+      field.innerHTML=`
+        <label>Destinar entrada para uma meta</label>
+        <label class="finora-v93-goal-check">
+          <input type="checkbox" id="goalUseCheck">
+          <span>Vincular esta entrada a uma meta cadastrada</span>
+        </label>
+        <select id="goalUseSelect" class="finora-v93-goal-select" aria-label="Meta vinculada"></select>
+        <div class="file-note">Quando vinculado, o valor desta entrada passa a compor o acumulado da meta.</div>`;
+      personField.insertAdjacentElement('afterend',field);
+      document.getElementById('goalUseCheck').addEventListener('change',e=>{
+        document.getElementById('goalUseSelect').classList.toggle('visible',e.target.checked);
+      });
+    }
+    refreshGoalLinkField();
+  }
+
+  function refreshGoalLinkField(){
+    const field=document.getElementById('goalUseField');
+    if(!field)return;
+    const goals=loadFinoraFeatureState().goals||[];
+    const isIncome=document.getElementById('tipo')?.value==='entrada';
+    field.classList.toggle('visible',isIncome&&goals.length>0);
+    const select=document.getElementById('goalUseSelect');
+    const old=select?.value||'';
+    if(select){
+      select.innerHTML='<option value="">Selecione a meta</option>'+goals.map(g=>`<option value="${v93Esc(g.id)}">${v93Esc(g.name)}</option>`).join('');
+      if(goals.some(g=>String(g.id)===String(old)))select.value=old;
+    }
+    if(!isIncome || !goals.length){
+      const cb=document.getElementById('goalUseCheck');
+      if(cb)cb.checked=false;
+      select?.classList.remove('visible');
+    }
+  }
+
+  ensureGoalLinkField();
+  document.getElementById('tipo')?.addEventListener('change',()=>setTimeout(refreshGoalLinkField,0));
+
+  const baseOpenLaunch=window.openLaunchModal;
+  if(typeof baseOpenLaunch==='function'){
+    window.openLaunchModal=function(mode='list'){
+      const r=baseOpenLaunch(mode);
+      setTimeout(()=>{ensureGoalLinkField();refreshGoalLinkField();},0);
+      return r;
+    };
+  }
+
+  const baseEditRow=window.editRow;
+  if(typeof baseEditRow==='function'){
+    window.editRow=function(id){
+      const x=data.find(r=>String(r.id)===String(id));
+      const r=baseEditRow(id);
+      setTimeout(()=>{
+        ensureGoalLinkField();refreshGoalLinkField();
+        if(x?.tipo==='entrada'&&x.goalId){
+          const cb=document.getElementById('goalUseCheck'),sel=document.getElementById('goalUseSelect');
+          if(cb)cb.checked=true;
+          if(sel){sel.value=x.goalId;sel.classList.add('visible');}
+        }
+      },0);
+      return r;
+    };
+  }
+
+  // ----------------------------------------------------------
+  // Alertas de cartão: fatura paga não volta como alerta virtual
+  // ----------------------------------------------------------
+  const baseCardInvoiceAlerts=window.cardInvoiceAlerts;
+  if(typeof baseCardInvoiceAlerts==='function'){
+    window.cardInvoiceAlerts=function(){
+      const rows=baseCardInvoiceAlerts()||[];
+      const cards=typeof loadFinoraCards==='function'?loadFinoraCards():[];
+      return rows.filter(a=>{
+        if(!a.virtualCardAlert)return true;
+        const month=String(a._month||a.vencimento||a.dataLancamento||'').slice(0,7);
+        const card=cards.find(c=>String(c.id)===String(a.cardId));
+        const tokens=[card?.name,card?.issuer].filter(Boolean).flatMap(s=>
+          String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(/[^a-z0-9]+/).filter(t=>t.length>=4)
+        );
+        const paid=data.some(x=>{
+          if(!sameWorkspace(x)||x.tipo!=='saida'||recordMonth(x)!==month||effectiveStatus(x)!=='pago')return false;
+          if(a.cardId && String(x.cardId||'')===String(a.cardId))return true;
+          const d=String(x.descricao||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+          return d.includes('fatura') && tokens.some(t=>d.includes(t));
+        });
+        return !paid;
+      });
+    };
+  }
+
+  // ----------------------------------------------------------
+  // Categorias / formas com ativação e exclusão
+  // ----------------------------------------------------------
+  function renderV93Manager(kind){
+    const root=document.getElementById('finoraUtilityBody');
+    const st=v93Feature();
+    const arr=kind==='categories'?st.categories:st.payments;
+    const isCat=kind==='categories';
+    document.getElementById('finoraUtilityTitle').textContent=isCat?'Categorias':'Formas de pagamento';
+    document.getElementById('finoraUtilitySubtitle').textContent=isCat
+      ?'Ative, desative, crie ou exclua categorias disponíveis nos lançamentos.'
+      :'Ative, desative, crie ou exclua meios de pagamento disponíveis.';
+    root.innerHTML=`<div class="finora-v90-feature-wrap">
+      <div class="finora-v90-feature-intro">${isCat
+        ?'Categorias ativas aparecem nos novos lançamentos. Excluir uma categoria não apaga os lançamentos históricos que já a utilizaram.'
+        :'Formas ativas aparecem nos novos lançamentos. Excluir uma forma não altera os registros históricos.'}</div>
+      <div class="finora-v93-manager">
+        ${arr.map((x,i)=>`<div class="finora-v93-manager-row">
+          <input type="checkbox" data-v93-toggle="${i}" ${x.active?'checked':''} aria-label="Ativar ${v93Esc(x.name)}">
+          <div class="finora-v93-manager-name">${v93Esc(x.name)}</div>
+          <span class="finora-v93-manager-kind">${x.goalCategory?'Meta':x.system?'Padrão':'Personalizada'}</span>
+          <button type="button" class="finora-v93-trash" data-v93-delete="${i}" title="Excluir">🗑</button>
+        </div>`).join('')}
+      </div>
+      <div>
+        <div class="finora-v90-section-title">Adicionar ${isCat?'categoria':'forma de pagamento'}</div>
+        <div class="finora-v90-add" style="margin-top:7px">
+          <input id="v93NewManagerItem" placeholder="Digite o nome">
+          <button type="button" class="finora-v90-primary" id="v93AddManagerItem">Adicionar e ativar</button>
+        </div>
+      </div>
+    </div>`;
+
+    root.querySelectorAll('[data-v93-toggle]').forEach(cb=>cb.onchange=()=>{
+      const s=v93Feature(),a=isCat?s.categories:s.payments,idx=Number(cb.dataset.v93Toggle);
+      if(a[idx])a[idx].active=cb.checked;
+      v93SaveFeature(s);refreshFinoraV90Controls();
+    });
+
+    root.querySelectorAll('[data-v93-delete]').forEach(btn=>btn.onclick=()=>{
+      const idx=Number(btn.dataset.v93Delete);
+      const s=v93Feature(),a=isCat?s.categories:s.payments,item=a[idx];
+      if(!item)return;
+      if(!confirm(`Excluir "${item.name}"?\n\nOs lançamentos históricos não serão apagados.`))return;
+      if(isCat && item.goalCategory && item.goalId){
+        const g=s.goals.find(g=>String(g.id)===String(item.goalId));
+        if(g)g.categoryDisabled=true;
+      }
+      a.splice(idx,1);
+      v93SaveFeature(s);refreshFinoraV90Controls();renderV93Manager(kind);
+      if(typeof toast==='function')toast(`${item.name} excluído.`);
+    });
+
+    document.getElementById('v93AddManagerItem').onclick=()=>{
+      const name=document.getElementById('v93NewManagerItem').value.trim();
+      if(!name)return toast('Informe um nome.');
+      const s=v93Feature(),a=isCat?s.categories:s.payments;
+      if(a.some(x=>x.name.toLowerCase()===name.toLowerCase()))return toast('Esse item já está cadastrado.');
+      a.push({name,active:true,system:false});
+      v93SaveFeature(s);refreshFinoraV90Controls();renderV93Manager(kind);toast(`${name} adicionado.`);
+    };
+  }
+
+  // Evita recriar categoria de meta que o usuário excluiu explicitamente.
+  const oldRefresh=window.refreshFinoraV90Controls;
+  window.refreshFinoraV90Controls=function(){
+    const s=loadFinoraFeatureState();
+    (s.goals||[]).forEach(g=>{
+      if(g.categoryDisabled){
+        s.categories=(s.categories||[]).filter(c=>String(c.goalId||'')!==String(g.id));
+      }
+    });
+    saveFinoraFeatureState(s,{skipCloud:true});
+    return oldRefresh?oldRefresh():undefined;
+  };
+
+  // ----------------------------------------------------------
+  // Orçamento: visão contábil + projeção + FAQ
+  // ----------------------------------------------------------
+  function v93ExpenseRows(month){
+    return data.filter(x=>sameWorkspace(x)&&x.tipo==='saida'&&recordMonth(x)===month&&hasKnownValue(x));
+  }
+  function v93BudgetModel(month){
+    const current=v93ExpenseRows(month);
+    const fixed=current.filter(x=>x.recorrente==='mensal');
+    let fixedTotal=fixed.reduce((s,x)=>s+Number(x.valor||0),0);
+
+    // Para mês futuro sem base fixa registrada, usa o último conjunto recorrente conhecido.
+    if(fixedTotal<=0){
+      const prior=data.filter(x=>sameWorkspace(x)&&x.tipo==='saida'&&x.recorrente==='mensal'&&hasKnownValue(x)&&recordMonth(x)<month);
+      const latestMonth=[...new Set(prior.map(recordMonth))].sort().pop();
+      if(latestMonth)fixedTotal=prior.filter(x=>recordMonth(x)===latestMonth).reduce((s,x)=>s+Number(x.valor||0),0);
+    }
+
+    const prev=[-1,-2,-3].map(d=>v93MonthShift(month,d));
+    const variableHist=prev.map(pm=>v93ExpenseRows(pm).filter(x=>x.recorrente!=='mensal').reduce((s,x)=>s+Number(x.valor||0),0));
+    let avgVariable=variableHist.reduce((s,v)=>s+v,0)/3;
+    const currentVariable=current.filter(x=>x.recorrente!=='mensal').reduce((s,x)=>s+Number(x.valor||0),0);
+    if(avgVariable<=0)avgVariable=currentVariable;
+    const base=fixedTotal+avgVariable;
+    const recommended=base*1.10;
+    const actual=current.reduce((s,x)=>s+Number(x.valor||0),0);
+    const usage=recommended>0?actual/recommended*100:0;
+    const variance=recommended-actual;
+    return {fixedTotal,avgVariable,recommended,actual,usage,variance};
+  }
+
+  function augmentBudget(){
+    const root=document.getElementById('finoraUtilityBody');
+    if(!root || document.getElementById('v93BudgetAccounting'))return;
+    const month=document.getElementById('filtroMes')?.value||currentMonth();
+    const model=v93BudgetModel(month);
+    const over=Math.max(0,-model.variance);
+    const [y,m]=month.split('-').map(Number);
+    const months=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const div=document.createElement('div');
+    div.id='v93BudgetAccounting';
+    div.className='finora-v93-budget-accounting';
+    div.innerHTML=`
+      <div class="finora-v90-section-title">Execução orçamentária · ${months[m]} ${y}</div>
+      <div class="finora-v93-budget-status">
+        <div class="finora-v93-budget-cell"><span>Orçamento do mês</span><strong>${v93Money(model.recommended)}</strong></div>
+        <div class="finora-v93-budget-cell"><span>Utilizado</span><strong>${v93Money(model.actual)}</strong></div>
+        <div class="finora-v93-budget-cell ${model.usage>100?'bad':model.usage>85?'warn':'good'}"><span>Percentual utilizado</span><strong>${model.usage.toFixed(1).replace('.',',')}%</strong></div>
+        <div class="finora-v93-budget-cell ${over>0?'bad':'good'}"><span>${over>0?'Estouro':'Disponível'}</span><strong>${v93Money(over>0?over:model.variance)}</strong></div>
+      </div>
+      <div class="finora-v93-budget-meter"><i class="${model.usage>100?'over':''}" style="width:${Math.min(100,model.usage)}%"></i></div>
+      <div class="finora-v93-budget-caption"><span>0%</span><span>${model.usage>100?'Orçamento ultrapassado em '+v93Money(over):'Utilização dentro da referência mensal'}</span><span>100%</span></div>
+
+      <div class="finora-v90-section-title">Projeção dos próximos meses</div>
+      <div style="overflow:auto"><table class="finora-v93-projection">
+        <thead><tr><th>Mês</th><th>Fixas estimadas</th><th>Variável média</th><th>Orçamento recomendado</th></tr></thead>
+        <tbody>${[1,2,3].map(offset=>{
+          const pm=v93MonthShift(month,offset),x=v93BudgetModel(pm),[py,pmo]=pm.split('-').map(Number);
+          return `<tr><td>${months[pmo]} ${py}</td><td>${v93Money(x.fixedTotal)}</td><td>${v93Money(x.avgVariable)}</td><td><strong>${v93Money(x.recommended)}</strong></td></tr>`;
+        }).join('')}</tbody>
+      </table></div>
+
+      <div class="finora-v93-budget-faq">
+        <h4>FAQ do orçamento</h4>
+        <details><summary>Como é calculado o orçamento do mês vigente?</summary><p>A FINORA soma as despesas recorrentes mensais identificadas como base fixa, calcula a média das despesas variáveis dos três meses anteriores e adiciona 10% de margem de segurança. O valor utilizado é a soma das despesas registradas no mês.</p></details>
+        <details><summary>Como é calculado o percentual utilizado?</summary><p>Percentual utilizado = despesas realizadas ÷ orçamento recomendado × 100. Acima de 100%, a tela mostra o valor que ultrapassou o orçamento.</p></details>
+        <details><summary>Como são estimados os próximos meses?</summary><p>A projeção usa as despesas recorrentes disponíveis para cada mês. Quando ainda não existe recorrência registrada naquele mês, a FINORA usa como referência o último conjunto de despesas recorrentes conhecido. A parte variável continua baseada na média móvel dos três meses anteriores.</p></details>
+        <details><summary>O orçamento cria ou altera lançamentos?</summary><p>Não. O orçamento é uma camada de planejamento e acompanhamento. Nenhum lançamento financeiro é criado, alterado ou excluído pelo cálculo orçamentário.</p></details>
+        <details><summary>Por que o orçamento pode mudar de um mês para outro?</summary><p>Porque despesas fixas podem mudar, novas recorrências podem surgir e a média móvel das despesas variáveis é recalculada conforme o histórico evolui.</p></details>
+      </div>`;
+    root.appendChild(div);
+  }
+
+  // Observa re-render do orçamento ao mudar mês/ano.
+  const budgetObserver=new MutationObserver(()=>{
+    if(document.getElementById('finoraUtilityTitle')?.textContent==='Orçamentos'){
+      setTimeout(augmentBudget,0);
+    }
+  });
+  const utilityBody=document.getElementById('finoraUtilityBody');
+  if(utilityBody)budgetObserver.observe(utilityBody,{childList:true});
+
+  // ----------------------------------------------------------
+  // Configuração do cockpit
+  // ----------------------------------------------------------
+  function renderCockpitSettings(){
+    const st=v93Feature(),c=st.cockpit;
+    const pays=(st.payments||[]).filter(x=>x.active).map(x=>x.name);
+    const root=document.getElementById('finoraUtilityBody');
+    document.getElementById('finoraUtilityTitle').textContent='Configurações';
+    document.getElementById('finoraUtilitySubtitle').textContent='Personalize a visualização do cockpit sem alterar os dados da FINORA.';
+    root.innerHTML=`<div class="finora-v93-settings">
+      <div class="finora-v90-feature-intro"><strong>Estrutura preservada:</strong> navegação por ano/mês e os cards Entradas, Saídas, Saldo do período e Saldo geral permanecem sempre visíveis. As opções abaixo alteram somente os painéis complementares do cockpit. O padrão continua sendo o visual atual.</div>
+
+      <section class="finora-v93-settings-section">
+        <h3>Despesas por categoria</h3>
+        <p>Controle a presença do painel, o tipo de visualização e o nível de detalhe.</p>
+        <div class="finora-v93-settings-grid">
+          <label class="finora-v93-switch"><input id="v93ChartVisible" type="checkbox" ${c.chartVisible?'checked':''}> Exibir despesas por categoria</label>
+          <label class="finora-v93-switch"><input id="v93ChartLegend" type="checkbox" ${c.chartLegend?'checked':''}> Exibir legenda e valores</label>
+          <div class="finora-v93-setting"><label>Tipo de gráfico</label><select id="v93ChartType">
+            <option value="pie" ${c.chartType==='pie'?'selected':''}>Pizza</option>
+            <option value="donut" ${c.chartType==='donut'?'selected':''}>Rosca</option>
+            <option value="bars" ${c.chartType==='bars'?'selected':''}>Barras horizontais</option>
+          </select></div>
+        </div>
+      </section>
+
+      <section class="finora-v93-settings-section">
+        <h3>Lançamento rápido</h3>
+        <p>O formulário completo continua disponível no menu mesmo quando o atalho do cockpit for ocultado.</p>
+        <label class="finora-v93-switch"><input id="v93QuickVisible" type="checkbox" ${c.quickVisible?'checked':''}> Exibir Lançamento rápido</label>
+      </section>
+
+      <section class="finora-v93-settings-section">
+        <h3>Últimos lançamentos</h3>
+        <p>Defina quais movimentações aparecem na tabela resumida da tela principal.</p>
+        <div class="finora-v93-settings-grid">
+          <label class="finora-v93-switch"><input id="v93RecentVisible" type="checkbox" ${c.recentVisible?'checked':''}> Exibir painel</label>
+          <div class="finora-v93-setting"><label>Ordenação pela data</label><select id="v93RecentOrder"><option value="desc" ${c.recentOrder==='desc'?'selected':''}>Mais recentes primeiro</option><option value="asc" ${c.recentOrder==='asc'?'selected':''}>Mais antigos primeiro</option></select></div>
+          <label class="finora-v93-switch"><input id="v93RecentPaid" type="checkbox" ${c.recentPaid?'checked':''}> Mostrar pagos/recebidos</label>
+          <label class="finora-v93-switch"><input id="v93RecentPending" type="checkbox" ${c.recentPending?'checked':''}> Mostrar pendentes</label>
+          <div class="finora-v93-setting"><label>Valor mínimo (R$)</label><input id="v93RecentMin" type="number" step="0.01" min="0" value="${v93Esc(c.recentMin)}" placeholder="Sem mínimo"></div>
+          <div class="finora-v93-setting"><label>Valor máximo (R$)</label><input id="v93RecentMax" type="number" step="0.01" min="0" value="${v93Esc(c.recentMax)}" placeholder="Sem máximo"></div>
+        </div>
+        <div class="finora-v93-setting" style="margin-top:9px"><label>Formas de pagamento (nenhuma marcada = todas)</label><div class="finora-v93-paychecks">${pays.map(p=>`<label><input type="checkbox" data-v93-payment="${v93Esc(p)}" ${(c.recentPayments||[]).includes(p)?'checked':''}>${v93Esc(p)}</label>`).join('')}</div></div>
+      </section>
+
+      <section class="finora-v93-settings-section">
+        <h3>Próximos vencimentos</h3>
+        <p>Você pode retirar o resumo do cockpit sem perder os alertas completos do menu.</p>
+        <label class="finora-v93-switch"><input id="v93UpcomingVisible" type="checkbox" ${c.upcomingVisible?'checked':''}> Exibir Próximos vencimentos</label>
+      </section>
+
+      <div class="finora-v93-settings-actions">
+        <button type="button" id="v93ResetCockpit">Restaurar padrão</button>
+        <button type="button" class="primary" id="v93SaveCockpit">Salvar configuração</button>
+      </div>
+    </div>`;
+
+    document.getElementById('v93SaveCockpit').onclick=()=>{
+      const s=v93Feature();
+      s.cockpit={
+        chartVisible:document.getElementById('v93ChartVisible').checked,
+        chartType:document.getElementById('v93ChartType').value,
+        chartLegend:document.getElementById('v93ChartLegend').checked,
+        quickVisible:document.getElementById('v93QuickVisible').checked,
+        recentVisible:document.getElementById('v93RecentVisible').checked,
+        recentOrder:document.getElementById('v93RecentOrder').value,
+        recentPaid:document.getElementById('v93RecentPaid').checked,
+        recentPending:document.getElementById('v93RecentPending').checked,
+        recentPayments:[...root.querySelectorAll('[data-v93-payment]:checked')].map(x=>x.dataset.v93Payment),
+        recentMin:document.getElementById('v93RecentMin').value,
+        recentMax:document.getElementById('v93RecentMax').value,
+        upcomingVisible:document.getElementById('v93UpcomingVisible').checked
+      };
+      v93SaveFeature(s);applyCockpit();toast('Configuração do cockpit salva.');
+    };
+    document.getElementById('v93ResetCockpit').onclick=()=>{
+      const s=v93Feature();s.cockpit={...V93_DEFAULT_COCKPIT};v93SaveFeature(s);renderCockpitSettings();applyCockpit();toast('Cockpit restaurado para o padrão.');
+    };
+  }
+
+  function renderRecentConfigured(c){
+    const tbody=document.getElementById('v84RecentRows');
+    if(!tbody)return;
+    const min=c.recentMin===''?null:Number(c.recentMin),max=c.recentMax===''?null:Number(c.recentMax);
+    let rows=(data||[]).filter(x=>sameWorkspace(x)&&hasKnownValue(x));
+    rows=rows.filter(x=>{
+      const st=effectiveStatus(x);
+      const paid=st==='pago';
+      if(paid&&!c.recentPaid)return false;
+      if(!paid&&!c.recentPending)return false;
+      const p=typeof reportPaymentOf==='function'?reportPaymentOf(x):(x.forma||'');
+      if(c.recentPayments?.length && !c.recentPayments.includes(p))return false;
+      const val=Number(x.valor||0);
+      if(min!==null&&val<min)return false;
+      if(max!==null&&val>max)return false;
+      return true;
+    });
+    rows.sort((a,b)=>{
+      const da=(typeof rowDate==='function'?rowDate(a):(a.vencimento||a.dataLancamento||''));
+      const db=(typeof rowDate==='function'?rowDate(b):(b.vencimento||b.dataLancamento||''));
+      return c.recentOrder==='asc'?da.localeCompare(db):db.localeCompare(da);
+    });
+    rows=rows.slice(0,5);
+    tbody.innerHTML=rows.length?rows.map(x=>{
+      const st=effectiveStatus(x),person=typeof reportPersonOf==='function'?reportPersonOf(x):(x.pessoa||'—');
+      const pay=typeof reportPaymentOf==='function'?reportPaymentOf(x):(x.forma||'—');
+      return `<tr><td>${brDate(rowDate(x))}</td><td>${v93Esc(x.descricao||'Movimentação')}</td><td>${v93Esc(x.categoria||'Outros')}</td><td>${v93Esc(person||'—')}</td><td>${v93Esc(pay||'—')}</td><td class="value ${x.tipo==='entrada'?'in':'out'}">${x.tipo==='entrada'?'+':'−'} ${v93Money(x.valor)}</td><td><span class="finora-v84-status">${st==='pago'?'Pago':st==='atrasado'?'Atrasado':'Pendente'}</span></td></tr>`;
+    }).join(''):'<tr><td colspan="7">Nenhum lançamento corresponde à configuração do cockpit.</td></tr>';
+  }
+
+  function renderBarChart(){
+    const card=document.getElementById('finoraHomeCategoryCard');
+    const layout=card?.querySelector('.finora-home-donut-layout');
+    if(!card||!layout)return;
+    let bars=layout.querySelector('.finora-v93-bar-chart');
+    if(!bars){bars=document.createElement('div');bars.className='finora-v93-bar-chart';layout.prepend(bars);}
+    const month=document.getElementById('filtroMes')?.value||currentMonth();
+    const sums={};
+    data.filter(x=>sameWorkspace(x)&&x.tipo==='saida'&&recordMonth(x)===month&&hasKnownValue(x)).forEach(x=>{
+      const k=x.categoria||'Outros';sums[k]=(sums[k]||0)+Number(x.valor||0);
+    });
+    const items=Object.entries(sums).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+    const max=Math.max(1,...items.map(x=>x[1]));
+    const colors=['#146ac6','#15963a','#f3aa13','#e7291e','#6a36a8','#28a7b2','#f26c08','#929292','#0b7651'];
+    bars.innerHTML=items.length?items.map(([k,v],i)=>`<div class="finora-v93-bar-row"><div class="finora-v93-bar-name">${v93Esc(k)}</div><div class="finora-v93-bar-track"><i style="width:${v/max*100}%;background:${colors[i%colors.length]}"></i></div><div class="finora-v93-bar-value">${v93Money(v)}</div></div>`).join(''):'<div class="empty">Nenhuma despesa no mês.</div>';
+  }
+
+  function applyCockpit(){
+    const c=v93Feature().cockpit;
+    const chart=document.getElementById('finoraHomeCategoryCard');
+    const quick=document.querySelector('.finora-v84-quick');
+    const bottom=document.getElementById('v84BottomGrid');
+    const recent=bottom?.children?.[0],upcoming=bottom?.children?.[1];
+
+    if(chart){
+      chart.style.display=c.chartVisible?'':'none';
+      chart.classList.toggle('v93-hide-legend',!c.chartLegend);
+      chart.classList.toggle('v93-chart-bars',c.chartType==='bars');
+      const pie=chart.querySelector('.report-donut');
+      if(pie){
+        pie.style.setProperty('--v93-hole',c.chartType==='donut'?'1':'0');
+        if(c.chartType==='donut'){
+          pie.style.clipPath='none';
+          pie.style.webkitMask='radial-gradient(circle at center, transparent 0 30%, #000 31%)';
+          pie.style.mask='radial-gradient(circle at center, transparent 0 30%, #000 31%)';
+        }else{
+          pie.style.webkitMask='none';pie.style.mask='none';
+        }
+      }
+      if(c.chartType==='bars')renderBarChart();
+    }
+    if(quick)quick.style.display=c.quickVisible?'':'none';
+    if(recent)recent.style.display=c.recentVisible?'':'none';
+    if(upcoming)upcoming.style.display=c.upcomingVisible?'':'none';
+    if(recent&&c.recentVisible)renderRecentConfigured(c);
+    if(bottom){
+      const visible=[...bottom.children].filter(x=>x.style.display!=='none').length;
+      bottom.style.gridTemplateColumns=visible===1?'1fr':'';
+      bottom.style.display=visible?'':'none';
+    }
+  }
+  window.applyFinoraCockpit=applyCockpit;
+
+  // ----------------------------------------------------------
+  // Intercepta utilitários v90/v92
+  // ----------------------------------------------------------
+  const previousUtility=window.openFinoraUtilityPanel;
+  window.openFinoraUtilityPanel=function(type){
+    if(type==='categories'||type==='payments'){
+      openSectionModal('finoraUtilityPanel');renderV93Manager(type);return;
+    }
+    if(type==='settings'){
+      openSectionModal('finoraUtilityPanel');renderCockpitSettings();return;
+    }
+    const r=previousUtility?previousUtility(type):undefined;
+    if(type==='budget')setTimeout(augmentBudget,0);
+    return r;
+  };
+
+  // Após renderizações normais reaplica preferências do cockpit.
+  const baseDashboard=window.renderV84Dashboard;
+  if(typeof baseDashboard==='function'){
+    window.renderV84Dashboard=function(){
+      const r=baseDashboard.apply(this,arguments);
+      setTimeout(applyCockpit,0);
+      return r;
+    };
+  }
+
+  setTimeout(()=>{
+    ensureGoalLinkField();
+    refreshGoalLinkField();
+    applyCockpit();
+  },0);
 })();
 </script>
 
