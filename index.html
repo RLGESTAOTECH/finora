@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v84-dashboard-aprovado">
+<meta name="finora-version" content="v85-dashboard-estavel-lancamento-rapido">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3848,6 +3848,14 @@ body.finora-v84-dark .finora-v84-panel-head h3{color:#f2f7f4!important}
   .finora-v84-quick-row{grid-template-columns:1fr!important}
 }
 
+
+/* FINORA v85 — estabilidade do lançamento rápido */
+.finora-v84-save:disabled{
+  opacity:.72!important;
+  cursor:wait!important;
+  filter:saturate(.75)!important;
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -5775,17 +5783,18 @@ function renderSimpleDashboard(){
   const naoEssenciais=nonRows.reduce((s,r)=>s+r.value,0);
   const saldo=entradas-despesas, reserva=essenciais*6;
 
-  $('simpleEntradas').textContent=money(entradas);$('simpleDespesas').textContent=money(despesas);
-  $('simpleSaldo').textContent=money(saldo);$('simpleReserva').textContent=money(reserva);
-  $('simpleAReceber').textContent='A receber: '+money(aReceber);$('simpleAPagar').textContent='A pagar: '+money(aPagar);
-  $('simpleEntradaTotal').textContent=money(entradas);$('simpleDespesaTotal').textContent=money(despesas);
-  $('simpleIncomeFooter').textContent=money(entradas);$('simpleExpenseFooter').textContent=money(despesas);
-  $('simpleEssenciaisTotal').textContent=money(essenciais);$('simpleNaoEssenciaisTotal').textContent=money(naoEssenciais);
-  $('simpleBottomSaldo').textContent=money(saldo);$('simpleBottomReserva').textContent=money(reserva);
+  const setText=(id,value)=>{const el=$(id);if(el)el.textContent=value};
+  setText('simpleEntradas',money(entradas));setText('simpleDespesas',money(despesas));
+  setText('simpleSaldo',money(saldo));setText('simpleReserva',money(reserva));
+  setText('simpleAReceber','A receber: '+money(aReceber));setText('simpleAPagar','A pagar: '+money(aPagar));
+  setText('simpleEntradaTotal',money(entradas));setText('simpleDespesaTotal',money(despesas));
+  setText('simpleIncomeFooter',money(entradas));setText('simpleExpenseFooter',money(despesas));
+  setText('simpleEssenciaisTotal',money(essenciais));setText('simpleNaoEssenciaisTotal',money(naoEssenciais));
+  setText('simpleBottomSaldo',money(saldo));setText('simpleBottomReserva',money(reserva));
 
   const month=$('filtroMes').value||currentMonth(), [y,m]=month.split('-');
   const names=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  $('simpleMonthTitle').textContent=`${names[+m]} ${y}`;
+  setText('simpleMonthTitle',`${names[+m]} ${y}`);
   if($('simpleWorkspaceTitle'))$('simpleWorkspaceTitle').textContent=currentWorkspaceName||'Meu ambiente';
 
   renderSimpleRows('simpleIncomeRows',incomeRows,account==='mae'?['RECEBIMENTOS DO MÊS']:['SALÁRIO LÍQUIDO DE SIMONE','SALÁRIO LÍQUIDO DE MARCELO','OUTRAS ENTRADAS']);
@@ -6570,7 +6579,7 @@ function render(){
   $('kpiSaldo').textContent=money(entradas-saidas);
   renderAlerts();
   renderFinanceDashboard();
-  renderSimpleDashboard();
+  try{renderSimpleDashboard()}catch(e){console.error('FINORA dashboard render',e)};
   // v61: despesas zeradas já são filtradas antes de renderizar.
   renderEvolutionChart();
   renderCategoryFigures();
@@ -9640,8 +9649,8 @@ setTimeout(renderHomeCategoryDonut,0);
     if(kpis){
       kpis.innerHTML=`
         <div class="simple-kpi balance"><span>Saldo geral</span><strong id="v84SaldoGeral">R$ 0,00</strong><small>em todas as contas</small></div>
-        <div class="simple-kpi income"><span>Entradas</span><strong id="simpleEntradas">R$ 0,00</strong><small>no período</small></div>
-        <div class="simple-kpi expense"><span>Saídas</span><strong id="simpleDespesas">R$ 0,00</strong><small>no período</small></div>
+        <div class="simple-kpi income"><span>Entradas</span><strong id="simpleEntradas">R$ 0,00</strong><small>no período</small><small id="simpleAReceber" style="display:none">A receber: R$ 0,00</small></div>
+        <div class="simple-kpi expense"><span>Saídas</span><strong id="simpleDespesas">R$ 0,00</strong><small>no período</small><small id="simpleAPagar" style="display:none">A pagar: R$ 0,00</small></div>
         <div class="simple-kpi reserve"><span>Saldo do período</span><strong id="simpleSaldo">R$ 0,00</strong><small>resultado</small><span id="simpleReserva" style="display:none">R$ 0,00</span></div>`;
     }
 
@@ -9714,37 +9723,100 @@ setTimeout(renderHomeCategoryDonut,0);
     setQuickType('entrada');
 
     document.getElementById('v84QuickSave').onclick=async()=>{
+      const saveBtn=document.getElementById('v84QuickSave');
+      if(saveBtn.dataset.busy==='1')return;
+
       const desc=document.getElementById('v84QuickDesc').value.trim();
-      const val=document.getElementById('v84QuickValue').value.trim();
+      const rawVal=document.getElementById('v84QuickValue').value.trim();
       const category=document.getElementById('v84QuickCategory').value;
-      const payment=document.getElementById('v84QuickPayment').value;
+      const payment=document.getElementById('v84QuickPayment').value||'PIX';
       const date=document.getElementById('v84QuickDate').value;
-      if(!desc||!val||!category||!date){
-        alert('Preencha descrição, valor, categoria e data.');
+
+      const value=typeof parseBRLInput==='function'
+        ? parseBRLInput(rawVal)
+        : Number(String(rawVal).replace(/\./g,'').replace(',','.'));
+
+      if(!desc||!Number.isFinite(value)||value<=0||!category||!date){
+        if(typeof toast==='function')toast('Preencha descrição, valor, categoria e data.');
+        else alert('Preencha descrição, valor, categoria e data.');
         return;
       }
+
+      saveBtn.dataset.busy='1';
+      saveBtn.disabled=true;
+      const originalText=saveBtn.textContent;
+      saveBtn.textContent='Salvando...';
+
       try{
-        if(typeof fillPeople==='function')fillPeople(document.getElementById('pessoa')?.value||'');
-        if(typeof applyLaunchMode==='function')applyLaunchMode(quickType);
-        document.getElementById('tipo').value=quickType;
-        document.getElementById('descricao').value=desc;
-        document.getElementById('valor').value=typeof formatBRLInput==='function'?formatBRLInput(val):val;
-        if(typeof setCategoryValue==='function')setCategoryValue(category);
-        else if(document.getElementById('categoria'))document.getElementById('categoria').value=category;
-        if(document.getElementById('forma'))document.getElementById('forma').value=payment||'PIX';
-        document.getElementById('dataLancamento').value=date;
-        if(document.getElementById('status'))document.getElementById('status').value='pago';
-        if(document.getElementById('recorrente'))document.getElementById('recorrente').value='nao';
-        document.getElementById('entryForm').requestSubmit();
-        setTimeout(()=>{
-          document.getElementById('v84QuickDesc').value='';
-          document.getElementById('v84QuickValue').value='';
-          document.getElementById('v84QuickCategory').selectedIndex=0;
-          renderV84Dashboard();
-        },350);
+        let selectedPerson='';
+        try{
+          const currentSelect=document.getElementById('pessoa');
+          if(currentSelect?.value)selectedPerson=currentSelect.value;
+          if(!selectedPerson && typeof people==='function'){
+            const names=people();
+            if(Array.isArray(names)&&names.length)selectedPerson=names[0];
+          }
+        }catch(e){}
+
+        const now=new Date().toISOString();
+        const row={
+          id:(crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`),
+          account:'family',
+          workspaceId:currentWorkspaceId,
+          tipo:quickType,
+          pessoa:selectedPerson,
+          expenseOwner:quickType==='saida'?selectedPerson:'',
+          descricao:desc,
+          categoria:category,
+          essentialType:'',
+          valor:value,
+          dataLancamento:date,
+          vencimento:'',
+          status:'pago',
+          recorrente:'nao',
+          recRule:'fixo',
+          valorRecorrente:'mesmo',
+          valorPendente:false,
+          beneficiario:'',
+          parcelas:'',
+          cardId:'',
+          forma:payment,
+          paymentAccount:'',
+          observacao:'',
+          attachment:null,
+          updatedAt:now
+        };
+
+        if(quickType==='saida' && typeof inferEssentialType==='function'){
+          try{row.essentialType=inferEssentialType(row)||''}catch(e){}
+        }
+
+        data.push(row);
+
+        // Usa a persistência oficial da FINORA.
+        save();
+
+        document.getElementById('v84QuickDesc').value='';
+        document.getElementById('v84QuickValue').value='';
+        document.getElementById('v84QuickCategory').selectedIndex=0;
+
+        if(typeof renderV84Dashboard==='function')renderV84Dashboard();
+        if(typeof toast==='function'){
+          toast(quickType==='entrada'?'Entrada salva com sucesso.':'Despesa / saída salva com sucesso.');
+        }
+
+        // Sincronização é feita em segundo plano; não bloqueia o usuário.
+        if(typeof scheduleCloudPush==='function'){
+          try{scheduleCloudPush()}catch(e){}
+        }
       }catch(e){
-        console.error('FINORA v84 quick launch',e);
-        alert('Não foi possível salvar o lançamento rápido. Use o formulário completo.');
+        console.error('FINORA v85 quick launch',e);
+        if(typeof toast==='function')toast('Não foi possível salvar o lançamento rápido.');
+        else alert('Não foi possível salvar o lançamento rápido.');
+      }finally{
+        saveBtn.disabled=false;
+        delete saveBtn.dataset.busy;
+        saveBtn.textContent=originalText;
       }
     };
   }
