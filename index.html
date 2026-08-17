@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v94-metas-cockpit-relatorio">
+<meta name="finora-version" content="v95-restauracao-cockpit">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -5403,6 +5403,26 @@ body.finora-v88-sidebar-collapsed .shell{
 <script src="./finora-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<script id="finora-v95-date-compat">
+(function(){
+  if(typeof window.brDate!=='function'){
+    window.brDate=function(value){
+      const s=String(value||'').trim();
+      if(!s)return '';
+      if(/^\d{2}\/\d{2}\/\d{4}$/.test(s))return s;
+      const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if(iso)return `${iso[3]}/${iso[2]}/${iso[1]}`;
+      const d=new Date(s);
+      if(!Number.isNaN(d.getTime())){
+        return d.toLocaleDateString('pt-BR');
+      }
+      return s;
+    };
+  }
+})();
+</script>
+
 </head>
 <body>
 
@@ -13414,6 +13434,129 @@ setTimeout(renderHomeCategoryDonut,0);
 
   // segurança para sincronização/alterações externas
   setTimeout(bootV94,100);
+})();
+</script>
+
+
+<script id="finora-v95-cockpit-reset-fix">
+(function(){
+  const DEFAULTS={
+    chartVisible:true,
+    chartType:'pie',
+    chartLegend:true,
+    quickVisible:true,
+    recentVisible:true,
+    recentOrder:'desc',
+    recentPaid:true,
+    recentPending:true,
+    recentPayments:[],
+    recentMin:'',
+    recentMax:'',
+    upcomingVisible:true
+  };
+
+  function restoreCockpitNow(){
+    const state=loadFinoraFeatureState();
+    state.cockpit={...DEFAULTS};
+    state.updatedAt=new Date().toISOString();
+    saveFinoraFeatureState(state);
+
+    // Limpa estados visuais remanescentes de versões anteriores.
+    const chart=document.getElementById('finoraHomeCategoryCard');
+    if(chart){
+      chart.classList.remove('finora-v94-force-hide','v93-hide-legend','v93-chart-bars');
+      chart.style.display='';
+      const pie=chart.querySelector('.report-donut');
+      if(pie){
+        pie.style.webkitMask='none';
+        pie.style.mask='none';
+      }
+    }
+
+    const quick=document.querySelector('#v84DashboardGrid .finora-v84-quick, .finora-v84-quick');
+    if(quick){
+      quick.classList.remove('finora-v94-force-hide');
+      quick.style.display='';
+    }
+
+    const bottom=document.getElementById('v84BottomGrid');
+    if(bottom){
+      bottom.classList.remove('finora-v94-no-bottom');
+      bottom.style.display='';
+      bottom.style.gridTemplateColumns='';
+      [...bottom.children].forEach(el=>{
+        el.classList.remove('finora-v94-force-hide');
+        el.style.display='';
+      });
+    }
+
+    try{ if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut(); }catch(e){}
+    try{ if(typeof window.renderV84Dashboard==='function')window.renderV84Dashboard(); }catch(e){console.warn('FINORA v95 dashboard',e);}
+    try{ if(typeof window.applyFinoraCockpit==='function')window.applyFinoraCockpit(); }catch(e){console.warn('FINORA v95 cockpit',e);}
+
+    if(typeof toast==='function')toast('Cockpit restaurado para o padrão.');
+  }
+
+  function bindReset(){
+    const reset=document.getElementById('v93ResetCockpit');
+    if(reset && reset.dataset.v95Bound!=='1'){
+      reset.dataset.v95Bound='1';
+
+      // Substitui integralmente o comportamento legado.
+      reset.onclick=function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        restoreCockpitNow();
+
+        // Atualiza também os controles exibidos na tela de configurações.
+        setTimeout(()=>{
+          const map={
+            v93ChartVisible:true,
+            v93ChartLegend:true,
+            v93QuickVisible:true,
+            v93RecentVisible:true,
+            v93RecentPaid:true,
+            v93RecentPending:true,
+            v93UpcomingVisible:true
+          };
+          Object.entries(map).forEach(([id,val])=>{
+            const el=document.getElementById(id);
+            if(el)el.checked=val;
+          });
+          const type=document.getElementById('v93ChartType');
+          if(type)type.value='pie';
+          const order=document.getElementById('v93RecentOrder');
+          if(order)order.value='desc';
+          const min=document.getElementById('v93RecentMin');
+          const max=document.getElementById('v93RecentMax');
+          if(min)min.value='';
+          if(max)max.value='';
+          document.querySelectorAll('[data-v93-payment]').forEach(x=>x.checked=false);
+        },0);
+      };
+    }
+  }
+
+  // Configurações recria os botões dinamicamente; observa e rebinda.
+  const body=document.getElementById('finoraUtilityBody');
+  if(body){
+    new MutationObserver(()=>bindReset()).observe(body,{childList:true,subtree:true});
+  }
+
+  const oldOpen=window.openFinoraUtilityPanel;
+  if(typeof oldOpen==='function'){
+    window.openFinoraUtilityPanel=function(type){
+      const r=oldOpen.apply(this,arguments);
+      if(type==='settings')setTimeout(bindReset,0);
+      return r;
+    };
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',bindReset,{once:true});
+  }else{
+    bindReset();
+  }
 })();
 </script>
 
