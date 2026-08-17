@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v86-modais-restaurados">
+<meta name="finora-version" content="v87-lancamento-rapido-integrado">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -3882,6 +3882,20 @@ body > #finoraUtilityPanel.section-modal-active{
   display:block!important;
 }
 
+
+/* FINORA v87 — integração total do lançamento rápido */
+.finora-v87-quick-tag{
+  display:inline-block;
+  margin-left:6px;
+  padding:2px 5px;
+  border-radius:999px;
+  background:#edf6f1;
+  color:#16714a;
+  font-size:7px;
+  font-weight:700;
+  vertical-align:middle;
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -6957,7 +6971,7 @@ $('entryForm').addEventListener('submit',async e=>{
     vencimento:vencVal,status:$('status').value,recorrente:recorrenciaVal,recRule:recRuleVal,
     valorRecorrente:$('valorRecorrente').value,valorPendente:false,beneficiario:$('beneficiario').value.trim(),parcelas:$('parcelas').value.trim(),cardId:$('launchCard')?.value||'',forma:$('forma').value,
     paymentAccount:paymentNeedsAccount($('forma').value)?$('paymentAccount').value.trim():'',
-    observacao:$('observacao').value.trim(),attachment,updatedAt:new Date().toISOString()};
+    observacao:$('observacao').value.trim(),attachment,createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
   const idx=data.findIndex(x=>x.id===id); if(idx>=0)data[idx]=row;else data.push(row);
   try{save()}catch(err){toast('Arquivo muito grande para o navegador. Remova o anexo.');return}
   if(row.recorrente==='mensal') ensureRecurringNextMonths();
@@ -9810,6 +9824,8 @@ setTimeout(renderHomeCategoryDonut,0);
           paymentAccount:'',
           observacao:'',
           attachment:null,
+          source:'quick',
+          createdAt:now,
           updatedAt:now
         };
 
@@ -9822,18 +9838,21 @@ setTimeout(renderHomeCategoryDonut,0);
         // Usa a persistência oficial da FINORA.
         save();
 
+        // Atualização global imediata:
+        // dashboard, últimos lançamentos, gráfico por categoria, relatórios e totais.
+        if(typeof render==='function')render();
+        if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut();
+        if(typeof renderFinoraReports==='function' && document.getElementById('finoraReportsPanel')){
+          renderFinoraReports();
+        }
+        if(typeof renderV84Dashboard==='function')renderV84Dashboard();
+
         document.getElementById('v84QuickDesc').value='';
         document.getElementById('v84QuickValue').value='';
         document.getElementById('v84QuickCategory').selectedIndex=0;
 
-        if(typeof renderV84Dashboard==='function')renderV84Dashboard();
         if(typeof toast==='function'){
-          toast(quickType==='entrada'?'Entrada salva com sucesso.':'Despesa / saída salva com sucesso.');
-        }
-
-        // Sincronização é feita em segundo plano; não bloqueia o usuário.
-        if(typeof scheduleCloudPush==='function'){
-          try{scheduleCloudPush()}catch(e){}
+          toast(quickType==='entrada'?'Entrada salva e integrada aos controles.':'Despesa / saída salva e integrada aos controles.');
         }
       }catch(e){
         console.error('FINORA v85 quick launch',e);
@@ -9872,7 +9891,12 @@ setTimeout(renderHomeCategoryDonut,0);
     if(badge)badge.textContent=String(Math.min(alertCount,99));
 
     // Recent transactions
-    const recent=[...all].sort((a,b)=>rowDate(b).localeCompare(rowDate(a))).slice(0,5);
+    const recent=[...all].sort((a,b)=>{
+      const ta=Date.parse(a.createdAt||a.updatedAt||'')||0;
+      const tb=Date.parse(b.createdAt||b.updatedAt||'')||0;
+      if(tb!==ta)return tb-ta;
+      return rowDate(b).localeCompare(rowDate(a));
+    }).slice(0,5);
     const tbody=document.getElementById('v84RecentRows');
     if(tbody){
       tbody.innerHTML=recent.length?recent.map(x=>{
@@ -9881,7 +9905,7 @@ setTimeout(renderHomeCategoryDonut,0);
         const payment=(typeof reportPaymentOf==='function'?reportPaymentOf(x):(x.forma||''))||'—';
         const val=Number(x.valor||0);
         return `<tr>
-          <td>${brDate(rowDate(x))}</td><td>${escV84(x.descricao||'Movimentação')}</td>
+          <td>${brDate(rowDate(x))}</td><td>${escV84(x.descricao||'Movimentação')}${x.source==='quick'?'<small class="finora-v87-quick-tag">Rápido</small>':''}</td>
           <td>${escV84(x.categoria||'Outros')}</td><td>${escV84(person)}</td><td>${escV84(payment)}</td>
           <td class="value ${x.tipo==='entrada'?'in':'out'}">${x.tipo==='entrada'?'+':'−'} ${moneyV84(val)}</td>
           <td><span class="finora-v84-status">${status==='pago'?'Pago':status==='atrasado'?'Atrasado':'Pendente'}</span></td>
