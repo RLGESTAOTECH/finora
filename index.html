@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="v95-restauracao-cockpit">
+<meta name="finora-version" content="1.0.0">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -5393,6 +5393,126 @@ body.finora-v88-sidebar-collapsed .shell{
   .finora-v94-goal-summary{grid-template-columns:1fr 1fr}
 }
 
+
+/* ==========================================================
+   FINORA 1.0.0 — padronização e auditoria
+   ========================================================== */
+
+/* Campos de negócio digitáveis aparecem em caixa alta.
+   Credenciais, e-mails, URLs, CPF, chaves e senhas são excluídos via JS. */
+.finora-uppercase{
+  text-transform:uppercase!important;
+}
+
+/* Auditoria */
+.finora-audit-wrap{display:grid;gap:12px}
+.finora-audit-toolbar{
+  display:grid;
+  grid-template-columns:minmax(190px,1fr) 170px 170px auto;
+  gap:8px;
+  align-items:end;
+}
+.finora-audit-toolbar label{
+  display:block;
+  margin-bottom:4px;
+  color:#65776d;
+  font-size:8px;
+  font-weight:750;
+}
+.finora-audit-toolbar input,
+.finora-audit-toolbar select{
+  min-height:38px;
+  width:100%;
+  border:1px solid #dce5e0;
+  border-radius:9px;
+  background:#fff;
+  box-sizing:border-box;
+}
+.finora-audit-toolbar button{
+  min-height:38px;
+  padding:0 13px;
+  border:0;
+  border-radius:9px;
+  background:#075f42;
+  color:#fff;
+  font-size:9px;
+  font-weight:800;
+  cursor:pointer;
+}
+.finora-audit-info{
+  padding:10px 12px;
+  border:1px solid #dce9e2;
+  border-radius:10px;
+  background:#f5faf7;
+  color:#51685d;
+  font-size:9px;
+  line-height:1.5;
+}
+.finora-audit-table-wrap{
+  overflow:auto;
+  max-height:520px;
+  border:1px solid #e0e8e3;
+  border-radius:12px;
+}
+.finora-audit-table{
+  width:100%;
+  min-width:900px;
+  border-collapse:collapse;
+  font-size:8.5px;
+}
+.finora-audit-table th{
+  position:sticky;
+  top:0;
+  z-index:1;
+  padding:9px 10px;
+  background:#f1f6f3;
+  color:#53685d;
+  text-align:left;
+  font-size:7.5px;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+.finora-audit-table td{
+  padding:9px 10px;
+  border-top:1px solid #edf1ef;
+  color:#29483b;
+  vertical-align:top;
+}
+.finora-audit-action{
+  display:inline-flex;
+  padding:4px 7px;
+  border-radius:999px;
+  background:#edf6f1;
+  color:#0b7047;
+  font-weight:800;
+  white-space:nowrap;
+}
+.finora-audit-action.delete{background:#fff0ef;color:#b33a34}
+.finora-audit-json{
+  max-width:260px;
+  max-height:90px;
+  overflow:auto;
+  padding:6px;
+  border-radius:7px;
+  background:#f7f9f8;
+  color:#66766e;
+  font:7.5px/1.45 monospace;
+  white-space:pre-wrap;
+}
+.finora-audit-empty{
+  padding:34px 14px;
+  text-align:center;
+  color:#738279;
+  font-size:9px;
+}
+.finora-v84-footer{
+  flex-wrap:wrap!important;
+  gap:8px 18px!important;
+}
+@media(max-width:850px){
+  .finora-audit-toolbar{grid-template-columns:1fr}
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 <script type="module">
@@ -5469,6 +5589,7 @@ body.finora-v88-sidebar-collapsed .shell{
     <button type="button" onclick="openFinoraUtilityPanel('categories')"><span class="ico">◇</span>Categorias</button>
     <button type="button" onclick="openFinoraUtilityPanel('payments')"><span class="ico">▤</span>Formas de pagamento</button>
     <button type="button" onclick="openSectionModal('simpleAlertsPanel')"><span class="ico">♧</span>Lembretes</button>
+    <button type="button" onclick="openFinoraAuditPanel()"><span class="ico">◷</span>Auditoria</button>
     <button type="button" onclick="openFinoraUtilityPanel('settings')"><span class="ico">⚙</span>Configurações</button>
     <button type="button" onclick="openFinoraUtilityPanel('faq')"><span class="ico">?</span>FAQ</button>
     <button type="button" onclick="document.getElementById('logoutBtn')?.click()"><span class="ico">↪</span>Sair</button>
@@ -7110,7 +7231,7 @@ function openCardPanel(){
 }
 function scrollFinora(id){$(id)?.scrollIntoView({behavior:'smooth',block:'start'})}
 async function saveFinoraCard(){
-  const name=$('cardName').value.trim(),issuer=$('cardIssuer').value.trim(),owner=$('cardOwner').value,last4=$('cardLast4').value.replace(/\D/g,''),expiry=$('cardExpiry').value.trim(),dueDay=Number($('cardDueDay').value||0),brandChoice=$('cardBrand').value,defaultCategory=$('cardDefaultCategory').value,cardColor=$('cardColor')?.value||'#0b3d2e';
+  const name=$('cardName').value.trim().toUpperCase(),issuer=$('cardIssuer').value.trim().toUpperCase(),owner=$('cardOwner').value,last4=$('cardLast4').value.replace(/\D/g,''),expiry=$('cardExpiry').value.trim().toUpperCase(),dueDay=Number($('cardDueDay').value||0),brandChoice=$('cardBrand').value,defaultCategory=$('cardDefaultCategory').value,cardColor=$('cardColor')?.value||'#0b3d2e';
   const brand=brandChoice==='auto'?inferCardBrand(name,issuer):brandChoice;
   if(dueDay&&(dueDay<1||dueDay>31))return toast('Informe um dia de vencimento entre 1 e 31.');
   if(!name)return toast('Informe o nome do cartão.');
@@ -7136,6 +7257,10 @@ async function saveFinoraCard(){
 };
   const idx=cards.findIndex(c=>c.id===id);if(idx>=0)cards[idx]=row;else cards.push(row);
   saveFinoraCards(cards);saveCardTombstones(loadCardTombstones().filter(t=>t.id!==id));
+  if(typeof finoraAuditLog==='function'){
+    finoraAuditLog(existing?'ATUALIZOU':'INCLUIU','CARTAO',id,
+      existing?'Cartão atualizado':'Cartão incluído',existing||null,row);
+  }
   renderFinoraCards();fillLaunchCards();
   try{if(cloudConfigured())await pushCloudState(false);toast(existing?'Cartão atualizado e sincronizado.':'Cartão cadastrado e sincronizado.')}
   catch(e){console.error(e);scheduleCloudPush();toast('Cartão salvo neste aparelho. A sincronização será repetida.')}
@@ -7183,6 +7308,9 @@ async function deleteFinoraCard(id, sourceButton=null){
 
     const remaining=loadFinoraCards().filter(c=>String(c.id)!==String(card.id));
     saveFinoraCards(remaining);
+    if(typeof finoraAuditLog==='function'){
+      finoraAuditLog('EXCLUIU','CARTAO',card.id,'Cartão excluído',card,null);
+    }
 
     renderFinoraCards();
     fillLaunchCards();
@@ -8516,6 +8644,10 @@ $('entryForm').addEventListener('submit',async e=>{
     observacao:$('observacao').value.trim(),attachment,createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
   const idx=data.findIndex(x=>x.id===id); if(idx>=0)data[idx]=row;else data.push(row);
   try{save()}catch(err){toast('Arquivo muito grande para o navegador. Remova o anexo.');return}
+  if(typeof finoraAuditLog==='function'){
+    finoraAuditLog(idx>=0?'ATUALIZOU':'INCLUIU','LANCAMENTO',row.id,
+      idx>=0?'Lançamento atualizado':'Lançamento incluído',old||null,row);
+  }
   if(row.recorrente==='mensal') ensureRecurringNextMonths();
   const savedMode=row.tipo==='entrada'?'entrada':'saida';
   resetForm();
@@ -8553,6 +8685,9 @@ async function deleteRow(id){
     recordTransactionDeletion(x.id);
     data=data.filter(r=>String(r.id)!==String(x.id));
     localStorage.setItem(KEY,JSON.stringify(data));
+    if(typeof finoraAuditLog==='function'){
+      finoraAuditLog('EXCLUIU','LANCAMENTO',x.id,'Lançamento excluído',x,null);
+    }
 
     // Immediate visual feedback on desktop/web.
     render();
@@ -8579,10 +8714,15 @@ async function deleteRow(id){
 function markPaid(id){
   const x=data.find(r=>r.id===id);
   if(x){
+    const before={...x};
     x.status='pago';
     x.dataPagamento=today();
     x.updatedAt=new Date().toISOString();
-    save();render();toast('Marcado como pago/recebido.');
+    save();
+    if(typeof finoraAuditLog==='function'){
+      finoraAuditLog('ALTEROU STATUS','LANCAMENTO',x.id,'Lançamento marcado como pago/recebido',before,x);
+    }
+    render();toast('Marcado como pago/recebido.');
   }
 }
 
@@ -11358,7 +11498,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
     const footer=document.createElement('footer');
     footer.className='finora-v84-footer';
-    footer.innerHTML='<span><strong>FINORA</strong> · suas finanças a qualquer hora</span><span>© 2026 FINORA. Todos os direitos reservados.</span>';
+    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.0</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
     home.appendChild(footer);
 
     // quick launch controls
@@ -13557,6 +13697,303 @@ setTimeout(renderHomeCategoryDonut,0);
   }else{
     bindReset();
   }
+})();
+</script>
+
+
+<script id="finora-v100-release-controls">
+(function(){
+  const UPPER_EXCLUDE_IDS=new Set([
+    'loginIdentifier','loginPass','regCpf','regEmail','regPass','regPass2',
+    'profileEmail','profileCpf','cloudUrl','cloudKey','supabaseUrl','supabaseKey',
+    'regInviteCode','workspaceToken','cardLast4','cardDueDay'
+  ]);
+
+  function isUppercaseBusinessField(el){
+    if(!el || !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement))return false;
+    if(UPPER_EXCLUDE_IDS.has(el.id))return false;
+    const type=(el.type||'text').toLowerCase();
+    if(['password','email','date','month','number','color','file','checkbox','radio','hidden','range'].includes(type))return false;
+    const ac=(el.autocomplete||'').toLowerCase();
+    if(['username','email','current-password','new-password'].includes(ac))return false;
+    const id=(el.id||'').toLowerCase();
+    if(/cpf|email|senha|pass|url|key|token|hash|codigo|code/.test(id))return false;
+    return true;
+  }
+
+  function uppercaseField(el){
+    if(!isUppercaseBusinessField(el))return;
+    const value=String(el.value||'');
+    const upper=value.toLocaleUpperCase('pt-BR');
+    if(value!==upper)el.value=upper;
+    el.classList.add('finora-uppercase');
+  }
+
+  // Garante caixa alta tanto visualmente quanto no valor efetivamente salvo.
+  document.addEventListener('input',e=>{
+    const el=e.target;
+    if(isUppercaseBusinessField(el))el.classList.add('finora-uppercase');
+  },true);
+  document.addEventListener('focusout',e=>uppercaseField(e.target),true);
+  document.addEventListener('change',e=>uppercaseField(e.target),true);
+  document.addEventListener('submit',e=>{
+    e.target.querySelectorAll?.('input,textarea').forEach(uppercaseField);
+  },true);
+
+  function parseCurrency(v){
+    let s=String(v??'').trim().replace(/\s/g,'').replace(/R\$/gi,'').replace(/[^\d,.\-]/g,'');
+    if(!s)return 0;
+    const comma=s.lastIndexOf(','),dot=s.lastIndexOf('.');
+    if(comma>=0&&dot>=0){
+      s=comma>dot?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');
+    }else if(comma>=0){
+      s=s.replace(/\./g,'').replace(',','.');
+    }else if(dot>=0){
+      const decimals=s.length-dot-1;
+      if(decimals===3 && /^\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');
+    }
+    const n=Number(s);
+    return Number.isFinite(n)?n:0;
+  }
+  function formatCurrency(v){
+    return Number(parseCurrency(v)||0).toLocaleString('pt-BR',{
+      style:'currency',currency:'BRL',minimumFractionDigits:2,maximumFractionDigits:2
+    });
+  }
+  function isCurrencyField(el){
+    if(!(el instanceof HTMLInputElement))return false;
+    const id=(el.id||'').toLowerCase();
+    const name=(el.name||'').toLowerCase();
+    if(el.dataset.currency==='brl')return true;
+    if(['valor','v84quickvalue','v90goaltarget','v90goalsaved','v90goalmonthly','v93recentmin','v93recentmax'].includes(id))return true;
+    if(/(^|_)(valor|amount|target|saved|monthly|minvalue|maxvalue)($|_)/.test(id+'_'+name))return true;
+    return false;
+  }
+  function currencyField(el){
+    if(!isCurrencyField(el))return;
+    // type number não aceita "R$"; converte somente os campos monetários.
+    if(el.type==='number')el.type='text';
+    el.inputMode='decimal';
+    el.value=formatCurrency(el.value);
+  }
+  document.addEventListener('focusout',e=>currencyField(e.target),true);
+  document.addEventListener('change',e=>currencyField(e.target),true);
+
+  // Aplica formatação inicial e também em campos criados dinamicamente.
+  function normalizeVisibleFields(root=document){
+    root.querySelectorAll?.('input,textarea').forEach(el=>{
+      if(isUppercaseBusinessField(el))el.classList.add('finora-uppercase');
+      if(isCurrencyField(el) && el.value)currencyField(el);
+    });
+  }
+  normalizeVisibleFields();
+  new MutationObserver(muts=>{
+    muts.forEach(m=>m.addedNodes.forEach(n=>{
+      if(n.nodeType===1)normalizeVisibleFields(n);
+    }));
+  }).observe(document.body,{childList:true,subtree:true});
+
+  // --------------------------------------------------------
+  // AUDITORIA EM BANCO
+  // --------------------------------------------------------
+  function safeSnapshot(value){
+    if(value===undefined)return null;
+    try{
+      const copy=JSON.parse(JSON.stringify(value));
+      // Não registra anexos em base64 nem segredos.
+      if(copy && typeof copy==='object'){
+        delete copy.attachment;
+        delete copy.password;
+        delete copy.pass;
+        delete copy.token;
+        delete copy.token_hash;
+        delete copy.cpfHash;
+        delete copy.cpf_hash;
+      }
+      return copy;
+    }catch(e){return null}
+  }
+
+  window.finoraAuditLog=async function(action,entityType,entityId,description,beforeData=null,afterData=null){
+    try{
+      const client=typeof getAuthClient==='function'?getAuthClient():null;
+      if(!client || !currentWorkspaceId)return false;
+
+      let authUserId=currentUser?.id||null;
+      try{
+        const session=await client.auth.getSession();
+        authUserId=session?.data?.session?.user?.id||authUserId;
+      }catch(e){}
+
+      const row={
+        workspace_id:String(currentWorkspaceId),
+        user_id:authUserId||null,
+        user_name:String(currentUser?.name||document.getElementById('loggedName')?.textContent||'USUÁRIO').toUpperCase(),
+        action:String(action||'ALTEROU').toUpperCase(),
+        entity_type:String(entityType||'REGISTRO').toUpperCase(),
+        entity_id:entityId?String(entityId):null,
+        description:String(description||'Alteração realizada').toUpperCase(),
+        before_data:safeSnapshot(beforeData),
+        after_data:safeSnapshot(afterData)
+      };
+
+      const {error}=await client.from('finora_audit_log').insert(row);
+      if(error){
+        console.warn('FINORA auditoria:',error.message||error);
+        return false;
+      }
+      return true;
+    }catch(e){
+      console.warn('FINORA auditoria indisponível:',e);
+      return false;
+    }
+  };
+
+  // Configurações/categorias/formas/metas: compara antes/depois.
+  if(typeof window.saveFinoraFeatureState==='function'){
+    const originalSaveFeature=window.saveFinoraFeatureState;
+    window.saveFinoraFeatureState=function(state,options={}){
+      const before=typeof loadFinoraFeatureState==='function'?loadFinoraFeatureState():null;
+      const result=originalSaveFeature.apply(this,arguments);
+      if(!options?.skipCloud){
+        try{
+          const strip=x=>{
+            const c=JSON.parse(JSON.stringify(x||{}));
+            delete c.updatedAt;
+            return c;
+          };
+          if(JSON.stringify(strip(before))!==JSON.stringify(strip(result))){
+            finoraAuditLog('ATUALIZOU','CONFIGURACAO',currentWorkspaceId,
+              'Configurações do ambiente atualizadas',before,result);
+          }
+        }catch(e){}
+      }
+      return result;
+    };
+  }
+
+  // Acessos: registra operações administrativas principais sem interromper a ação.
+  ['createFamilyInvite','deleteFamilyInvite','removeFamilyMember'].forEach(name=>{
+    const original=window[name];
+    if(typeof original!=='function')return;
+    window[name]=async function(){
+      const args=[...arguments];
+      const result=await original.apply(this,args);
+      const action=name==='createFamilyInvite'?'INCLUIU':name==='deleteFamilyInvite'?'EXCLUIU':'REMOVEU';
+      const description=name==='createFamilyInvite'?'Convite de acesso criado':
+        name==='deleteFamilyInvite'?'Convite de acesso excluído':'Integrante removido do ambiente';
+      finoraAuditLog(action,'ACESSO',args[0]||null,description,null,{argumentos:args});
+      return result;
+    };
+  });
+
+  // --------------------------------------------------------
+  // PAINEL DE AUDITORIA
+  // --------------------------------------------------------
+  function auditDate(v){
+    const d=new Date(v);
+    return Number.isNaN(d.getTime())?String(v||''):d.toLocaleString('pt-BR',{
+      day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'
+    });
+  }
+  function escAudit(s=''){
+    return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function jsonAudit(v){
+    if(!v)return '—';
+    try{return escAudit(JSON.stringify(v,null,2))}catch(e){return '—'}
+  }
+
+  async function loadAuditRows(){
+    const client=typeof getAuthClient==='function'?getAuthClient():null;
+    if(!client)throw new Error('Conexão com Supabase indisponível.');
+    let q=client.from('finora_audit_log')
+      .select('id,workspace_id,user_id,user_name,action,entity_type,entity_id,description,before_data,after_data,created_at')
+      .eq('workspace_id',currentWorkspaceId)
+      .order('created_at',{ascending:false})
+      .limit(500);
+
+    const user=document.getElementById('auditUserFilter')?.value||'';
+    const entity=document.getElementById('auditEntityFilter')?.value||'';
+    const search=(document.getElementById('auditSearch')?.value||'').trim();
+    if(user)q=q.eq('user_name',user);
+    if(entity)q=q.eq('entity_type',entity);
+    if(search)q=q.or(`description.ilike.%${search.replace(/[%_,]/g,'')}%,entity_id.ilike.%${search.replace(/[%_,]/g,'')}%`);
+
+    const {data,error}=await q;
+    if(error)throw error;
+    return data||[];
+  }
+
+  async function renderAuditRows(){
+    const box=document.getElementById('auditTableBody');
+    if(!box)return;
+    box.innerHTML='<tr><td colspan="8" class="finora-audit-empty">CARREGANDO HISTÓRICO...</td></tr>';
+    try{
+      const rows=await loadAuditRows();
+      const users=[...new Set(rows.map(x=>x.user_name).filter(Boolean))].sort();
+      const entities=[...new Set(rows.map(x=>x.entity_type).filter(Boolean))].sort();
+
+      const uf=document.getElementById('auditUserFilter');
+      const ef=document.getElementById('auditEntityFilter');
+      if(uf && uf.options.length<=1)users.forEach(v=>uf.add(new Option(v,v)));
+      if(ef && ef.options.length<=1)entities.forEach(v=>ef.add(new Option(v,v)));
+
+      box.innerHTML=rows.length?rows.map(r=>`<tr>
+        <td>${escAudit(auditDate(r.created_at))}</td>
+        <td><strong>${escAudit(r.user_name||'—')}</strong></td>
+        <td><span class="finora-audit-action ${String(r.action).includes('EXCL')?'delete':''}">${escAudit(r.action||'—')}</span></td>
+        <td>${escAudit(r.entity_type||'—')}</td>
+        <td>${escAudit(r.entity_id||'—')}</td>
+        <td>${escAudit(r.description||'—')}</td>
+        <td><div class="finora-audit-json">${jsonAudit(r.before_data)}</div></td>
+        <td><div class="finora-audit-json">${jsonAudit(r.after_data)}</div></td>
+      </tr>`).join(''):'<tr><td colspan="8" class="finora-audit-empty">NENHUM EVENTO DE AUDITORIA ENCONTRADO.</td></tr>';
+    }catch(e){
+      box.innerHTML=`<tr><td colspan="8" class="finora-audit-empty">
+        NÃO FOI POSSÍVEL CONSULTAR A AUDITORIA.<br><br>
+        ${escAudit(e.message||String(e))}<br><br>
+        EXECUTE O ARQUIVO SQL DE AUDITORIA NO SUPABASE ANTES DE USAR ESTE MENU.
+      </td></tr>`;
+    }
+  }
+
+  window.openFinoraAuditPanel=function(){
+    const title=document.getElementById('finoraUtilityTitle');
+    const subtitle=document.getElementById('finoraUtilitySubtitle');
+    const body=document.getElementById('finoraUtilityBody');
+    if(!title||!subtitle||!body)return;
+
+    title.textContent='Auditoria';
+    subtitle.textContent='Histórico imutável das alterações realizadas no ambiente.';
+    body.innerHTML=`<div class="finora-audit-wrap">
+      <div class="finora-audit-info">
+        A trilha registra usuário, data/hora, ação, tipo de registro e os estados anterior/posterior.
+        Os eventos são armazenados no Supabase e não podem ser alterados ou excluídos pela interface da FINORA.
+      </div>
+      <div class="finora-audit-toolbar">
+        <div><label>BUSCAR</label><input id="auditSearch" placeholder="Descrição ou ID do registro"></div>
+        <div><label>USUÁRIO</label><select id="auditUserFilter"><option value="">TODOS</option></select></div>
+        <div><label>TIPO</label><select id="auditEntityFilter"><option value="">TODOS</option></select></div>
+        <button type="button" id="auditRefreshBtn">ATUALIZAR</button>
+      </div>
+      <div class="finora-audit-table-wrap">
+        <table class="finora-audit-table">
+          <thead><tr><th>DATA/HORA</th><th>USUÁRIO</th><th>AÇÃO</th><th>TIPO</th><th>ID</th><th>DESCRIÇÃO</th><th>ANTES</th><th>DEPOIS</th></tr></thead>
+          <tbody id="auditTableBody"></tbody>
+        </table>
+      </div>
+    </div>`;
+    openSectionModal('finoraUtilityPanel');
+    document.getElementById('auditRefreshBtn').onclick=renderAuditRows;
+    ['auditSearch','auditUserFilter','auditEntityFilter'].forEach(id=>{
+      document.getElementById(id)?.addEventListener(id==='auditSearch'?'input':'change',()=>{
+        clearTimeout(window.__finoraAuditTimer);
+        window.__finoraAuditTimer=setTimeout(renderAuditRows,250);
+      });
+    });
+    renderAuditRows();
+  };
 })();
 </script>
 
