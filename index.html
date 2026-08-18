@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.4">
+<meta name="finora-version" content="1.0.5">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -5575,6 +5575,64 @@ body.finora-v88-sidebar-collapsed .shell{
 })();
 </script>
 
+
+<style id="finora-v105-mobile-parity">
+.finora-mobile-more-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+}
+.finora-mobile-more-action{
+  min-height:78px;
+  border:1px solid #dce6e0;
+  background:#fbfdfb;
+  border-radius:12px;
+  padding:11px 12px;
+  text-align:left;
+  cursor:pointer;
+  display:grid;
+  grid-template-columns:28px 1fr;
+  grid-template-rows:auto auto;
+  column-gap:8px;
+  align-items:center;
+  color:#294538;
+}
+.finora-mobile-more-action>span{
+  grid-row:1/3;
+  width:28px;height:28px;
+  border-radius:9px;
+  display:grid;place-items:center;
+  background:#e9f3ed;
+  color:#0f5a3e;
+  font-size:16px;
+}
+.finora-mobile-more-action>b{
+  font:700 10px Verdana,sans-serif;
+  line-height:1.25;
+}
+.finora-mobile-more-action>small{
+  font:8px Verdana,sans-serif;
+  color:#75847c;
+  line-height:1.25;
+}
+.finora-mobile-more-action:active{
+  transform:translateY(1px);
+  background:#f2f7f4;
+}
+.finora-mobile-more-danger{
+  border-color:#efd5d2;
+  color:#8f3831;
+}
+.finora-mobile-more-danger>span{
+  background:#faecea;
+  color:#a23d35;
+}
+@media(max-width:420px){
+  .finora-mobile-more-grid{grid-template-columns:1fr;}
+  .finora-mobile-more-action{min-height:66px;}
+}
+</style>
+
 </head>
 <body>
 
@@ -7697,14 +7755,63 @@ async function createNewWorkspace(){
 }
 
 function isAdmin(){return currentUser?.role==='admin'}
+
+async function finoraEnsureWorkspaceOnlineForInvite(workspaceId){
+  const client=getAuthClient();
+  if(!client)throw new Error('Não foi possível conectar ao Supabase.');
+
+  const {data,error}=await client.rpc('finora_list_my_workspaces');
+  if(error)throw error;
+
+  const rows=Array.isArray(data)?data:[];
+  const row=rows.find(w=>String(w.workspace_id)===String(workspaceId));
+
+  if(!row){
+    throw new Error(
+      'Este ambiente existe apenas neste navegador e não está registrado no Supabase. '+
+      'Por segurança, nenhum convite foi gerado. Reabra o ambiente pela conta administradora '+
+      'ou recrie/sincronize o ambiente antes de convidar integrantes.'
+    );
+  }
+
+  const role=String(row.member_role||'').toLowerCase();
+  if(role!=='admin'){
+    throw new Error('Somente o administrador deste ambiente pode gerar convites.');
+  }
+
+  return {
+    id:row.workspace_id,
+    name:row.workspace_name||'Meu ambiente',
+    type:row.workspace_type||'Familiar',
+    description:row.workspace_description||'',
+    ownerUserId:row.owner_user_id||null,
+    role,
+    online:true
+  };
+}
+
 async function createFamilyInvite(){
   if(!isAdmin())return toast('Somente o administrador pode convidar familiares.');
   if(!cloudConfigured())return toast('A conexão online precisa estar ativa para gerar um convite familiar.');
   const email=$('inviteEmail').value.trim().toLowerCase(),name=$('inviteName').value.trim();
   const allowedWorkspaceId=$('inviteWorkspace')?.value||currentWorkspaceId;
-  const allowedWorkspace=adminAvailableWorkspaces().find(w=>w.id===allowedWorkspaceId);
-  if(!allowedWorkspace)return toast('Selecione um ambiente permitido.');
+  if(!allowedWorkspaceId)return toast('Selecione um ambiente permitido.');
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return toast('Informe um e-mail válido.');
+
+  let allowedWorkspace;
+  try{
+    allowedWorkspace=await finoraEnsureWorkspaceOnlineForInvite(allowedWorkspaceId);
+
+    // Atualiza o cache local com a versão confirmada pelo servidor.
+    const cached=loadFinoraWorkspaces();
+    const idx=cached.findIndex(w=>String(w.id)===String(allowedWorkspace.id));
+    if(idx>=0)cached[idx]={...cached[idx],...allowedWorkspace};
+    else cached.push(allowedWorkspace);
+    saveFinoraWorkspaces(cached);
+  }catch(e){
+    console.error('FINORA invite workspace validation',e);
+    return toast(e?.message||'Não foi possível validar o ambiente no Supabase.');
+  }
 
   let invites=loadFinoraInvites().filter(i=>i.protocolVersion===FINORA_INVITE_PROTOCOL_VERSION);
   invites=invites.filter(i=>!(i.workspaceId===allowedWorkspaceId&&normalizeFinoraEmail(i.email)===normalizeFinoraEmail(email)&&i.status==='pending'));
@@ -10349,8 +10456,44 @@ $('doRegister').addEventListener('click',async()=>{
     }
 
     if(mode==='join'){
-      const {error:joinError}=await client.rpc('finora_join_workspace',{p_workspace_id:workspace.id});
-      if(joinError)throw joinError;
+      const {data:joinData,error:joinError}=await client.rpc(
+        'finora_join_workspace',
+        {p_workspace_id:workspace.id}
+      );
+      if(joinError){
+        const detail=String(joinError?.message||joinError?.details||'');
+        if(/ambiente|workspace|foreign key|não encontrado|not found/i.test(detail)){
+          throw new Error(
+            'Não foi possível vincular sua conta ao ambiente. O ambiente do convite não está '+
+            'disponível no Supabase. Peça ao administrador para abrir Acessos e gerar um novo convite.'
+          );
+        }
+        throw joinError;
+      }
+      if(joinData===false)throw new Error('O servidor não confirmou o vínculo com o ambiente.');
+
+      // Confirma que o vínculo realmente passou a existir antes de marcar o convite como utilizado.
+      const {data:joinedRows,error:listJoinError}=await client.rpc('finora_list_my_workspaces');
+      if(listJoinError)throw listJoinError;
+      const joined=(Array.isArray(joinedRows)?joinedRows:[]).find(
+        w=>String(w.workspace_id)===String(workspace.id)
+      );
+      if(!joined){
+        throw new Error(
+          'Sua conta foi autenticada, mas o vínculo com o ambiente não foi confirmado. '+
+          'O convite permanece disponível para uma nova tentativa.'
+        );
+      }
+
+      workspace={
+        ...workspace,
+        name:joined.workspace_name||workspace.name,
+        type:joined.workspace_type||workspace.type||'Familiar',
+        description:joined.workspace_description||workspace.description||'',
+        ownerUserId:joined.owner_user_id||workspace.ownerUserId||null,
+        role:joined.member_role||'member',
+        online:true
+      };
     }
 
     const workspaces=loadFinoraWorkspaces();
@@ -10918,15 +11061,23 @@ $('adminAuthPassword')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.pre
       <button type="button" class="finora-modal-close" onclick="closeMobileMore()">×</button>
     </div>
     <div class="profile-modal-body">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-        <button class="simple-action" onclick="closeMobileMore();openLaunchModal('list')">Lançamentos</button>
-        <button class="simple-action" onclick="closeMobileMore();openSectionModal('finoraCardsPanel')">Cartões</button>
-        <button class="simple-action" onclick="closeMobileMore();openSimplePanel('simpleImportPanel','boleto')">Boletos</button>
-        <button class="simple-action" onclick="closeMobileMore();openSimplePanel('simpleImportPanel','extrato')">Extratos</button>
-        <button class="simple-action" onclick="closeMobileMore();openSectionModal('finoraMonthlySheet')">Planilha mensal</button>
-        <button class="simple-action" onclick="closeMobileMore();openSectionModal('finoraCategories')">Categorias</button>
-        <button class="simple-action" onclick="closeMobileMore();openSectionModal('finoraFamilyAccess')">Acessos</button>
-        <button class="simple-action" onclick="closeMobileMore();openCloudModal()">Sincronização</button>
+      <div class="finora-mobile-more-grid">
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openLaunchModal('list')"><span>☷</span><b>Lançamentos</b><small>Consultar todos</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openSectionModal('finoraCardsPanel')"><span>▰</span><b>Cartões</b><small>Cartões cadastrados</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openSimplePanel('simpleImportPanel','extrato')"><span>▣</span><b>Contas</b><small>Contas e extratos</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openFinoraUtilityPanel('budget')"><span>◎</span><b>Orçamentos</b><small>Planejamento mensal</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openFinoraUtilityPanel('goals')"><span>⚑</span><b>Metas</b><small>Objetivos financeiros</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openReportsPanel()"><span>▥</span><b>Relatórios</b><small>Extratos e análises</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openSectionModal('finoraFamilyAccess')"><span>♧</span><b>Acessos</b><small>Ambientes e integrantes</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openFinoraUtilityPanel('categories')"><span>◇</span><b>Categorias</b><small>Classificações</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openFinoraUtilityPanel('payments')"><span>▤</span><b>Formas de pagamento</b><small>Meios cadastrados</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openSectionModal('simpleAlertsPanel')"><span>♧</span><b>Lembretes</b><small>Alertas e vencimentos</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openFinoraAuditPanel()"><span>◷</span><b>Auditoria</b><small>Histórico de alterações</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openFinoraUtilityPanel('settings')"><span>⚙</span><b>Configurações</b><small>Personalizar cockpit</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openFinoraUtilityPanel('faq')"><span>?</span><b>FAQ</b><small>Ajuda do FINORA</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openProfileModal()"><span>●</span><b>Meu perfil</b><small>Conta e senha</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openCloudModal()"><span>☁</span><b>Sincronização</b><small>Status da nuvem</small></button>
+        <button class="finora-mobile-more-action finora-mobile-more-danger" onclick="closeMobileMore();document.getElementById('logoutBtn')?.click()"><span>↪</span><b>Sair</b><small>Encerrar sessão</small></button>
       </div>
     </div>
   </section>
@@ -11570,7 +11721,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
     const footer=document.createElement('footer');
     footer.className='finora-v84-footer';
-    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.4</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
+    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.5</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
     home.appendChild(footer);
 
     // quick launch controls
@@ -14449,6 +14600,11 @@ setTimeout(renderHomeCategoryDonut,0);
     };
   };
 })();
+</script>
+
+
+<script id="finora-v105-release-marker">
+window.FINORA_RELEASE='1.0.5';
 </script>
 
 </body>
