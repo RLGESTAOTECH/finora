@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.0">
+<meta name="finora-version" content="1.0.1">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -5538,6 +5538,18 @@ body.finora-v88-sidebar-collapsed .shell{
         return d.toLocaleDateString('pt-BR');
       }
       return s;
+    };
+  }
+})();
+</script>
+
+
+<script id="finora-v101-rowdate-compat">
+(function(){
+  if(typeof window.rowDate!=='function'){
+    window.rowDate=function(x){
+      if(!x)return '';
+      return x.vencimento || x.dataRecebimento || x.dataPagamento || x.dataLancamento || x.createdAt || '';
     };
   }
 })();
@@ -11498,7 +11510,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
     const footer=document.createElement('footer');
     footer.className='finora-v84-footer';
-    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.0</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
+    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.1</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
     home.appendChild(footer);
 
     // quick launch controls
@@ -11927,10 +11939,22 @@ setTimeout(renderHomeCategoryDonut,0);
     return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
   }
   function v90Num(v){
-    const s=String(v??'').trim();
+    let s=String(v??'').trim();
     if(!s)return 0;
-    if(s.includes(','))return Number(s.replace(/\./g,'').replace(',','.'))||0;
-    return Number(s)||0;
+    s=s.replace(/\s/g,'').replace(/R\$/gi,'').replace(/[^\d,.-]/g,'');
+    if(!s)return 0;
+    const comma=s.lastIndexOf(',');
+    const dot=s.lastIndexOf('.');
+    if(comma>=0 && dot>=0){
+      s=comma>dot ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,'');
+    }else if(comma>=0){
+      s=s.replace(/\./g,'').replace(',','.');
+    }else if(dot>=0){
+      const decimals=s.length-dot-1;
+      if(decimals===3 && /^-?\d{1,3}(\.\d{3})+$/.test(s))s=s.replace(/\./g,'');
+    }
+    const n=Number(s);
+    return Number.isFinite(n)?n:0;
   }
   function v90AllStore(){
     try{return JSON.parse(localStorage.getItem(V90_KEY)||'{}')||{}}catch(e){return{}}
@@ -13994,6 +14018,82 @@ setTimeout(renderHomeCategoryDonut,0);
     });
     renderAuditRows();
   };
+})();
+</script>
+
+
+<script id="finora-v101-goal-save-fix">
+(function(){
+  function parseBRL(v){
+    let s=String(v??'').trim().replace(/\s/g,'').replace(/R\$/gi,'').replace(/[^\d,.-]/g,'');
+    if(!s)return 0;
+    const comma=s.lastIndexOf(','),dot=s.lastIndexOf('.');
+    if(comma>=0&&dot>=0){
+      s=comma>dot?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');
+    }else if(comma>=0){
+      s=s.replace(/\./g,'').replace(',','.');
+    }
+    const n=Number(s);
+    return Number.isFinite(n)?n:0;
+  }
+
+  function bindGoalSave(){
+    const btn=document.getElementById('v90GoalSave');
+    if(!btn || btn.dataset.v101Bound==='1')return;
+    btn.dataset.v101Bound='1';
+
+    // Captura antes do handler legado para garantir que valores formatados em R$ sejam aceitos.
+    btn.addEventListener('click',function(e){
+      const name=document.getElementById('v90GoalName')?.value.trim();
+      const target=parseBRL(document.getElementById('v90GoalTarget')?.value);
+      if(!name || target<=0){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if(typeof toast==='function')toast('Informe o nome e um valor-alvo maior que zero.');
+        return;
+      }
+
+      // Normaliza temporariamente para o handler original.
+      const targetEl=document.getElementById('v90GoalTarget');
+      const savedEl=document.getElementById('v90GoalSaved');
+      const monthlyEl=document.getElementById('v90GoalMonthly');
+      if(targetEl)targetEl.value=String(target);
+      if(savedEl)savedEl.value=String(parseBRL(savedEl.value));
+      if(monthlyEl)monthlyEl.value=String(parseBRL(monthlyEl.value));
+
+      setTimeout(()=>{
+        try{
+          if(typeof v91SyncGoalCategories==='function')v91SyncGoalCategories();
+        }catch(err){}
+        try{
+          if(typeof refreshFinoraV90Controls==='function')refreshFinoraV90Controls();
+        }catch(err){}
+        try{
+          if(typeof renderGoals==='function')renderGoals();
+        }catch(err){console.warn('FINORA 1.0.1 metas:',err);}
+      },30);
+    },true);
+  }
+
+  const body=document.getElementById('finoraUtilityBody');
+  if(body){
+    new MutationObserver(()=>bindGoalSave()).observe(body,{childList:true,subtree:true});
+  }
+
+  const oldOpen=window.openFinoraUtilityPanel;
+  if(typeof oldOpen==='function'){
+    window.openFinoraUtilityPanel=function(type){
+      const r=oldOpen.apply(this,arguments);
+      if(type==='goals')setTimeout(bindGoalSave,0);
+      return r;
+    };
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',bindGoalSave,{once:true});
+  }else{
+    bindGoalSave();
+  }
 })();
 </script>
 
