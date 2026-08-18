@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.1">
+<meta name="finora-version" content="1.0.3">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -5511,6 +5511,26 @@ body.finora-v88-sidebar-collapsed .shell{
 }
 @media(max-width:850px){
   .finora-audit-toolbar{grid-template-columns:1fr}
+}
+
+
+/* ==========================================================
+   FINORA 1.0.2 — metas sempre disponíveis nos lançamentos
+   ========================================================== */
+#goalUseField.finora-v102-visible{
+  display:block!important;
+}
+#goalUseField.finora-v102-hidden{
+  display:none!important;
+}
+#goalUseSelect.finora-v102-visible{
+  display:block!important;
+}
+#goalUseSelect.finora-v102-hidden{
+  display:none!important;
+}
+#categoriaExpense option.finora-v102-goal-option{
+  font-weight:800;
 }
 
 </style>
@@ -11510,7 +11530,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
     const footer=document.createElement('footer');
     footer.className='finora-v84-footer';
-    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.1</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
+    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.3</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
     home.appendChild(footer);
 
     // quick launch controls
@@ -14094,6 +14114,276 @@ setTimeout(renderHomeCategoryDonut,0);
   }else{
     bindGoalSave();
   }
+})();
+</script>
+
+
+<script id="finora-v102-goal-launch-sync">
+(function(){
+  const FEATURE_KEY='finora_v90_features_by_workspace';
+  let internalUpdate=false;
+
+  function esc(s=''){
+    return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function currentGoals(){
+    // Fonte principal oficial da FINORA.
+    try{
+      const state=typeof loadFinoraFeatureState==='function'?loadFinoraFeatureState():null;
+      if(state && Array.isArray(state.goals) && state.goals.length)return state.goals;
+    }catch(e){}
+
+    // Fallback defensivo para o mesmo workspace no localStorage.
+    try{
+      const all=JSON.parse(localStorage.getItem(FEATURE_KEY)||'{}')||{};
+      const id=String(currentWorkspaceId||'default');
+      const exact=all[id];
+      if(exact && Array.isArray(exact.goals))return exact.goals;
+
+      // Só usa fallback único quando existe apenas um estado com metas.
+      const candidates=Object.values(all).filter(x=>Array.isArray(x?.goals)&&x.goals.length);
+      if(candidates.length===1)return candidates[0].goals;
+    }catch(e){}
+
+    return [];
+  }
+
+  function goalCategoryName(g){
+    return `Meta: ${g.name}`;
+  }
+
+  function syncGoalEntryField(){
+    const field=document.getElementById('goalUseField');
+    const check=document.getElementById('goalUseCheck');
+    const select=document.getElementById('goalUseSelect');
+    const tipo=document.getElementById('tipo');
+    if(!field||!check||!select||!tipo)return;
+
+    const goals=currentGoals();
+    const isIncome=tipo.value==='entrada';
+    const selected=select.value;
+
+    const wanted='<option value="">Selecione a meta</option>'+
+      goals.map(g=>`<option value="${esc(g.id)}">${esc(String(g.name||'').toUpperCase())}</option>`).join('');
+
+    if(select.innerHTML!==wanted){
+      internalUpdate=true;
+      select.innerHTML=wanted;
+      if(goals.some(g=>String(g.id)===String(selected)))select.value=selected;
+      internalUpdate=false;
+    }
+
+    const show=isIncome && goals.length>0;
+    field.classList.toggle('finora-v102-visible',show);
+    field.classList.toggle('finora-v102-hidden',!show);
+
+    if(!show){
+      check.checked=false;
+      select.value='';
+      select.classList.remove('finora-v102-visible');
+      select.classList.add('finora-v102-hidden');
+    }else{
+      const showSelect=check.checked;
+      select.classList.toggle('finora-v102-visible',showSelect);
+      select.classList.toggle('finora-v102-hidden',!showSelect);
+    }
+  }
+
+  function syncGoalExpenseCategories(){
+    const select=document.getElementById('categoriaExpense');
+    if(!select)return;
+
+    const goals=currentGoals().filter(g=>!g.categoryDisabled);
+    if(!goals.length)return;
+
+    const selected=select.value;
+    const existing=new Set([...select.options].map(o=>o.value));
+
+    internalUpdate=true;
+    goals.forEach(g=>{
+      const name=goalCategoryName(g);
+      if(!existing.has(name)){
+        const opt=document.createElement('option');
+        opt.value=name;
+        opt.textContent=String(name).toUpperCase();
+        opt.className='finora-v102-goal-option';
+        opt.dataset.goalId=String(g.id||'');
+        select.appendChild(opt);
+        existing.add(name);
+      }
+    });
+    if(selected && [...select.options].some(o=>o.value===selected))select.value=selected;
+    internalUpdate=false;
+  }
+
+  function syncAll(){
+    syncGoalEntryField();
+    syncGoalExpenseCategories();
+  }
+  window.finoraSyncGoalsIntoLaunch=syncAll;
+
+  document.getElementById('goalUseCheck')?.addEventListener('change',syncGoalEntryField);
+  document.getElementById('tipo')?.addEventListener('change',()=>setTimeout(syncAll,0));
+
+  // Reaplica depois das rotinas antigas que reconstroem os campos.
+  ['openLaunchModal','updateTypeLabels','refreshFinoraV90Controls'].forEach(name=>{
+    const original=window[name];
+    if(typeof original!=='function' || original.__v102Wrapped)return;
+    const wrapped=function(){
+      const r=original.apply(this,arguments);
+      setTimeout(syncAll,0);
+      setTimeout(syncAll,60);
+      setTimeout(syncAll,180);
+      return r;
+    };
+    wrapped.__v102Wrapped=true;
+    window[name]=wrapped;
+  });
+
+  // Se outra rotina reescrever o combo de categoria, recoloca as metas.
+  const category=document.getElementById('categoriaExpense');
+  if(category){
+    new MutationObserver(()=>{
+      if(!internalUpdate)setTimeout(syncGoalExpenseCategories,0);
+    }).observe(category,{childList:true});
+  }
+
+  // Campo de meta e modal também podem sofrer re-render.
+  const launch=document.getElementById('launchModal') || document.body;
+  new MutationObserver(()=>{
+    if(!internalUpdate && document.getElementById('goalUseField')){
+      setTimeout(syncAll,0);
+    }
+  }).observe(launch,{childList:true,subtree:true});
+
+  // Depois de cadastrar/excluir/alterar uma meta, atualiza imediatamente os lançamentos.
+  document.addEventListener('click',e=>{
+    if(e.target?.id==='v90GoalSave' ||
+       e.target?.matches?.('[data-v90-goal-del]') ||
+       e.target?.matches?.('[data-v90-goal-add]')){
+      setTimeout(syncAll,80);
+      setTimeout(syncAll,250);
+    }
+  },true);
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',()=>setTimeout(syncAll,0),{once:true});
+  }else{
+    setTimeout(syncAll,0);
+  }
+})();
+</script>
+
+
+<script id="finora-v103-config-first-save-fix">
+(function(){
+  const IDS=[
+    'cfgShowCategory','cfgShowLegend','cfgChartType','cfgShowQuick',
+    'cfgShowRecent','cfgRecentOrder','cfgRecentPaid','cfgRecentPending',
+    'cfgRecentMin','cfgRecentMax','cfgShowDue'
+  ];
+
+  function findConfigSaveButton(){
+    const direct=document.getElementById('cfgSave') ||
+                 document.getElementById('saveCockpitConfig') ||
+                 document.querySelector('[data-save-cockpit-config]');
+    if(direct) return direct;
+
+    return [...document.querySelectorAll('button')].find(b =>
+      /salvar configura/i.test((b.textContent||'').trim())
+    ) || null;
+  }
+
+  function snapshot(){
+    const out={};
+    IDS.forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el)return;
+      out[id]=el.type==='checkbox' ? !!el.checked : el.value;
+    });
+
+    // Também captura checkboxes de formas de pagamento.
+    out.paymentChecks=[...document.querySelectorAll(
+      '#configModal input[type="checkbox"][data-payment], #configModal input[type="checkbox"][name*="payment"], #configModal input[type="checkbox"][name*="forma"]'
+    )].map(el=>({
+      id:el.id||'',
+      name:el.name||'',
+      value:el.value||'',
+      checked:!!el.checked
+    }));
+    return out;
+  }
+
+  function restoreSnapshot(s){
+    if(!s)return;
+    Object.entries(s).forEach(([id,val])=>{
+      if(id==='paymentChecks')return;
+      const el=document.getElementById(id);
+      if(!el)return;
+      if(el.type==='checkbox')el.checked=!!val;
+      else el.value=val;
+    });
+
+    (s.paymentChecks||[]).forEach(x=>{
+      let el=x.id ? document.getElementById(x.id) : null;
+      if(!el && x.name){
+        el=[...document.querySelectorAll('#configModal input[type="checkbox"]')]
+          .find(n=>n.name===x.name && n.value===x.value);
+      }
+      if(el)el.checked=!!x.checked;
+    });
+  }
+
+  function forceApply(){
+    // Usa as rotinas já existentes do FINORA, mas somente após o clique antigo terminar.
+    try{
+      if(typeof saveCockpitConfig==='function') saveCockpitConfig();
+    }catch(e){}
+    try{
+      if(typeof applyCockpit==='function') applyCockpit();
+    }catch(e){}
+    try{
+      if(typeof applyCockpitConfig==='function') applyCockpitConfig();
+    }catch(e){}
+    try{
+      if(typeof renderRecentConfigured==='function') renderRecentConfigured();
+    }catch(e){}
+  }
+
+  function install(){
+    const btn=findConfigSaveButton();
+    if(!btn || btn.dataset.v103FirstSaveFix==='1')return;
+    btn.dataset.v103FirstSaveFix='1';
+
+    // Capture phase: pega exatamente o que o usuário marcou ANTES de handlers antigos.
+    btn.addEventListener('click',function(){
+      const snap=snapshot();
+
+      // Depois que os handlers antigos rodarem, restaura os valores escolhidos
+      // e reaplica/salva. Isso elimina a necessidade do segundo clique.
+      setTimeout(()=>{
+        restoreSnapshot(snap);
+        forceApply();
+
+        // Garante persistência disparando change/input para listeners existentes.
+        IDS.forEach(id=>{
+          const el=document.getElementById(id);
+          if(!el)return;
+          try{ el.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){}
+        });
+
+        setTimeout(forceApply,30);
+      },0);
+    },true);
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',install,{once:true});
+  }else install();
+
+  // Caso o modal seja reconstruído dinamicamente.
+  new MutationObserver(install).observe(document.body,{childList:true,subtree:true});
 })();
 </script>
 
