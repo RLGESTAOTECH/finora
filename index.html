@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.6">
+<meta name="finora-version" content="1.0.7">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -6413,6 +6413,7 @@ function save(){
     data.forEach(x=>{if(sameWorkspace(x) && !x.workspaceId)x.workspaceId=currentWorkspaceId});
   }
   localStorage.setItem(KEY,JSON.stringify(data));
+  if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
   scheduleCloudPush();
 }
 function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),1800)}
@@ -9137,6 +9138,27 @@ const FINORA_CLOUD_SYNC_KEY='finora_cloud_last_sync_v1';
 let finoraCloudClient=null;
 let finoraCloudPushTimer=null;
 let finoraCloudBusy=false;
+
+// FINORA 1.0.7 — fila confiável de sincronização.
+// Evita a condição de corrida em que o primeiro lançamento podia ser salvo
+// localmente enquanto um pull/push anterior ainda estava em andamento.
+let finoraCloudDirty=false;
+let finoraCloudPushPending=false;
+let finoraCloudMutationRevision=0;
+
+function finoraMarkCloudDirty(){
+  finoraCloudDirty=true;
+  finoraCloudPushPending=true;
+  finoraCloudMutationRevision++;
+}
+
+function finoraReleaseCloudBusy(){
+  finoraCloudBusy=false;
+  if(finoraCloudPushPending || finoraCloudDirty){
+    clearTimeout(finoraCloudPushTimer);
+    finoraCloudPushTimer=setTimeout(()=>pushCloudState(false),180);
+  }
+}
 // FINORA 1.0.4: impede que cache local antigo seja enviado antes de o
 // workspace receber sua fonte de verdade do Supabase.
 const finoraCloudHydratedWorkspaces=new Set();
@@ -9750,7 +9772,13 @@ async function saveCloudConfiguration(){
   startCloudPolling();
 }
 async function pushCloudState(showToast=false){
-  if(finoraCloudBusy||!cloudConfigured())return false;
+  if(!cloudConfigured())return false;
+
+  // Nunca descarta um push por concorrência: coloca na fila.
+  if(finoraCloudBusy){
+    finoraCloudPushPending=true;
+    return false;
+  }
 
   // O workspace precisa ter sido verificado contra o servidor.
   if(!showToast && !finoraWorkspaceHydrated())return false;
@@ -9760,6 +9788,8 @@ async function pushCloudState(showToast=false){
   if(!showToast && !finoraBootstrapHasMutation())return false;
 
   const client=getCloudClient();if(!client)return false;
+  const pushRevision=finoraCloudMutationRevision;
+  finoraCloudPushPending=false;
   finoraCloudBusy=true;
   try{
     let payload=cloudStatePayload();
@@ -9816,6 +9846,16 @@ async function pushCloudState(showToast=false){
     finoraFinishBootstrap();
     markFinoraWorkspaceHydrated();
 
+    // Só limpa o indicador de alterações se nenhum novo salvamento ocorreu
+    // enquanto a requisição estava em trânsito.
+    if(finoraCloudMutationRevision===pushRevision){
+      finoraCloudDirty=false;
+      finoraCloudPushPending=false;
+    }else{
+      finoraCloudDirty=true;
+      finoraCloudPushPending=true;
+    }
+
     // Atualiza o navegador com o mesmo estado consolidado que foi salvo.
     data=data.filter(x=>!sameWorkspace(x)).concat(
       payload.transactions.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'}))
@@ -9842,18 +9882,31 @@ async function pushCloudState(showToast=false){
     return true;
   }catch(e){
     console.error('FINORA cloud push',e);
+    finoraCloudDirty=true;
+    finoraCloudPushPending=true;
     updateCloudUI('error');
     if(showToast)toast('Falha ao enviar dados para a nuvem.');
     return false;
-  }finally{finoraCloudBusy=false}
+  }finally{
+    finoraReleaseCloudBusy();
+  }
 }
 function scheduleCloudPush(){
   if(!cloudConfigured() || !finoraWorkspaceHydrated())return;
+  finoraCloudPushPending=true;
   clearTimeout(finoraCloudPushTimer);
   finoraCloudPushTimer=setTimeout(()=>pushCloudState(false),450);
 }
 async function pullCloudState(showToast=false){
-  if(finoraCloudBusy||!cloudConfigured())return false;
+  if(!cloudConfigured())return false;
+
+  // Nunca baixa estado remoto por cima de um lançamento local ainda não enviado.
+  if(finoraCloudDirty || finoraCloudPushPending){
+    scheduleCloudPush();
+    return false;
+  }
+
+  if(finoraCloudBusy)return false;
   const client=getCloudClient();if(!client)return false;
   finoraCloudBusy=true;
   try{
@@ -9973,7 +10026,9 @@ async function pullCloudState(showToast=false){
     updateCloudUI('error');
     if(showToast)toast('Falha ao baixar dados da nuvem.');
     return false;
-  }finally{finoraCloudBusy=false}
+  }finally{
+    finoraReleaseCloudBusy();
+  }
 }
 async function initializeCloudForWorkspace(){
   if(!cloudConfigured())return;
@@ -11809,7 +11864,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
     const footer=document.createElement('footer');
     footer.className='finora-v84-footer';
-    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.6</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
+    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.7</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
     home.appendChild(footer);
 
     // quick launch controls
@@ -14682,6 +14737,8 @@ setTimeout(renderHomeCategoryDonut,0);
       workspaceId:window.currentWorkspaceId||currentWorkspaceId||null,
       hydrated:typeof finoraWorkspaceHydrated==='function'?finoraWorkspaceHydrated():false,
       bootstrapWaitingMutation:typeof finoraBootstrapHasMutation==='function'?(!finoraBootstrapHasMutation()):null,
+      cloudDirty:typeof finoraCloudDirty!=='undefined'?finoraCloudDirty:null,
+      cloudPushPending:typeof finoraCloudPushPending!=='undefined'?finoraCloudPushPending:null,
       cloudConfigured:typeof cloudConfigured==='function'?cloudConfigured():false,
       localTransactions:(typeof data!=='undefined'&&Array.isArray(data)&&typeof sameWorkspace==='function')
         ? data.filter(x=>sameWorkspace(x)).length : null,
@@ -14692,8 +14749,8 @@ setTimeout(renderHomeCategoryDonut,0);
 </script>
 
 
-<script id="finora-v106-release-marker">
-window.FINORA_RELEASE='1.0.6';
+<script id="finora-v107-release-marker">
+window.FINORA_RELEASE='1.0.7';
 </script>
 
 </body>
