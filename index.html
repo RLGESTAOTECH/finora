@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.5">
+<meta name="finora-version" content="1.0.6">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -9140,11 +9140,82 @@ let finoraCloudBusy=false;
 // FINORA 1.0.4: impede que cache local antigo seja enviado antes de o
 // workspace receber sua fonte de verdade do Supabase.
 const finoraCloudHydratedWorkspaces=new Set();
+
+// FINORA 1.0.6:
+// Quando o workspace existe e o usuário é membro, mas ainda não existe
+// finora_workspace_state, guardamos uma assinatura do conteúdo local.
+// Assim o primeiro acesso NÃO publica cache antigo sozinho.
+// O primeiro salvamento real (lançamento/cartão/configuração) altera
+// a assinatura e passa a poder criar o estado remoto.
+const finoraCloudBootstrapBaseline=new Map();
+
 function finoraWorkspaceHydrated(){
   return !!currentWorkspaceId && finoraCloudHydratedWorkspaces.has(String(currentWorkspaceId));
 }
-function markFinoraWorkspaceHydrated(){
-  if(currentWorkspaceId)finoraCloudHydratedWorkspaces.add(String(currentWorkspaceId));
+
+function finoraBootstrapSignature(){
+  try{
+    const ws=String(currentWorkspaceId||'');
+    const tx=(Array.isArray(data)?data:[])
+      .filter(x=>String(x?.workspaceId||'')===ws || (typeof sameWorkspace==='function' && sameWorkspace(x)))
+      .map(x=>({
+        id:x.id||'',
+        tipo:x.tipo||'',
+        descricao:x.descricao||'',
+        valor:Number(x.valor||0),
+        status:x.status||'',
+        dataLancamento:x.dataLancamento||'',
+        vencimento:x.vencimento||'',
+        updatedAt:x.updatedAt||x.createdAt||''
+      }))
+      .sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+
+    const cards=(typeof accountCards==='function'?accountCards():[])
+      .map(c=>({
+        id:c.id||'',
+        name:c.name||'',
+        issuer:c.issuer||'',
+        last4:c.last4||'',
+        dueDay:c.dueDay||0,
+        updatedAt:c.updatedAt||c.createdAt||''
+      }))
+      .sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+
+    let feature=null;
+    try{
+      feature=typeof loadFinoraFeatureState==='function'
+        ? loadFinoraFeatureState()
+        : null;
+    }catch(e){feature=null}
+
+    // updatedAt da configuração conta como mutação legítima.
+    return JSON.stringify({tx,cards,feature});
+  }catch(e){
+    return String(Date.now());
+  }
+}
+
+function markFinoraWorkspaceHydrated(options={}){
+  if(!currentWorkspaceId)return;
+  const ws=String(currentWorkspaceId);
+  finoraCloudHydratedWorkspaces.add(ws);
+
+  if(options.remoteMissing){
+    finoraCloudBootstrapBaseline.set(ws,finoraBootstrapSignature());
+  }else{
+    finoraCloudBootstrapBaseline.delete(ws);
+  }
+}
+
+function finoraBootstrapHasMutation(){
+  if(!currentWorkspaceId)return false;
+  const ws=String(currentWorkspaceId);
+  if(!finoraCloudBootstrapBaseline.has(ws))return true;
+  return finoraCloudBootstrapBaseline.get(ws)!==finoraBootstrapSignature();
+}
+
+function finoraFinishBootstrap(){
+  if(currentWorkspaceId)finoraCloudBootstrapBaseline.delete(String(currentWorkspaceId));
 }
 
 
@@ -9680,9 +9751,14 @@ async function saveCloudConfiguration(){
 }
 async function pushCloudState(showToast=false){
   if(finoraCloudBusy||!cloudConfigured())return false;
-  // Um push automático nunca pode ser o primeiro contato do workspace com a nuvem.
-  // Isso evita "ressuscitar" dados antigos do localStorage.
+
+  // O workspace precisa ter sido verificado contra o servidor.
   if(!showToast && !finoraWorkspaceHydrated())return false;
+
+  // Se o servidor ainda não possui state, não publica o cache que já estava
+  // no navegador ao simplesmente entrar. Só publica depois de uma mutação real.
+  if(!showToast && !finoraBootstrapHasMutation())return false;
+
   const client=getCloudClient();if(!client)return false;
   finoraCloudBusy=true;
   try{
@@ -9736,6 +9812,10 @@ async function pushCloudState(showToast=false){
       .upsert(row,{onConflict:'workspace_id'});
     if(error)throw error;
 
+    // A partir daqui já existe uma fonte de verdade remota.
+    finoraFinishBootstrap();
+    markFinoraWorkspaceHydrated();
+
     // Atualiza o navegador com o mesmo estado consolidado que foi salvo.
     data=data.filter(x=>!sameWorkspace(x)).concat(
       payload.transactions.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'}))
@@ -9784,9 +9864,17 @@ async function pullCloudState(showToast=false){
       .maybeSingle();
     if(error)throw error;
     if(!row?.state){
-      if(showToast)toast('Ainda não existem dados deste ambiente na nuvem.');
+      // Workspace válido, porém ainda sem estado financeiro.
+      // Preserva o conteúdo local e registra uma linha de base.
+      // O primeiro salvamento posterior poderá criar o state no Supabase.
+      markFinoraWorkspaceHydrated({remoteMissing:true});
+      updateCloudUI('connected');
+      if(showToast)toast('Ambiente conectado. O primeiro lançamento será sincronizado automaticamente.');
       return false;
     }
+
+    // Há estado remoto: ele volta a ser a fonte de verdade.
+    markFinoraWorkspaceHydrated();
 
     const state=row.state||{};
     if(state.featureConfig && typeof saveFinoraFeatureState==='function'){
@@ -11721,7 +11809,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
     const footer=document.createElement('footer');
     footer.className='finora-v84-footer';
-    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.5</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
+    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.6</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
     home.appendChild(footer);
 
     // quick launch controls
@@ -14593,6 +14681,7 @@ setTimeout(renderHomeCategoryDonut,0);
     return {
       workspaceId:window.currentWorkspaceId||currentWorkspaceId||null,
       hydrated:typeof finoraWorkspaceHydrated==='function'?finoraWorkspaceHydrated():false,
+      bootstrapWaitingMutation:typeof finoraBootstrapHasMutation==='function'?(!finoraBootstrapHasMutation()):null,
       cloudConfigured:typeof cloudConfigured==='function'?cloudConfigured():false,
       localTransactions:(typeof data!=='undefined'&&Array.isArray(data)&&typeof sameWorkspace==='function')
         ? data.filter(x=>sameWorkspace(x)).length : null,
@@ -14603,8 +14692,8 @@ setTimeout(renderHomeCategoryDonut,0);
 </script>
 
 
-<script id="finora-v105-release-marker">
-window.FINORA_RELEASE='1.0.5';
+<script id="finora-v106-release-marker">
+window.FINORA_RELEASE='1.0.6';
 </script>
 
 </body>
