@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.9">
+<meta name="finora-version" content="1.0.10">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -5914,6 +5914,91 @@ body.finora-v88-sidebar-collapsed .shell{
 }
 </style>
 
+
+<style id="finora-v110-style">
+.finora-v110-card-toolbar{
+  display:grid;
+  grid-template-columns:minmax(260px,1fr) minmax(240px,360px);
+  gap:9px;
+  margin:0 0 12px;
+}
+#finoraCardsCount{
+  display:block;
+  margin-top:3px;
+  font:9px Verdana,sans-serif;
+  color:#728178;
+}
+.finora-v110-card-meta{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:4px 8px;
+  margin-top:7px;
+}
+.finora-v110-card-meta small{
+  margin:0!important;
+}
+.finora-v110-card-type{
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  max-width:100%;
+  margin-top:6px;
+  padding:3px 7px;
+  border-radius:999px;
+  background:#eef4f0;
+  color:#315c49;
+  font:700 8px Verdana,sans-serif;
+}
+.finora-v110-launch-toolbar{
+  grid-template-columns:minmax(220px,1fr) 135px 135px 145px 200px 125px!important;
+}
+.finora-v110-sync-state{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font:8px Verdana,sans-serif;
+  color:#6b7b73;
+}
+.finora-v110-sync-state::before{
+  content:'';
+  width:6px;height:6px;border-radius:50%;background:#1e9b61;
+}
+.finora-v110-alert-dialog{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:17000;
+  background:rgba(10,30,21,.58);
+  backdrop-filter:blur(3px);
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+}
+.finora-v110-alert-dialog.open{display:flex}
+.finora-v110-alert-card{
+  width:min(430px,96vw);
+  background:#fff;
+  border-radius:16px;
+  box-shadow:0 28px 80px rgba(10,30,21,.28);
+  padding:18px;
+}
+.finora-v110-alert-card h3{margin:0 0 5px;color:#174b36;font-size:18px}
+.finora-v110-alert-card p{margin:0 0 14px;font:9px/1.55 Verdana,sans-serif;color:#6b7b73}
+.finora-v110-alert-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.finora-v110-print-hint{font:8px Verdana,sans-serif;color:#728178}
+
+@media(max-width:900px){
+  .finora-v110-card-toolbar{grid-template-columns:1fr}
+  .finora-v110-launch-toolbar{grid-template-columns:1fr 1fr!important}
+  .finora-v110-launch-toolbar #busca{grid-column:1/-1}
+}
+@media(max-width:560px){
+  .finora-v110-launch-toolbar{grid-template-columns:1fr!important}
+  .finora-v110-launch-toolbar #busca{grid-column:auto}
+  .finora-v110-card-meta{grid-template-columns:1fr}
+}
+</style>
+
 </head>
 <body>
 
@@ -5952,7 +6037,7 @@ body.finora-v88-sidebar-collapsed .shell{
     <button type="button" onclick="openLaunchModal('entrada')"><span class="ico">⊕</span>Nova entrada</button>
     <button type="button" onclick="openLaunchModal('saida')"><span class="ico">⊖</span>Nova despesa/saída</button>
     <button type="button" onclick="openSectionModal('finoraCardsPanel')"><span class="ico">▰</span>Cartões</button>
-    <button type="button" onclick="openSimplePanel('simpleImportPanel','extrato')"><span class="ico">▣</span>Contas</button>
+    <button type="button" onclick="openSimplePanel('simpleImportPanel','extrato')"><span class="ico">▣</span>Uploads</button>
     <button type="button" onclick="openFinoraUtilityPanel('budget')"><span class="ico">◎</span>Orçamentos</button>
     <button type="button" onclick="openFinoraUtilityPanel('goals')"><span class="ico">⚑</span>Metas</button>
     <button type="button" onclick="openReportsPanel()"><span class="ico">▥</span>Relatórios</button>
@@ -6264,8 +6349,20 @@ body.finora-v88-sidebar-collapsed .shell{
 
 <section class="popup-only-panel finora-cards-panel" id="finoraCardsPanel">
   <div class="finora-cards-head">
-    <h3>Cartões cadastrados</h3>
-    <button type="button" class="simple-action" onclick="toggleCardForm()">+ Cadastrar cartão</button>
+    <div>
+      <h3>Cartões cadastrados</h3>
+      <small id="finoraCardsCount">0 cartões</small>
+    </div>
+    <button type="button" class="simple-action" onclick="finoraOpenNewCard()">+ Cadastrar cartão</button>
+  </div>
+  <div class="finora-v110-card-toolbar">
+    <input id="finoraCardSearch" type="search" placeholder="Filtrar por cartão, titular, bandeira ou emissor">
+    <select id="finoraCardSort" aria-label="Ordenar cartões">
+      <option value="default">Bandeira → Titular → Emissor (A–Z)</option>
+      <option value="name">Nome do cartão (A–Z)</option>
+      <option value="owner">Titular (A–Z)</option>
+      <option value="issuer">Emissor (A–Z)</option>
+    </select>
   </div>
   <div class="finora-card-grid" id="finoraCardGrid"></div>
 </section>
@@ -6277,9 +6374,18 @@ body.finora-v88-sidebar-collapsed .shell{
     <div class="field"><label>Nome do cartão</label><input id="cardName" placeholder="Ex.: Carrefour Mastercard"></div>
     <div class="field"><label>Instituição / emissor</label><input id="cardIssuer" placeholder="Ex.: Banco Carrefour"></div>
     <div class="field"><label>Titular</label><select id="cardOwner"></select></div>
+    <div class="field"><label>Tipo do cartão</label>
+      <select id="cardType">
+        <option value="credito">Crédito</option>
+        <option value="debito">Débito</option>
+        <option value="debito_credito">Débito e crédito</option>
+      </select>
+    </div>
     <div class="field"><label>Final do cartão</label><input id="cardLast4" maxlength="4" inputmode="numeric" placeholder="1234"></div>
-    <div class="field"><label>Validade</label><input id="cardExpiry" placeholder="MM/AA"></div>
-    <div class="field"><label>Vencimento da fatura</label><input id="cardDueDay" type="number" min="1" max="31" placeholder="Ex.: 10"><div class="file-note">Informe o dia do mês. A FINORA criará alertas mensais para a fatura.</div></div>
+    <div class="field"><label>Validade</label><input id="cardExpiry" maxlength="5" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/AA"></div>
+    <div class="field"><label>Vencimento da fatura</label><input id="cardDueDay" type="number" min="1" max="31" placeholder="Ex.: 10"><div class="file-note">Usado apenas para cartões com função crédito.</div></div>
+    <div class="field"><label>Limite</label><input id="cardLimit" type="text" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00"><div class="file-note">Campo cadastral; não altera cálculos nesta versão.</div></div>
+    <div class="field"><label>Anuidade</label><input id="cardAnnualFee" type="text" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00"><div class="file-note">Campo cadastral; não gera lançamentos automáticos.</div></div>
     <div class="field"><label>Bandeira</label>
       <select id="cardBrand">
         <option value="auto">Identificar automaticamente</option>
@@ -6340,7 +6446,7 @@ body.finora-v88-sidebar-collapsed .shell{
       </select>
     </div>
     <div class="card-warning">
-      Por segurança, a FINORA não armazena CVV, senha/PIN nem o número completo do cartão. O cadastro guarda somente nome, emissor, titular, final de 4 dígitos, validade, vencimento da fatura, bandeira e categoria padrão.
+      Por segurança, a FINORA não armazena CVV, senha/PIN nem o número completo do cartão. O cadastro guarda somente dados administrativos do cartão, como nome, emissor, titular, tipo, final de 4 dígitos, validade, vencimento da fatura, bandeira, limite, anuidade e categoria padrão.
     </div>
     <div class="field full"><button type="button" class="btn btn-primary" onclick="saveFinoraCard()">Salvar cartão</button></div>
   </div>
@@ -6644,11 +6750,23 @@ body.finora-v88-sidebar-collapsed .shell{
 
 <section class="panel" id="launchListPanel">
   <div class="panel-head"><h2 id="launchListTitle">Lançamentos</h2><span id="countLabel">0 registros</span></div>
-  <div class="toolbar">
+  <div class="toolbar finora-v110-launch-toolbar">
     <input id="busca" placeholder="Buscar descrição, pessoa ou categoria">
     <select id="filtroTipo"><option value="">Todos os tipos</option><option value="entrada">Entradas</option><option value="saida">Saídas</option></select>
     <select id="filtroStatus"><option value="">Todos os status</option><option value="pendente">Pendentes</option><option value="pago">Pagos</option><option value="atrasado">Atrasados</option></select>
     <input id="filtroMes" type="month">
+    <select id="launchSortField" aria-label="Ordenar lançamentos">
+      <option value="date">Data prevista / vencimento</option>
+      <option value="description">Descrição</option>
+      <option value="person">Pessoa</option>
+      <option value="status">Status</option>
+      <option value="value">Valor</option>
+      <option value="file">Arquivo</option>
+    </select>
+    <select id="launchSortDirection" aria-label="Direção da ordenação">
+      <option value="asc">Crescente</option>
+      <option value="desc">Decrescente</option>
+    </select>
   </div>
   <div class="table-wrap" id="tableWrap"></div>
   <div class="footer-tools">
@@ -9102,6 +9220,8 @@ $('entryForm').addEventListener('submit',async e=>{
     observacao:$('observacao').value.trim(),attachment,createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
   const idx=data.findIndex(x=>x.id===id); if(idx>=0)data[idx]=row;else data.push(row);
   try{save()}catch(err){toast('Arquivo muito grande para o navegador. Remova o anexo.');return}
+  // v1.0.10: confirmação visual local acontece no mesmo ciclo do primeiro clique.
+  render();
   if(typeof finoraAuditLog==='function'){
     finoraAuditLog(idx>=0?'ATUALIZOU':'INCLUIU','LANCAMENTO',row.id,
       idx>=0?'Lançamento atualizado':'Lançamento incluído',old||null,row);
@@ -11529,7 +11649,7 @@ $('adminAuthPassword')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.pre
       <div class="finora-mobile-more-grid">
         <button class="finora-mobile-more-action" onclick="closeMobileMore();openLaunchModal('list')"><span>☷</span><b>Lançamentos</b><small>Consultar todos</small></button>
         <button class="finora-mobile-more-action" onclick="closeMobileMore();openSectionModal('finoraCardsPanel')"><span>▰</span><b>Cartões</b><small>Cartões cadastrados</small></button>
-        <button class="finora-mobile-more-action" onclick="closeMobileMore();openSimplePanel('simpleImportPanel','extrato')"><span>▣</span><b>Contas</b><small>Contas e extratos</small></button>
+        <button class="finora-mobile-more-action" onclick="closeMobileMore();openSimplePanel('simpleImportPanel','extrato')"><span>▣</span><b>Uploads</b><small>Documentos e extratos</small></button>
         <button class="finora-mobile-more-action" onclick="closeMobileMore();openFinoraUtilityPanel('budget')"><span>◎</span><b>Orçamentos</b><small>Planejamento mensal</small></button>
         <button class="finora-mobile-more-action" onclick="closeMobileMore();openFinoraUtilityPanel('goals')"><span>⚑</span><b>Metas</b><small>Objetivos financeiros</small></button>
         <button class="finora-mobile-more-action" onclick="closeMobileMore();openReportsPanel()"><span>▥</span><b>Relatórios</b><small>Extratos e análises</small></button>
@@ -15072,7 +15192,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
 
 <script id="finora-v107-release-marker">
-window.FINORA_RELEASE='1.0.9';
+window.FINORA_RELEASE='1.0.10';
 </script>
 
 
@@ -15600,6 +15720,959 @@ window.FINORA_RELEASE='1.0.9';
       if(typeof render==='function')render();
     }catch(e){console.error('FINORA root dedup fix',e)}
   });
+})();
+</script>
+
+
+<script id="finora-v110-functional">
+(function(){
+  'use strict';
+
+  const RELEASE='1.0.10';
+  const TYPE_LABELS={
+    credito:'Crédito',
+    debito:'Débito',
+    debito_credito:'Débito e crédito'
+  };
+  const BRAND_LABELS={
+    visa:'Visa',
+    mastercard:'Mastercard',
+    elo:'Elo',
+    amex:'American Express',
+    hipercard:'Hipercard',
+    outra:'Outra',
+    auto:'Automática'
+  };
+
+  let cardMutationBusy=false;
+  let alertPaymentContext=null;
+  let lastStableRecentSignature='';
+
+  function normalizeText(v){
+    return String(v||'')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .toLowerCase().trim();
+  }
+
+  function esc110(v=''){
+    return String(v).replace(/[&<>"']/g,c=>({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  function parseMoney110(value){
+    if(typeof parseBRLInput==='function'){
+      try{return Number(parseBRLInput(value)||0)}catch(e){}
+    }
+    let s=String(value??'').replace(/[R$\s]/g,'');
+    if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');
+    const n=Number(s);
+    return Number.isFinite(n)?n:0;
+  }
+
+  function formatMoney110(value){
+    const n=typeof value==='number'?value:parseMoney110(value);
+    return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  }
+
+  function canonicalCardType(card){
+    const t=String(card?.cardType||card?.type||'').toLowerCase();
+    if(t==='debito'||t==='credito'||t==='debito_credito')return t;
+    // decisão funcional aprovada: legado = Crédito.
+    return 'credito';
+  }
+
+  function expiryMask(value){
+    const digits=String(value||'').replace(/\D/g,'').slice(0,4);
+    if(digits.length<=2)return digits;
+    return digits.slice(0,2)+'/'+digits.slice(2);
+  }
+
+  function validExpiry(value){
+    if(!value)return true;
+    const m=String(value).match(/^(\d{2})\/(\d{2})$/);
+    if(!m)return false;
+    const month=Number(m[1]);
+    return month>=1&&month<=12;
+  }
+
+  function resetCardForm110(){
+    const ids=['cardEditId','cardName','cardIssuer','cardLast4','cardExpiry','cardDueDay'];
+    ids.forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    if(document.getElementById('cardBrand'))document.getElementById('cardBrand').value='auto';
+    if(document.getElementById('cardDefaultCategory'))document.getElementById('cardDefaultCategory').value='';
+    if(document.getElementById('cardType'))document.getElementById('cardType').value='credito';
+    if(document.getElementById('cardLimit'))document.getElementById('cardLimit').value='';
+    if(document.getElementById('cardAnnualFee'))document.getElementById('cardAnnualFee').value='';
+    try{if(typeof setCardColor==='function')setCardColor('#0b3d2e')}catch(e){}
+    try{fillCardOwners110('')}catch(e){}
+    const title=document.querySelector('#cardFormPanel .panel-head h2');
+    if(title)title.textContent='Cadastrar cartão';
+  }
+
+  function fillCardOwners110(selected=''){
+    const el=document.getElementById('cardOwner');
+    if(!el)return;
+    let vals=[];
+    try{vals=typeof people==='function'?people():[]}catch(e){}
+    vals=[...vals,'EMPRESA RL']
+      .map(v=>String(v||'').trim())
+      .filter(Boolean);
+    vals=[...new Set(vals)];
+    el.innerHTML=vals.map(v=>`<option value="${esc110(v)}">${esc110(v)}</option>`).join('');
+    if(selected && vals.includes(selected))el.value=selected;
+    else if(selected){
+      const o=document.createElement('option');
+      o.value=selected;o.textContent=selected;el.appendChild(o);el.value=selected;
+    }
+  }
+
+  window.fillCardOwners=fillCardOwners110;
+
+  function markCardsDirty(){
+    try{if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty()}catch(e){}
+    try{if(typeof scheduleCloudPush==='function')scheduleCloudPush()}catch(e){}
+  }
+
+  function fireAndForgetCloud(){
+    markCardsDirty();
+    if(typeof pushCloudState==='function' && typeof cloudConfigured==='function' && cloudConfigured()){
+      Promise.resolve()
+        .then(()=>pushCloudState(false))
+        .catch(err=>{
+          console.warn('FINORA 1.0.10 sync pendente',err);
+          try{scheduleCloudPush()}catch(e){}
+        });
+    }
+  }
+
+  window.finoraOpenNewCard=function(){
+    resetCardForm110();
+    fillCardOwners110('');
+    try{if(typeof installCardColorPicker==='function')installCardColorPicker()}catch(e){}
+    if(typeof openSectionModal==='function')openSectionModal('cardFormPanel');
+    requestAnimationFrame(()=>document.getElementById('cardName')?.focus());
+  };
+
+  window.toggleCardForm=function(force){
+    const panel=document.getElementById('cardFormPanel');
+    const show=force===undefined?!panel?.classList.contains('section-modal-active'):!!force;
+    if(show){
+      // Se não está editando, é obrigatoriamente um cadastro limpo.
+      if(!document.getElementById('cardEditId')?.value)resetCardForm110();
+      fillCardOwners110(document.getElementById('cardOwner')?.value||'');
+      try{if(typeof installCardColorPicker==='function')installCardColorPicker()}catch(e){}
+      if(typeof openSectionModal==='function')openSectionModal('cardFormPanel');
+    }else if(typeof closeSectionModal==='function'){
+      closeSectionModal();
+    }
+  };
+
+  window.editFinoraCard=function(id){
+    if(cardMutationBusy)return;
+    const cards=typeof loadFinoraCards==='function'?loadFinoraCards():[];
+    const c=cards.find(x=>String(x.id)===String(id));
+    if(!c){
+      if(typeof toast==='function')toast('Cartão não encontrado.');
+      return;
+    }
+
+    // Primeiro abre o modal e monta seus controles; depois popula.
+    // Isso evita o bug anterior em que fillCardOwners apagava o titular já carregado.
+    if(typeof openSectionModal==='function')openSectionModal('cardFormPanel');
+    try{if(typeof installCardColorPicker==='function')installCardColorPicker()}catch(e){}
+    fillCardOwners110(c.owner||'');
+
+    const put=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val??''};
+    put('cardEditId',c.id);
+    put('cardName',c.name||'');
+    put('cardIssuer',c.issuer||'');
+    put('cardOwner',c.owner||'');
+    put('cardType',canonicalCardType(c));
+    put('cardLast4',c.last4||'');
+    put('cardExpiry',expiryMask(c.expiry||''));
+    put('cardDueDay',c.dueDay||'');
+    put('cardBrand',c.brand||'auto');
+    put('cardDefaultCategory',c.defaultCategory||'');
+    put('cardLimit',c.limit?formatMoney110(Number(c.limit)):'');
+    put('cardAnnualFee',c.annualFee?formatMoney110(Number(c.annualFee)):'');
+    try{if(typeof setCardColor==='function')setCardColor(c.cardColor||c.color||'#0b3d2e')}catch(e){}
+
+    const title=document.querySelector('#cardFormPanel .panel-head h2');
+    if(title)title.textContent='Editar cartão';
+    panelScrollTop();
+  };
+
+  function panelScrollTop(){
+    const p=document.getElementById('cardFormPanel');
+    if(p)p.scrollTop=0;
+  }
+
+  window.saveFinoraCard=async function(){
+    if(cardMutationBusy)return;
+    const btn=document.querySelector('#cardFormPanel .btn-primary');
+    cardMutationBusy=true;
+    if(btn){btn.disabled=true;btn.textContent='Salvando...';}
+
+    try{
+      const get=id=>document.getElementById(id);
+      const name=(get('cardName')?.value||'').trim().toUpperCase();
+      const issuer=(get('cardIssuer')?.value||'').trim().toUpperCase();
+      const owner=get('cardOwner')?.value||'';
+      const cardType=get('cardType')?.value||'credito';
+      const last4=(get('cardLast4')?.value||'').replace(/\D/g,'');
+      const expiry=expiryMask(get('cardExpiry')?.value||'');
+      const dueDay=Number(get('cardDueDay')?.value||0);
+      const brandChoice=get('cardBrand')?.value||'auto';
+      const defaultCategory=get('cardDefaultCategory')?.value||'';
+      const cardColor=get('cardColor')?.value||'#0b3d2e';
+      const limit=parseMoney110(get('cardLimit')?.value||'');
+      const annualFee=parseMoney110(get('cardAnnualFee')?.value||'');
+
+      if(!name)return toast('Informe o nome do cartão.');
+      if(last4&&last4.length!==4)return toast('Informe apenas os 4 últimos dígitos.');
+      if(!validExpiry(expiry))return toast('Informe a validade no formato MM/AA, com mês entre 01 e 12.');
+      if(dueDay&&(dueDay<1||dueDay>31))return toast('Informe um dia de vencimento entre 1 e 31.');
+      if(cardType==='debito' && dueDay){
+        // Pode permanecer cadastrado, mas não será usado para alertas.
+      }
+
+      let brand=brandChoice;
+      if(brandChoice==='auto' && typeof inferCardBrand==='function')brand=inferCardBrand(name,issuer);
+
+      const cards=typeof loadFinoraCards==='function'?loadFinoraCards():[];
+      const editId=get('cardEditId')?.value||'';
+      const id=editId||(crypto.randomUUID?crypto.randomUUID():String(Date.now()));
+      const idx=cards.findIndex(c=>String(c.id)===String(id));
+      const existing=idx>=0?cards[idx]:null;
+      const now=new Date().toISOString();
+
+      const row={
+        ...(existing||{}),
+        id,
+        account:'family',
+        workspaceId:currentWorkspaceId,
+        name,issuer,owner,
+        cardType,
+        type:cardType,
+        last4,expiry,dueDay,brand,defaultCategory,
+        limit,
+        annualFee,
+        cardColor:cardColor||existing?.cardColor||existing?.color||'#0b3d2e',
+        color:cardColor||existing?.cardColor||existing?.color||'#0b3d2e',
+        createdAt:existing?.createdAt||now,
+        updatedAt:now
+      };
+
+      if(idx>=0)cards[idx]=row;else cards.push(row);
+      saveFinoraCards(cards);
+      try{
+        if(typeof saveCardTombstones==='function'&&typeof loadCardTombstones==='function'){
+          saveCardTombstones(loadCardTombstones().filter(t=>String(t.id)!==String(id)));
+        }
+      }catch(e){}
+
+      if(typeof finoraAuditLog==='function'){
+        finoraAuditLog(existing?'ATUALIZOU':'INCLUIU','CARTAO',id,
+          existing?'Cartão atualizado':'Cartão incluído',existing||null,row);
+      }
+
+      // Confirma primeiro localmente e renderiza no mesmo ciclo.
+      if(typeof renderFinoraCards==='function')renderFinoraCards();
+      if(typeof fillLaunchCards==='function')fillLaunchCards();
+      if(typeof closeSectionModal==='function')closeSectionModal();
+      resetCardForm110();
+      if(typeof openSectionModal==='function')openSectionModal('finoraCardsPanel');
+      if(typeof renderFinoraCards==='function')renderFinoraCards();
+
+      if(typeof toast==='function')toast(existing?'Cartão atualizado. Sincronizando...':'Cartão cadastrado. Sincronizando...');
+      fireAndForgetCloud();
+
+      return true;
+    }catch(err){
+      console.error('FINORA 1.0.10 save card',err);
+      if(typeof toast==='function')toast('Não foi possível salvar o cartão.');
+      return false;
+    }finally{
+      cardMutationBusy=false;
+      if(btn){btn.disabled=false;btn.textContent='Salvar cartão';}
+    }
+  };
+
+  function cardBrandKey(c){
+    let b=c.brand||'auto';
+    if(b==='auto' && typeof inferCardBrand==='function')b=inferCardBrand(c.name,c.issuer);
+    return b||'outra';
+  }
+
+  function cardSort110(cards){
+    const mode=document.getElementById('finoraCardSort')?.value||'default';
+    const cmp=(a,b)=>String(a||'').localeCompare(String(b||''),'pt-BR',{sensitivity:'base'});
+    return [...cards].sort((a,b)=>{
+      if(mode==='name')return cmp(a.name,b.name);
+      if(mode==='owner')return cmp(a.owner,b.owner)||cmp(a.name,b.name);
+      if(mode==='issuer')return cmp(a.issuer,b.issuer)||cmp(a.name,b.name);
+      return cmp(BRAND_LABELS[cardBrandKey(a)]||cardBrandKey(a),BRAND_LABELS[cardBrandKey(b)]||cardBrandKey(b))
+        ||cmp(a.owner,b.owner)
+        ||cmp(a.issuer,b.issuer)
+        ||cmp(a.name,b.name);
+    });
+  }
+
+  window.renderFinoraCards=function(){
+    const all=typeof accountCards==='function'?accountCards():[];
+    const q=normalizeText(document.getElementById('finoraCardSearch')?.value||'');
+    let cards=all.filter(c=>{
+      if(!q)return true;
+      const b=BRAND_LABELS[cardBrandKey(c)]||cardBrandKey(c);
+      return normalizeText([c.name,c.owner,c.issuer,b,TYPE_LABELS[canonicalCardType(c)]].join(' ')).includes(q);
+    });
+    cards=cardSort110(cards);
+
+    const count=document.getElementById('finoraCardsCount');
+    if(count)count.textContent=`${cards.length} de ${all.length} cartão${all.length===1?'':'ões'}`;
+
+    const box=document.getElementById('finoraCardGrid');
+    if(!box)return;
+
+    box.innerHTML=cards.length?cards.map(c=>{
+      const brand=cardBrandKey(c);
+      const type=canonicalCardType(c);
+      const limit=Number(c.limit||0);
+      const annualFee=Number(c.annualFee||0);
+      return `<div class="finora-card-item" data-card-id="${esc110(c.id)}">
+        <div class="finora-card-visual" style="--card-user-color:${esc110(c.cardColor||c.color||'#0b3d2e')};background:linear-gradient(135deg,var(--card-user-color) 0%,var(--card-user-color) 76%,rgba(255,255,255,.11) 76%)!important;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div class="brandname">${esc110(c.issuer||'CARTÃO')}</div>
+            <div class="card-brand-logo">${typeof cardBrandMarkup==='function'?cardBrandMarkup(brand):esc110(BRAND_LABELS[brand]||'Cartão')}</div>
+          </div>
+          <div class="card-chip"></div>
+          <div class="digits">•••• •••• •••• ${esc110(c.last4||'••••')}</div>
+        </div>
+        <span class="finora-v110-card-type">${esc110(TYPE_LABELS[type])}</span>
+        <small>${esc110(c.owner||'—')}</small>
+        <strong>${esc110(c.name||'Cartão')}</strong>
+        <div class="finora-v110-card-meta">
+          <small>Bandeira: ${esc110(BRAND_LABELS[brand]||'Outra')}</small>
+          <small>Validade: ${esc110(c.expiry||'—')}</small>
+          <small>Emissor: ${esc110(c.issuer||'—')}</small>
+          <small>${type==='debito'?'Sem alerta de fatura':`Vencimento: ${c.dueDay?`dia ${c.dueDay}`:'—'}`}</small>
+          <small>Limite: ${limit?formatMoney110(limit):'—'}</small>
+          <small>Anuidade: ${annualFee?formatMoney110(annualFee):'—'}</small>
+        </div>
+        <small>Categoria padrão: ${esc110(c.defaultCategory||'Sem categoria')}</small>
+        <div class="finora-card-actions">
+          <button type="button" onclick="editFinoraCard('${esc110(c.id)}')">Editar</button>
+          <button type="button" data-finora-delete="card" data-id="${esc110(c.id)}">Excluir</button>
+        </div>
+      </div>`;
+    }).join(''):'<div class="empty" style="grid-column:1/-1;padding:20px">Nenhum cartão encontrado.</div>';
+  };
+
+  // REQ-010: somente cartões com função crédito geram fatura.
+  const previousCardInvoiceAlerts=window.cardInvoiceAlerts;
+  window.cardInvoiceAlerts=function(){
+    if(typeof previousCardInvoiceAlerts!=='function')return [];
+    const allowed=new Set(
+      (typeof accountCards==='function'?accountCards():[])
+        .filter(c=>canonicalCardType(c)!=='debito')
+        .map(c=>String(c.id))
+    );
+    return previousCardInvoiceAlerts().filter(a=>!a.cardId||allowed.has(String(a.cardId)));
+  };
+
+  // ----------------------------------------------------------
+  // REQ-011 — Registrar pago com modal controlado
+  // ----------------------------------------------------------
+  function ensureAlertDialog(){
+    if(document.getElementById('finoraV110AlertDialog'))return;
+    const root=document.createElement('div');
+    root.id='finoraV110AlertDialog';
+    root.className='finora-v110-alert-dialog';
+    root.innerHTML=`
+      <div class="finora-v110-alert-card" role="dialog" aria-modal="true" aria-labelledby="finoraV110AlertTitle">
+        <h3 id="finoraV110AlertTitle">Registrar fatura paga</h3>
+        <p id="finoraV110AlertDescription">Informe o valor pago. Se deixar R$ 0,00, apenas o alerta será encerrado.</p>
+        <div class="field">
+          <label>Valor pago</label>
+          <input id="finoraV110AlertValue" type="text" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00">
+        </div>
+        <div class="finora-v110-alert-actions">
+          <button type="button" class="btn btn-soft" id="finoraV110AlertCancel">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="finoraV110AlertConfirm">Confirmar pagamento</button>
+        </div>
+      </div>`;
+    document.body.appendChild(root);
+    root.addEventListener('click',e=>{if(e.target===root)closeAlertDialog();});
+    document.getElementById('finoraV110AlertCancel').onclick=closeAlertDialog;
+    document.getElementById('finoraV110AlertConfirm').onclick=commitAlertPayment;
+    const inp=document.getElementById('finoraV110AlertValue');
+    inp.addEventListener('blur',()=>{inp.value=inp.value?formatMoney110(inp.value):'';});
+  }
+
+  function closeAlertDialog(){
+    document.getElementById('finoraV110AlertDialog')?.classList.remove('open');
+    alertPaymentContext=null;
+  }
+
+  window.finoraV109MarkInvoicePaid=function(cardId,date){
+    ensureAlertDialog();
+    const card=(typeof accountCards==='function'?accountCards():[]).find(c=>String(c.id)===String(cardId));
+    if(!card)return toast('Cartão não encontrado.');
+    alertPaymentContext={cardId:String(cardId),date:String(date).slice(0,10),card};
+    const title=document.getElementById('finoraV110AlertTitle');
+    if(title)title.textContent=`Registrar ${card.name} como paga`;
+    const inp=document.getElementById('finoraV110AlertValue');
+    if(inp)inp.value='';
+    document.getElementById('finoraV110AlertDialog').classList.add('open');
+    requestAnimationFrame(()=>inp?.focus());
+  };
+
+  function commitAlertPayment(){
+    if(!alertPaymentContext)return;
+    const btn=document.getElementById('finoraV110AlertConfirm');
+    if(btn.disabled)return;
+    btn.disabled=true;
+
+    try{
+      const {cardId,date,card}=alertPaymentContext;
+      const value=parseMoney110(document.getElementById('finoraV110AlertValue')?.value||'');
+      const now=new Date().toISOString();
+
+      if(value>0){
+        const month=date.slice(0,7);
+        const existing=(Array.isArray(data)?data:[]).find(x=>
+          String(x.cardId||'')===cardId &&
+          String((typeof recordMonth==='function'?recordMonth(x):(x.vencimento||x.dataLancamento||'').slice(0,7)))===month &&
+          x.tipo==='saida' &&
+          /fatura/i.test(String(x.descricao||''))
+        );
+
+        if(existing){
+          existing.valor=value;
+          existing.valorPendente=false;
+          existing.status='pago';
+          existing.dataPagamento=typeof today==='function'?today():new Date().toISOString().slice(0,10);
+          existing.updatedAt=now;
+        }else{
+          data.push({
+            id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,
+            account:'family',
+            workspaceId:currentWorkspaceId,
+            tipo:'saida',
+            pessoa:card.owner||'Família / compartilhada',
+            expenseOwner:card.owner||'Família / compartilhada',
+            descricao:`FATURA ${String(card.name||'CARTÃO').toUpperCase()}`,
+            beneficiario:String(card.issuer||card.name||'').toUpperCase(),
+            categoria:'Cartão de crédito',
+            valor:value,
+            valorPendente:false,
+            dataLancamento:date,
+            vencimento:date,
+            status:'pago',
+            dataPagamento:typeof today==='function'?today():new Date().toISOString().slice(0,10),
+            forma:'Cartão de crédito',
+            cardId,
+            recorrente:'nao',
+            valorRecorrente:'mesmo',
+            source:'card-invoice-alert',
+            createdAt:now,
+            updatedAt:now
+          });
+        }
+        if(typeof save==='function')save();
+      }else{
+        const state=typeof loadFinoraFeatureState==='function'?loadFinoraFeatureState():{};
+        const key=`${cardId}|${date.slice(0,7)}`;
+        state.paidCardInvoices={...(state.paidCardInvoices||{})};
+        state.paidCardInvoices[key]={paid:true,paidAt:now,cardId,month:date.slice(0,7)};
+        state.updatedAt=now;
+        if(typeof saveFinoraFeatureState==='function')saveFinoraFeatureState(state);
+      }
+
+      if(typeof finoraAuditLog==='function'){
+        finoraAuditLog('ALTEROU STATUS','FATURA_CARTAO',`${cardId}|${date.slice(0,7)}`,
+          'Fatura marcada como paga pelo alerta',null,{cardId,cardName:card.name,month:date.slice(0,7),valor:value});
+      }
+
+      // Render imediato: o alerta sai no mesmo clique.
+      if(typeof render==='function')render();
+      if(typeof renderAlerts==='function')renderAlerts();
+      if(typeof renderFinoraCards==='function')renderFinoraCards();
+      if(typeof renderV84Dashboard==='function')renderV84Dashboard();
+      if(typeof renderFinoraReports==='function')renderFinoraReports();
+
+      closeAlertDialog();
+      if(typeof toast==='function')toast(value>0?'Fatura paga e contabilizada.':'Fatura marcada como paga.');
+      try{if(typeof scheduleCloudPush==='function')scheduleCloudPush()}catch(e){}
+    }catch(err){
+      console.error('FINORA 1.0.10 pagar fatura',err);
+      if(typeof toast==='function')toast('Não foi possível registrar o pagamento.');
+    }finally{
+      btn.disabled=false;
+    }
+  }
+
+  // ----------------------------------------------------------
+  // REQ-013 — ordenação visual da tabela de lançamentos
+  // ----------------------------------------------------------
+  function launchValueById(id){
+    return (Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id));
+  }
+
+  function sortKey(row,field){
+    const action=row.querySelector('[data-row-id]');
+    const id=action?.dataset.rowId||row.querySelector('[data-finora-delete="transaction"]')?.dataset.id||'';
+    const x=launchValueById(id);
+    if(!x)return '';
+    if(field==='description')return normalizeText(x.descricao);
+    if(field==='person')return normalizeText(x.tipo==='saida'?(x.expenseOwner||x.pessoa):x.pessoa);
+    if(field==='status')return normalizeText(typeof effectiveStatus==='function'?effectiveStatus(x):x.status);
+    if(field==='value')return Number(x.valor||0);
+    if(field==='file')return normalizeText(x.attachment?.name||'');
+    return String(x.vencimento||x.dataLancamento||'');
+  }
+
+  function applyLaunchOrdering(){
+    const table=document.querySelector('#tableWrap table');
+    const tbody=table?.tBodies?.[0];
+    if(!tbody)return;
+    const field=document.getElementById('launchSortField')?.value||'date';
+    const dir=document.getElementById('launchSortDirection')?.value||'asc';
+    const sign=dir==='desc'?-1:1;
+    const rows=[...tbody.rows];
+    rows.sort((a,b)=>{
+      const av=sortKey(a,field),bv=sortKey(b,field);
+      if(typeof av==='number'&&typeof bv==='number')return (av-bv)*sign;
+      return String(av).localeCompare(String(bv),'pt-BR',{numeric:true,sensitivity:'base'})*sign;
+    });
+    rows.forEach(r=>tbody.appendChild(r));
+  }
+
+  const previousRender=window.render;
+  if(typeof previousRender==='function'){
+    window.render=function(){
+      const result=previousRender.apply(this,arguments);
+      applyLaunchOrdering();
+      return result;
+    };
+  }
+
+  // ----------------------------------------------------------
+  // REQ-012 — Últimos lançamentos sem flicker:
+  // não reconstrói se o HTML calculado não mudou.
+  // ----------------------------------------------------------
+  function stableRecent110(){
+    const tbody=document.getElementById('v84RecentRows');
+    if(!tbody || typeof data==='undefined')return;
+    const month=document.getElementById('filtroMes')?.value ||
+      (typeof currentMonth==='function'?currentMonth():new Date().toISOString().slice(0,7));
+    const rows=(typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(data):data)
+      .filter(x=>{
+        try{return (typeof sameWorkspace!=='function'||sameWorkspace(x)) &&
+          (typeof recordMonth!=='function'||recordMonth(x)===month) &&
+          (typeof hasKnownValue!=='function'||hasKnownValue(x));
+        }catch(e){return false;}
+      })
+      .sort((a,b)=>{
+        const da=String(a.vencimento||a.dataLancamento||'');
+        const db=String(b.vencimento||b.dataLancamento||'');
+        if(db!==da)return db.localeCompare(da);
+        return String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||''));
+      }).slice(0,5);
+
+    const signature=rows.map(x=>`${x.id}|${x.updatedAt}|${x.status}|${x.valor}`).join('§');
+    if(signature===lastStableRecentSignature)return;
+    lastStableRecentSignature=signature;
+
+    tbody.innerHTML=rows.length?rows.map(x=>{
+      const st=typeof effectiveStatus==='function'?effectiveStatus(x):(x.status||'');
+      const person=typeof reportPersonOf==='function'?reportPersonOf(x):(x.pessoa||'—');
+      const pay=typeof reportPaymentOf==='function'?reportPaymentOf(x):(x.forma||'—');
+      const d=x.vencimento||x.dataLancamento||'';
+      return `<tr>
+        <td>${typeof brDate==='function'?brDate(d):esc110(d)}</td>
+        <td>${esc110(x.descricao||'Movimentação')}</td>
+        <td>${esc110(x.categoria||'Outros')}</td>
+        <td>${esc110(person||'—')}</td>
+        <td>${esc110(pay||'—')}</td>
+        <td class="value ${x.tipo==='entrada'?'in':'out'}">${x.tipo==='entrada'?'+':'−'} ${formatMoney110(x.valor)}</td>
+        <td><span class="finora-v84-status">${st==='pago'?(x.tipo==='entrada'?'Recebido':'Pago'):st==='atrasado'?'Atrasado':'Pendente'}</span></td>
+      </tr>`;
+    }).join(''):'<tr><td colspan="7">Nenhum lançamento no mês selecionado.</td></tr>';
+  }
+
+  // Substitui a cadeia antiga de wrappers de dashboard por uma renderização
+  // estável. O layout só é construído se ainda não existir; depois atualizamos
+  // apenas os valores e blocos que mudaram.
+  window.renderV84Dashboard=function(){
+    try{
+      if(!document.getElementById('v84DashboardGrid') && typeof buildApprovedHome==='function'){
+        buildApprovedHome();
+        hardenQuickLaunch();
+      }
+      if(typeof data==='undefined')return;
+
+      const canonical=typeof finoraCanonicalTransactions==='function'
+        ?finoraCanonicalTransactions(data)
+        :data;
+
+      const all=(canonical||[]).filter(x=>{
+        try{return typeof sameWorkspace==='function'?sameWorkspace(x):true}
+        catch(e){return true}
+      }).filter(x=>{
+        try{return typeof hasKnownValue==='function'?hasKnownValue(x):true}
+        catch(e){return true}
+      });
+
+      const selectedMonth=document.getElementById('filtroMes')?.value ||
+        (typeof currentMonth==='function'?currentMonth():new Date().toISOString().slice(0,7));
+
+      const monthRows=all.filter(x=>{
+        try{return typeof recordMonth==='function'?recordMonth(x)===selectedMonth:true}
+        catch(e){return true}
+      });
+
+      const income=monthRows.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0);
+      const expense=monthRows.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0);
+      const totalBalance=all.filter(x=>{
+        try{
+          const rm=typeof recordMonth==='function'?recordMonth(x):'';
+          return rm && rm<=selectedMonth;
+        }catch(e){return false}
+      }).reduce((s,x)=>s+(x.tipo==='entrada'?1:-1)*Number(x.valor||0),0);
+
+      const set=(id,v)=>{
+        const el=document.getElementById(id);
+        if(el)el.textContent=formatMoney110(v);
+      };
+      set('simpleEntradas',income);
+      set('simpleDespesas',expense);
+      set('simpleSaldo',income-expense);
+      set('v84SaldoGeral',totalBalance);
+
+      const alertCount=all.filter(x=>
+        x.tipo==='saida' &&
+        (typeof effectiveStatus!=='function'||effectiveStatus(x)!=='pago')
+      ).length;
+      const badge=document.getElementById('v84NotificationCount');
+      if(badge)badge.textContent=String(Math.min(alertCount,99));
+
+      stableRecent110();
+
+      const now=typeof today==='function'?today():new Date().toISOString().slice(0,10);
+      const upcoming=all
+        .filter(x=>x.tipo==='saida'&&String(x.vencimento||'')>=now)
+        .filter(x=>typeof effectiveStatus!=='function'||effectiveStatus(x)!=='pago')
+        .sort((a,b)=>String(a.vencimento||'').localeCompare(String(b.vencimento||'')))
+        .slice(0,4);
+      const box=document.getElementById('v84UpcomingRows');
+      if(box){
+        const sig=upcoming.map(x=>`${x.id}|${x.updatedAt}|${x.status}|${x.valor}`).join('§');
+        if(box.dataset.signature!==sig){
+          box.dataset.signature=sig;
+          box.innerHTML=upcoming.length?upcoming.map(x=>`
+            <div class="finora-v84-due-row">
+              <div class="finora-v84-due-icon">▣</div>
+              <div><b>${esc110(x.descricao||'Vencimento')}</b><small>${esc110(x.categoria||'Despesa')}</small></div>
+              <div class="finora-v84-due-meta">${typeof brDate==='function'?brDate(x.vencimento).slice(0,5):esc110(x.vencimento)}
+                <strong>${formatMoney110(x.valor||0)}</strong>
+              </div>
+            </div>`).join(''):'<div style="padding:18px;color:#718078;font-size:10px">Nenhum vencimento futuro.</div>';
+        }
+      }
+
+      try{if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut()}catch(e){}
+    }catch(err){
+      console.error('FINORA 1.0.10 dashboard estável',err);
+    }
+  };
+
+  // ----------------------------------------------------------
+  // REQ-014 — estabiliza o quick launch existente do cockpit.
+  // A implementação antiga já é local-first; aqui garantimos render e
+  // bloqueio único do botão.
+  // ----------------------------------------------------------
+  function hardenQuickLaunch(){
+    const btn=document.getElementById('v84QuickSave');
+    if(btn)btn.setAttribute('data-finora-v110','1');
+
+    const legacy=document.getElementById('addEntradaMes');
+    if(legacy && !legacy.dataset.v110Hardened){
+      legacy.dataset.v110Hardened='1';
+      const original=legacy.onclick;
+      legacy.onclick=function(e){
+        if(this.dataset.busy==='1')return;
+        this.dataset.busy='1';
+        try{
+          const r=original?.call(this,e);
+          // garante que a primeira operação seja visível.
+          if(typeof render==='function')render();
+          if(typeof renderV84Dashboard==='function')renderV84Dashboard();
+          return r;
+        }finally{
+          delete this.dataset.busy;
+        }
+      };
+    }
+  }
+
+  // ----------------------------------------------------------
+  // REQ-016/018 — delete local-first; nuvem nunca bloqueia feedback.
+  // ----------------------------------------------------------
+  window.deleteRow=async function(id){
+    const x=(Array.isArray(data)?data:[]).find(r=>String(r.id)===String(id) &&
+      (typeof sameWorkspace!=='function'||sameWorkspace(r)));
+    if(!x){
+      if(typeof toast==='function')toast('Lançamento não encontrado ou já excluído.');
+      if(typeof render==='function')render();
+      return false;
+    }
+    const desc=x.descricao||'este lançamento';
+    const val=formatMoney110(Number(x.valor||0));
+    if(!confirm(`Excluir "${desc}" (${val})?\n\nA exclusão será sincronizada com os outros dispositivos.`))return false;
+
+    try{
+      if(typeof recordTransactionDeletion==='function')recordTransactionDeletion(x.id);
+      data=(typeof finoraCanonicalTransactions==='function'
+        ?finoraCanonicalTransactions(data.filter(r=>String(r.id)!==String(x.id)))
+        :data.filter(r=>String(r.id)!==String(x.id)));
+      localStorage.setItem(KEY,JSON.stringify(data));
+      try{if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty()}catch(e){}
+      if(typeof finoraAuditLog==='function'){
+        finoraAuditLog('EXCLUIU','LANCAMENTO',x.id,'Lançamento excluído',x,null);
+      }
+      if(typeof render==='function')render();
+      if(typeof renderV84Dashboard==='function')renderV84Dashboard();
+      if(typeof renderFinoraReports==='function')renderFinoraReports();
+      if(typeof toast==='function')toast('Lançamento excluído. Sincronizando...');
+      try{if(typeof scheduleCloudPush==='function')scheduleCloudPush()}catch(e){}
+      return true;
+    }catch(err){
+      console.error('FINORA 1.0.10 delete',err);
+      if(typeof toast==='function')toast('Não foi possível excluir o lançamento.');
+      return false;
+    }
+  };
+
+  // ----------------------------------------------------------
+  // REQ-019/020/021 — impressão confiável e detalhada
+  // Abre documento próprio de impressão, sem depender de visibility/DOM modal.
+  // ----------------------------------------------------------
+  function reportTitle110(){
+    const tab=document.querySelector('.report-tabs button.active')?.dataset.reportTab||'overview';
+    const map={
+      overview:'Visão geral',
+      statement:'Extrato',
+      category:'Categorias',
+      person:'Por pessoa',
+      payment:'Formas de pagamento',
+      cards:'Cartões',
+      goals:'Metas'
+    };
+    return map[tab]||'Relatório';
+  }
+
+  function printRowsTable(rows){
+    if(!rows.length)return '<div class="empty">Nenhum registro para os filtros selecionados.</div>';
+    return `<table>
+      <thead><tr>
+        <th>Data</th><th>Descrição</th><th>Pessoa</th><th>Categoria</th>
+        <th>Forma</th><th>Status</th><th class="num">Valor</th>
+      </tr></thead>
+      <tbody>${rows.map(x=>{
+        const d=typeof referenceDate==='function'?referenceDate(x):(x.vencimento||x.dataLancamento||'');
+        const st=typeof effectiveStatus==='function'?effectiveStatus(x):(x.status||'');
+        const person=typeof reportPersonOf==='function'?reportPersonOf(x):(x.pessoa||'');
+        const payment=typeof reportPaymentOf==='function'?reportPaymentOf(x):(x.forma||'');
+        return `<tr>
+          <td>${esc110(typeof reportBRDate==='function'?reportBRDate(d):d)}</td>
+          <td><strong>${esc110(x.descricao||'Movimentação')}</strong></td>
+          <td>${esc110(person||'—')}</td>
+          <td>${esc110(x.categoria||'Outros')}</td>
+          <td>${esc110(payment||'—')}</td>
+          <td>${esc110(st==='pago'?(x.tipo==='entrada'?'Recebido':'Pago'):st==='atrasado'?'Atrasado':'Pendente')}</td>
+          <td class="num ${x.tipo==='entrada'?'in':'out'}">${x.tipo==='entrada'?'+':'−'} ${formatMoney110(x.valor||0)}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  }
+
+  window.printFinoraReport=function(){
+    try{
+      if(typeof renderFinoraReports==='function')renderFinoraReports();
+      const rows=typeof reportRows==='function'?reportRows():[];
+      const known=rows.filter(x=>typeof simpleKnownValue!=='function'||simpleKnownValue(x));
+      const credits=known.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0);
+      const debits=known.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0);
+      const title=reportTitle110();
+      const period=typeof reportPeriodLabel==='function'?reportPeriodLabel():'';
+      const workspace=currentWorkspaceName||'Meu ambiente';
+
+      let specific='';
+      const tab=document.querySelector('.report-tabs button.active')?.dataset.reportTab||'overview';
+      if(tab==='goals'){
+        specific=document.getElementById('reportGoalsBody')?.innerHTML||'';
+      }else if(tab==='category'||tab==='person'||tab==='payment'||tab==='cards'){
+        specific=document.getElementById('reportBreakdownRows')?.innerHTML||'';
+      }
+
+      const w=window.open('','_blank');
+      if(!w){
+        if(typeof toast==='function')toast('O navegador bloqueou a janela de impressão. Permita pop-ups para o FINORA.');
+        return;
+      }
+
+      w.document.open();
+      w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+        <title>FINORA — ${esc110(title)}</title>
+        <style>
+          @page{size:A4 portrait;margin:9mm}
+          *{box-sizing:border-box}
+          body{margin:0;color:#21322a;font-family:Arial,sans-serif;font-size:9px}
+          header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0f5a3e;padding-bottom:6px;margin-bottom:7px}
+          h1{margin:0;color:#0f5a3e;font:700 18px Georgia,serif}
+          h2{margin:12px 0 5px;font-size:11px;color:#174b36}
+          .meta{text-align:right;color:#66756d;line-height:1.4}
+          .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:6px 0 9px}
+          .kpi{border:1px solid #dce5e0;border-radius:5px;padding:6px}
+          .kpi span{display:block;color:#6b7871;font-size:7px;text-transform:uppercase}
+          .kpi strong{display:block;margin-top:2px;font-size:11px}
+          table{width:100%;border-collapse:collapse;table-layout:fixed}
+          th{background:#eef4f0;color:#315c49;text-align:left;font-size:7px;padding:4px;border-bottom:1px solid #cfdad4}
+          td{padding:4px;border-bottom:1px solid #e8edea;vertical-align:top;word-break:break-word}
+          tr{break-inside:avoid;page-break-inside:avoid}
+          .num{text-align:right;white-space:nowrap}
+          .in{color:#16754a}.out{color:#a13a32}
+          .specific{margin:7px 0}
+          .specific .report-breakdown-row{display:grid;grid-template-columns:160px 1fr 90px;gap:6px;padding:4px 0;border-bottom:1px solid #edf1ee}
+          .specific .report-breakdown-track{height:5px;background:#edf2ef;margin-top:5px}
+          .specific .report-breakdown-track i{display:block;height:100%;background:#0f5a3e}
+          .empty{padding:10px;border:1px dashed #ccd9d2;color:#6b7871}
+          footer{margin-top:8px;padding-top:5px;border-top:1px solid #dfe6e2;color:#7a8880;font-size:7px}
+        </style></head><body>
+        <header>
+          <div><h1>FINORA</h1><div>${esc110(title)}</div></div>
+          <div class="meta">${esc110(workspace)}<br>${esc110(period)}</div>
+        </header>
+        <div class="kpis">
+          <div class="kpi"><span>Créditos</span><strong>${formatMoney110(credits)}</strong></div>
+          <div class="kpi"><span>Débitos</span><strong>${formatMoney110(debits)}</strong></div>
+          <div class="kpi"><span>Saldo do período</span><strong>${formatMoney110(credits-debits)}</strong></div>
+        </div>
+        ${specific?`<h2>${esc110(title)}</h2><div class="specific">${specific}</div>`:''}
+        <h2>Detalhamento dos registros (${rows.length})</h2>
+        ${printRowsTable(rows)}
+        <footer>FINORA · Versão 1.0.10 · Relatório gerado em ${new Date().toLocaleString('pt-BR')}</footer>
+        <script>window.addEventListener('load',()=>{setTimeout(()=>window.print(),120)});<\/script>
+        </body></html>`);
+      w.document.close();
+    }catch(err){
+      console.error('FINORA 1.0.10 print',err);
+      if(typeof toast==='function')toast('Não foi possível preparar a impressão.');
+    }
+  };
+
+  // ----------------------------------------------------------
+  // Inicialização e máscaras
+  // ----------------------------------------------------------
+  function install(){
+    window.FINORA_RELEASE=RELEASE;
+
+    const expiry=document.getElementById('cardExpiry');
+    if(expiry && !expiry.dataset.v110){
+      expiry.dataset.v110='1';
+      expiry.addEventListener('input',()=>{
+        const masked=expiryMask(expiry.value);
+        if(masked!==expiry.value)expiry.value=masked;
+      });
+      expiry.addEventListener('blur',()=>{
+        if(expiry.value&&!validExpiry(expiry.value)){
+          expiry.setCustomValidity('Use MM/AA e informe um mês entre 01 e 12.');
+        }else expiry.setCustomValidity('');
+      });
+    }
+
+    ['cardLimit','cardAnnualFee'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el||el.dataset.v110)return;
+      el.dataset.v110='1';
+      el.addEventListener('focus',()=>{
+        if(parseMoney110(el.value)===0)el.value='';
+      });
+      el.addEventListener('blur',()=>{
+        if(el.value)el.value=formatMoney110(el.value);
+      });
+    });
+
+    document.getElementById('finoraCardSearch')?.addEventListener('input',()=>renderFinoraCards());
+    document.getElementById('finoraCardSort')?.addEventListener('change',()=>renderFinoraCards());
+    document.getElementById('launchSortField')?.addEventListener('change',applyLaunchOrdering);
+    document.getElementById('launchSortDirection')?.addEventListener('change',applyLaunchOrdering);
+
+    hardenQuickLaunch();
+    ensureAlertDialog();
+
+    // Migração não destrutiva dos cartões legados: só adiciona o default Crédito.
+    try{
+      const cards=typeof loadFinoraCards==='function'?loadFinoraCards():[];
+      let changed=false;
+      cards.forEach(c=>{
+        if(!c.cardType&&!c.type){
+          c.cardType='credito';
+          c.type='credito';
+          c.updatedAt=c.updatedAt||new Date().toISOString();
+          changed=true;
+        }
+      });
+      if(changed){
+        saveFinoraCards(cards);
+        fireAndForgetCloud();
+      }
+    }catch(e){console.warn('FINORA 1.0.10 migração local de cartões',e)}
+
+    try{renderFinoraCards()}catch(e){}
+    try{applyLaunchOrdering()}catch(e){}
+    try{stableRecent110()}catch(e){}
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',install,{once:true});
+  }else install();
+
+  // Diagnóstico técnico simples para validação da Patch.
+  window.finoraV110Health=function(){
+    const cards=typeof accountCards==='function'?accountCards():[];
+    const tx=typeof data!=='undefined'&&Array.isArray(data)?data:[];
+    return {
+      release:window.FINORA_RELEASE,
+      transactions:tx.length,
+      uniqueTransactionIds:new Set(tx.map(x=>String(x.id||'')).filter(Boolean)).size,
+      cards:cards.length,
+      debitCards:cards.filter(c=>canonicalCardType(c)==='debito').length,
+      cloudDirty:typeof finoraCloudDirty!=='undefined'?finoraCloudDirty:null,
+      cloudPushPending:typeof finoraCloudPushPending!=='undefined'?finoraCloudPushPending:null
+    };
+  };
+})();
+</script>
+
+
+<script id="finora-v110-report-tabs">
+(function(){
+  const previous=window.setReportTab;
+  window.setReportTab=function(tab,btn){
+    if(typeof previous==='function')previous(tab,btn);
+    const goals=document.getElementById('reportGoals');
+    const breakdown=document.getElementById('reportBreakdown');
+    const overview=document.getElementById('reportOverview');
+    const statement=document.getElementById('reportStatement');
+    if(goals)goals.classList.toggle('active',tab==='goals');
+    if(breakdown)breakdown.classList.toggle('active',['category','person','payment','cards'].includes(tab));
+    if(overview)overview.classList.toggle('active',tab==='overview');
+    if(statement)statement.classList.toggle('active',tab==='statement');
+    try{if(typeof renderFinoraReports==='function')renderFinoraReports()}catch(e){}
+  };
 })();
 </script>
 
