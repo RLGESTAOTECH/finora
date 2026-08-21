@@ -5857,6 +5857,63 @@ body.finora-v88-sidebar-collapsed .shell{
 }
 </style>
 
+
+<style id="finora-v109-card-brands">
+/* FINORA 1.0.9 — bandeiras visuais dos cartões */
+.card-brand-logo{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  min-height:28px!important;
+  position:relative;
+  z-index:3;
+}
+.finora-card-brand-svg{
+  display:block;
+  width:auto;
+  height:26px;
+  max-width:74px;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.10));
+}
+.finora-card-brand-word{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:23px;
+  padding:3px 7px;
+  border-radius:5px;
+  background:rgba(255,255,255,.94);
+  color:#143e32;
+  font:800 9px Verdana,sans-serif;
+  letter-spacing:.25px;
+  box-shadow:0 1px 3px rgba(0,0,0,.13);
+}
+.finora-card-brand-word.hipercard{
+  background:#b71928;
+  color:#fff;
+  text-transform:lowercase;
+  font-style:italic;
+}
+.finora-card-brand-word.amex{
+  background:#1684c5;
+  color:#fff;
+  border:1px solid rgba(255,255,255,.55);
+  letter-spacing:.45px;
+}
+.finora-card-brand-word.elo{
+  background:#111;
+  color:#fff;
+  padding-left:8px;
+  padding-right:8px;
+}
+.finora-card-brand-word.other{
+  background:rgba(255,255,255,.20);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.45);
+  box-shadow:none;
+}
+</style>
+
 </head>
 <body>
 
@@ -15412,6 +15469,73 @@ window.FINORA_RELEASE='1.0.9';
   });
 
   window.FINORA_RELEASE=V109;
+})();
+</script>
+
+
+<script id="finora-v109-card-brand-art">
+(function(){
+  function brandSvgVisa(){
+    return `
+      <svg class="finora-card-brand-svg" viewBox="0 0 92 30" aria-label="Visa" role="img">
+        <rect width="92" height="30" rx="5" fill="rgba(255,255,255,.96)"/>
+        <text x="46" y="21" text-anchor="middle"
+          font-family="Arial, Helvetica, sans-serif" font-size="19"
+          font-style="italic" font-weight="900" fill="#163f89">VISA</text>
+      </svg>`;
+  }
+
+  function brandSvgMastercard(){
+    return `
+      <svg class="finora-card-brand-svg" viewBox="0 0 64 38" aria-label="Mastercard" role="img">
+        <rect width="64" height="38" rx="6" fill="rgba(255,255,255,.94)"/>
+        <circle cx="26" cy="19" r="11" fill="#EB001B"/>
+        <circle cx="38" cy="19" r="11" fill="#F79E1B"/>
+        <path d="M32 10.6a11 11 0 0 1 0 16.8 11 11 0 0 1 0-16.8z" fill="#FF5F00"/>
+      </svg>`;
+  }
+
+  function brandSvgElo(){
+    return `
+      <svg class="finora-card-brand-svg" viewBox="0 0 70 34" aria-label="Elo" role="img">
+        <rect width="70" height="34" rx="6" fill="rgba(255,255,255,.96)"/>
+        <g transform="translate(7 6)">
+          <circle cx="11" cy="11" r="10" fill="#111"/>
+          <path d="M7 7.5h7.5c2.2 0 3.5 1.1 3.5 2.8 0 1.2-.6 2.1-1.8 2.6 1.5.5 2.3 1.5 2.3 3 0 2.1-1.6 3.4-4.2 3.4H7V7.5z" fill="#fff" opacity=".92"/>
+          <rect x="31" y="4" width="5" height="14" rx="2.5" fill="#FFD100"/>
+          <circle cx="45" cy="11" r="5" fill="#00A4E4"/>
+          <circle cx="55" cy="11" r="5" fill="#EF3340"/>
+        </g>
+      </svg>`;
+  }
+
+  function brandSvgAmex(){
+    return `<span class="finora-card-brand-word amex" aria-label="American Express">AMERICAN<br>EXPRESS</span>`;
+  }
+
+  function brandSvgHipercard(){
+    return `<span class="finora-card-brand-word hipercard" aria-label="Hipercard">hipercard</span>`;
+  }
+
+  // Redefine o gerador já existente, preservando a identificação automática.
+  window.cardBrandMarkup=function(brand){
+    switch(String(brand||'').toLowerCase()){
+      case 'visa': return brandSvgVisa();
+      case 'mastercard': return brandSvgMastercard();
+      case 'elo': return brandSvgElo();
+      case 'amex': return brandSvgAmex();
+      case 'hipercard': return brandSvgHipercard();
+      default: return '<span class="finora-card-brand-word other">CARTÃO</span>';
+    }
+  };
+
+  // Re-renderiza os cartões já carregados para aplicar a nova bandeira.
+  requestAnimationFrame(()=>{
+    try{
+      if(typeof renderFinoraCards==='function')renderFinoraCards();
+      if(typeof render==='function')render();
+    }catch(e){}
+  });
 })();
 </script>
 
