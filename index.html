@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.7">
+<meta name="finora-version" content="1.0.8">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -5630,6 +5630,41 @@ body.finora-v88-sidebar-collapsed .shell{
 @media(max-width:420px){
   .finora-mobile-more-grid{grid-template-columns:1fr;}
   .finora-mobile-more-action{min-height:66px;}
+}
+</style>
+
+
+<style id="finora-v108-launch-scroll-fix">
+/* FINORA 1.0.8 — correção de rolagem da tela Todos os lançamentos (web)
+   O modal passa a ser o único responsável pela rolagem vertical.
+   A tabela mantém somente rolagem horizontal, evitando duas áreas
+   verticais concorrentes que podiam prender o scroll em notebooks/desktops. */
+@media (min-width: 821px) and (hover:hover) and (pointer:fine){
+  #simpleLaunchPanel.section-modal-active{
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    max-height:92vh!important;
+    scrollbar-gutter:stable;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  #simpleLaunchPanel.section-modal-active .table-wrap,
+  #simpleLaunchPanel.section-modal-active .sheet-table-wrap{
+    max-height:none!important;
+    overflow-x:auto!important;
+    overflow-y:visible!important;
+  }
+
+  #simpleLaunchPanel.section-modal-active #launchListPanel{
+    overflow:visible!important;
+    max-height:none!important;
+  }
+
+  #simpleLaunchPanel.section-modal-active .footer-tools{
+    position:relative!important;
+    z-index:2!important;
+    background:#fff!important;
+  }
 }
 </style>
 
@@ -11864,7 +11899,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
     const footer=document.createElement('footer');
     footer.className='finora-v84-footer';
-    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.7</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
+    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.8</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
     home.appendChild(footer);
 
     // quick launch controls
@@ -14750,7 +14785,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
 
 <script id="finora-v107-release-marker">
-window.FINORA_RELEASE='1.0.7';
+window.FINORA_RELEASE='1.0.8';
 </script>
 
 </body>
