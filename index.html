@@ -15539,5 +15539,152 @@ window.FINORA_RELEASE='1.0.9';
 })();
 </script>
 
+
+<script id="finora-v109-kpi-dedup-hotfix">
+(function(){
+  /*
+    FINORA 1.0.9 — hotfix de consolidação dos KPIs.
+
+    Diagnóstico confirmado em produção:
+    - Supabase (agosto/2026): entradas 21.512,14 / saídas 10.070,87.
+    - Dashboard: exatamente o dobro.
+    - Supabase: 93 lançamentos e nenhum ID repetido.
+
+    Portanto o banco está íntegro; a duplicidade ocorre somente na camada
+    em memória/renderização. A correção abaixo consolida por ID antes de
+    qualquer totalização do cockpit.
+  */
+
+  function uniqueTx(rows){
+    const map=new Map();
+    (Array.isArray(rows)?rows:[]).forEach((row,index)=>{
+      if(!row)return;
+      const id=String(row.id||'').trim();
+
+      // Registros FINORA normais possuem ID. Para legados sem ID,
+      // usa uma chave estável apenas para a renderização.
+      const key=id || [
+        row.workspaceId||'',
+        row.tipo||'',
+        row.descricao||'',
+        row.pessoa||'',
+        row.valor||0,
+        row.dataLancamento||'',
+        row.vencimento||'',
+        index
+      ].join('|');
+
+      const prev=map.get(key);
+      if(!prev){
+        map.set(key,row);
+        return;
+      }
+
+      // Em caso de duas cópias do mesmo ID na memória, conserva a mais recente.
+      const rt=Date.parse(row.updatedAt||row.createdAt||0)||0;
+      const pt=Date.parse(prev.updatedAt||prev.createdAt||0)||0;
+      if(rt>=pt)map.set(key,row);
+    });
+    return [...map.values()];
+  }
+
+  window.finoraUniqueTransactions=uniqueTx;
+
+  // Torna a função-base do mês imune a cópias do mesmo lançamento em memória.
+  window.simpleMonthRows=function(){
+    const month=document.getElementById('filtroMes')?.value ||
+      (typeof currentMonth==='function'?currentMonth():new Date().toISOString().slice(0,7));
+
+    const rows=uniqueTx(typeof data!=='undefined'?data:[]);
+    return rows.filter(x=>{
+      try{
+        const same=typeof sameWorkspace==='function'?sameWorkspace(x):true;
+        const rm=typeof recordMonth==='function'?recordMonth(x):
+          String(x.vencimento||x.dataLancamento||'').slice(0,7);
+        return same && rm===month;
+      }catch(e){
+        return false;
+      }
+    });
+  };
+
+  function money109(v){
+    try{
+      if(typeof moneyV84==='function')return moneyV84(v);
+      if(typeof money==='function')return money(v);
+    }catch(e){}
+    return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  }
+
+  function correctCockpitTotals(){
+    if(typeof data==='undefined')return;
+
+    const all=uniqueTx(data).filter(x=>{
+      try{return typeof sameWorkspace==='function'?sameWorkspace(x):true}
+      catch(e){return true}
+    });
+
+    const month=document.getElementById('filtroMes')?.value ||
+      (typeof currentMonth==='function'?currentMonth():new Date().toISOString().slice(0,7));
+
+    const monthRows=all.filter(x=>{
+      const rm=typeof recordMonth==='function'
+        ?recordMonth(x)
+        :String(x.vencimento||x.dataLancamento||'').slice(0,7);
+      return rm===month;
+    });
+
+    const income=monthRows
+      .filter(x=>x.tipo==='entrada')
+      .reduce((s,x)=>s+Number(x.valor||0),0);
+
+    const expense=monthRows
+      .filter(x=>x.tipo==='saida')
+      .reduce((s,x)=>s+Number(x.valor||0),0);
+
+    const balanceRows=all.filter(x=>{
+      const rm=typeof recordMonth==='function'
+        ?recordMonth(x)
+        :String(x.vencimento||x.dataLancamento||'').slice(0,7);
+      return rm && rm<=month;
+    });
+
+    const totalBalance=balanceRows.reduce(
+      (s,x)=>s+(x.tipo==='entrada'?1:-1)*Number(x.valor||0),0
+    );
+
+    const set=(id,v)=>{
+      const el=document.getElementById(id);
+      if(el)el.textContent=money109(v);
+    };
+
+    set('simpleEntradas',income);
+    set('simpleDespesas',expense);
+    set('simpleSaldo',income-expense);
+    set('v84SaldoGeral',totalBalance);
+  }
+
+  // Mantém toda a renderização existente e corrige os KPIs no final.
+  const previous=window.renderV84Dashboard;
+  if(typeof previous==='function'){
+    window.renderV84Dashboard=function(){
+      const result=previous.apply(this,arguments);
+      correctCockpitTotals();
+      return result;
+    };
+  }
+
+  // Atualiza a tela atual sem gravar ou alterar qualquer lançamento.
+  requestAnimationFrame(()=>{
+    try{
+      if(typeof renderV84Dashboard==='function')renderV84Dashboard();
+      else correctCockpitTotals();
+    }catch(e){
+      console.error('FINORA 1.0.9 KPI dedup hotfix',e);
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
