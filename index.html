@@ -6669,7 +6669,43 @@ const KEY='controleFinanceiroFamiliar_v1';
 let account='family';
 let currentWorkspaceId='';
 let currentWorkspaceName='Meu ambiente';
-let data=JSON.parse(localStorage.getItem(KEY)||'[]');
+function finoraCanonicalTransactions(rows){
+  const map=new Map();
+  const noId=[];
+  (Array.isArray(rows)?rows:[]).forEach((raw,index)=>{
+    if(!raw)return;
+    const id=String(raw.id||'').trim();
+    if(!id){
+      noId.push(raw);
+      return;
+    }
+    const prev=map.get(id);
+    if(!prev){
+      map.set(id,raw);
+      return;
+    }
+    // If duplicate copies of the same transaction exist locally, keep
+    // the newest representation. Supabase remains the source of truth.
+    const rt=Date.parse(raw.updatedAt||raw.createdAt||0)||0;
+    const pt=Date.parse(prev.updatedAt||prev.createdAt||0)||0;
+    if(rt>=pt)map.set(id,raw);
+  });
+  return [...map.values(),...noId];
+}
+
+let data=finoraCanonicalTransactions(
+  JSON.parse(localStorage.getItem(KEY)||'[]')
+);
+
+// Repair contaminated local caches from older builds.
+// Example observed in production: 186 local rows / 93 unique IDs.
+try{
+  const rawLocal=JSON.parse(localStorage.getItem(KEY)||'[]');
+  if(Array.isArray(rawLocal) && rawLocal.length!==data.length){
+    localStorage.setItem(KEY,JSON.stringify(data));
+    console.info(`FINORA: cache local normalizado (${rawLocal.length} → ${data.length} lançamentos).`);
+  }
+}catch(e){}
 let editingAttachment=null;
 
 const $=id=>document.getElementById(id);
@@ -6693,6 +6729,7 @@ function save(){
   if(currentWorkspaceId){
     data.forEach(x=>{if(sameWorkspace(x) && !x.workspaceId)x.workspaceId=currentWorkspaceId});
   }
+  data=finoraCanonicalTransactions(data);
   localStorage.setItem(KEY,JSON.stringify(data));
   if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
   scheduleCloudPush();
@@ -9891,7 +9928,7 @@ function recordTransactionDeletion(id){
 }
 
 function cloudStatePayload(){
-  const workspaceRows=data.filter(x=>sameWorkspace(x));
+  const workspaceRows=finoraCanonicalTransactions(data.filter(x=>sameWorkspace(x)));
   const cards=accountCards();
   const members=familyMembersDirectory()
     .filter(u=>u.workspaceId===currentWorkspaceId)
@@ -10138,8 +10175,10 @@ async function pushCloudState(showToast=false){
     }
 
     // Atualiza o navegador com o mesmo estado consolidado que foi salvo.
-    data=data.filter(x=>!sameWorkspace(x)).concat(
-      payload.transactions.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'}))
+    data=finoraCanonicalTransactions(
+      data.filter(x=>!sameWorkspace(x)).concat(
+        payload.transactions.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'}))
+      )
     );
     localStorage.setItem(KEY,JSON.stringify(data));
     saveDeletedTransactions(payload.transactionTombstones||[]);
@@ -10250,8 +10289,10 @@ async function pullCloudState(showToast=false){
       ? remoteTx
       : mergeTransactions(localTx,remoteTx,mergedTombstones);
 
-    data=data.filter(x=>!sameWorkspace(x)).concat(
-      mergedTx.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'}))
+    data=finoraCanonicalTransactions(
+      data.filter(x=>!sameWorkspace(x)).concat(
+        mergedTx.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'}))
+      )
     );
     localStorage.setItem(KEY,JSON.stringify(data));
     saveDeletedTransactions(
@@ -15540,148 +15581,24 @@ window.FINORA_RELEASE='1.0.9';
 </script>
 
 
-<script id="finora-v109-kpi-dedup-hotfix">
+<script id="finora-v109-root-dedup-fix">
 (function(){
-  /*
-    FINORA 1.0.9 — hotfix de consolidação dos KPIs.
-
-    Diagnóstico confirmado em produção:
-    - Supabase (agosto/2026): entradas 21.512,14 / saídas 10.070,87.
-    - Dashboard: exatamente o dobro.
-    - Supabase: 93 lançamentos e nenhum ID repetido.
-
-    Portanto o banco está íntegro; a duplicidade ocorre somente na camada
-    em memória/renderização. A correção abaixo consolida por ID antes de
-    qualquer totalização do cockpit.
-  */
-
-  function uniqueTx(rows){
-    const map=new Map();
-    (Array.isArray(rows)?rows:[]).forEach((row,index)=>{
-      if(!row)return;
-      const id=String(row.id||'').trim();
-
-      // Registros FINORA normais possuem ID. Para legados sem ID,
-      // usa uma chave estável apenas para a renderização.
-      const key=id || [
-        row.workspaceId||'',
-        row.tipo||'',
-        row.descricao||'',
-        row.pessoa||'',
-        row.valor||0,
-        row.dataLancamento||'',
-        row.vencimento||'',
-        index
-      ].join('|');
-
-      const prev=map.get(key);
-      if(!prev){
-        map.set(key,row);
-        return;
-      }
-
-      // Em caso de duas cópias do mesmo ID na memória, conserva a mais recente.
-      const rt=Date.parse(row.updatedAt||row.createdAt||0)||0;
-      const pt=Date.parse(prev.updatedAt||prev.createdAt||0)||0;
-      if(rt>=pt)map.set(key,row);
-    });
-    return [...map.values()];
-  }
-
-  window.finoraUniqueTransactions=uniqueTx;
-
-  // Torna a função-base do mês imune a cópias do mesmo lançamento em memória.
-  window.simpleMonthRows=function(){
-    const month=document.getElementById('filtroMes')?.value ||
-      (typeof currentMonth==='function'?currentMonth():new Date().toISOString().slice(0,7));
-
-    const rows=uniqueTx(typeof data!=='undefined'?data:[]);
-    return rows.filter(x=>{
-      try{
-        const same=typeof sameWorkspace==='function'?sameWorkspace(x):true;
-        const rm=typeof recordMonth==='function'?recordMonth(x):
-          String(x.vencimento||x.dataLancamento||'').slice(0,7);
-        return same && rm===month;
-      }catch(e){
-        return false;
-      }
-    });
+  window.finoraDataHealth=function(){
+    const rows=Array.isArray(data)?data:[];
+    const ids=rows.map(x=>String(x?.id||'')).filter(Boolean);
+    return {
+      release:window.FINORA_RELEASE||document.querySelector('meta[name="finora-version"]')?.content,
+      total:rows.length,
+      idsUnicos:new Set(ids).size,
+      duplicados:ids.length-new Set(ids).size
+    };
   };
-
-  function money109(v){
-    try{
-      if(typeof moneyV84==='function')return moneyV84(v);
-      if(typeof money==='function')return money(v);
-    }catch(e){}
-    return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-  }
-
-  function correctCockpitTotals(){
-    if(typeof data==='undefined')return;
-
-    const all=uniqueTx(data).filter(x=>{
-      try{return typeof sameWorkspace==='function'?sameWorkspace(x):true}
-      catch(e){return true}
-    });
-
-    const month=document.getElementById('filtroMes')?.value ||
-      (typeof currentMonth==='function'?currentMonth():new Date().toISOString().slice(0,7));
-
-    const monthRows=all.filter(x=>{
-      const rm=typeof recordMonth==='function'
-        ?recordMonth(x)
-        :String(x.vencimento||x.dataLancamento||'').slice(0,7);
-      return rm===month;
-    });
-
-    const income=monthRows
-      .filter(x=>x.tipo==='entrada')
-      .reduce((s,x)=>s+Number(x.valor||0),0);
-
-    const expense=monthRows
-      .filter(x=>x.tipo==='saida')
-      .reduce((s,x)=>s+Number(x.valor||0),0);
-
-    const balanceRows=all.filter(x=>{
-      const rm=typeof recordMonth==='function'
-        ?recordMonth(x)
-        :String(x.vencimento||x.dataLancamento||'').slice(0,7);
-      return rm && rm<=month;
-    });
-
-    const totalBalance=balanceRows.reduce(
-      (s,x)=>s+(x.tipo==='entrada'?1:-1)*Number(x.valor||0),0
-    );
-
-    const set=(id,v)=>{
-      const el=document.getElementById(id);
-      if(el)el.textContent=money109(v);
-    };
-
-    set('simpleEntradas',income);
-    set('simpleDespesas',expense);
-    set('simpleSaldo',income-expense);
-    set('v84SaldoGeral',totalBalance);
-  }
-
-  // Mantém toda a renderização existente e corrige os KPIs no final.
-  const previous=window.renderV84Dashboard;
-  if(typeof previous==='function'){
-    window.renderV84Dashboard=function(){
-      const result=previous.apply(this,arguments);
-      correctCockpitTotals();
-      return result;
-    };
-  }
-
-  // Atualiza a tela atual sem gravar ou alterar qualquer lançamento.
   requestAnimationFrame(()=>{
     try{
-      if(typeof renderV84Dashboard==='function')renderV84Dashboard();
-      else correctCockpitTotals();
-    }catch(e){
-      console.error('FINORA 1.0.9 KPI dedup hotfix',e);
-    }
+      data=finoraCanonicalTransactions(data);
+      localStorage.setItem(KEY,JSON.stringify(data));
+      if(typeof render==='function')render();
+    }catch(e){console.error('FINORA root dedup fix',e)}
   });
 })();
 </script>
