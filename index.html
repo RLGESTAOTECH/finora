@@ -5999,6 +5999,112 @@ body.finora-v88-sidebar-collapsed .shell{
 }
 </style>
 
+
+<style id="finora-v110-r2-style">
+/* ===== Homologação R2 ===== */
+
+/* Status semântico em Últimos lançamentos */
+.finora-v84-status.finora-status-pago,
+.finora-v84-status.finora-status-recebido{
+  background:#e7f3eb!important;color:#1e6b47!important;border:1px solid #cde4d5!important;
+}
+.finora-v84-status.finora-status-pendente{
+  background:#fff3d9!important;color:#846015!important;border:1px solid #eddcae!important;
+}
+.finora-v84-status.finora-status-atrasado{
+  background:#f8e7e4!important;color:#a23830!important;border:1px solid #ebc8c3!important;
+}
+
+/* Privacidade dos valores */
+.finora-privacy-toggle{
+  margin-left:auto;
+  border:1px solid #d9e3dd;
+  background:#fff;
+  color:#315c49;
+  border-radius:9px;
+  padding:8px 11px;
+  cursor:pointer;
+  font:700 9px Verdana,sans-serif;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+body.finora-values-hidden #simpleEntradas,
+body.finora-values-hidden #simpleDespesas,
+body.finora-values-hidden #simpleSaldo,
+body.finora-values-hidden #v84SaldoGeral,
+body.finora-values-hidden #homeCategoryDonutTotal,
+body.finora-values-hidden #homeCategoryLegend .report-legend-row > span{
+  color:transparent!important;
+  position:relative!important;
+  text-shadow:none!important;
+  user-select:none!important;
+}
+body.finora-values-hidden #simpleEntradas::after,
+body.finora-values-hidden #simpleDespesas::after,
+body.finora-values-hidden #simpleSaldo::after,
+body.finora-values-hidden #v84SaldoGeral::after,
+body.finora-values-hidden #homeCategoryDonutTotal::after,
+body.finora-values-hidden #homeCategoryLegend .report-legend-row > span::after{
+  content:'••••••';
+  color:#53675d!important;
+  position:absolute;
+  inset:0 auto auto 0;
+  white-space:nowrap;
+}
+
+/* Ferramentas do card Despesas por categoria */
+.finora-v88-chart-tools{position:relative!important}
+.finora-v88-chart-period{
+  cursor:default!important;
+}
+.finora-r2-chart-menu{
+  display:none;
+  position:absolute;
+  right:0;
+  top:calc(100% + 7px);
+  width:230px;
+  z-index:9000;
+  background:#fff;
+  border:1px solid #dce5e0;
+  border-radius:11px;
+  box-shadow:0 14px 38px rgba(28,57,44,.16);
+  padding:8px;
+}
+.finora-r2-chart-menu.open{display:block}
+.finora-r2-chart-menu button{
+  width:100%;
+  border:0;
+  background:transparent;
+  text-align:left;
+  padding:9px 10px;
+  border-radius:7px;
+  cursor:pointer;
+  color:#34483e;
+  font:9px Verdana,sans-serif;
+}
+.finora-r2-chart-menu button:hover{background:#edf4ef;color:#0f5a3e}
+.finora-r2-chart-menu .state{
+  float:right;
+  color:#718078;
+}
+
+/* Formulário novo: opção vazia realmente sem seleção */
+#cardFormPanel select:invalid{color:#78867f}
+
+/* Impressão contextual */
+.finora-r2-print-bars{display:grid;gap:6px;margin-top:8px}
+.finora-r2-print-bar{display:grid;grid-template-columns:150px 1fr 90px;gap:8px;align-items:center}
+.finora-r2-print-track{height:8px;background:#edf2ef;border-radius:999px;overflow:hidden}
+.finora-r2-print-track i{display:block;height:100%;background:#0f5a3e}
+.finora-r2-print-bar b{font-size:8px}.finora-r2-print-bar span{text-align:right;font-size:8px}
+
+@media(max-width:700px){
+  .finora-privacy-toggle{margin-left:0}
+  .finora-r2-chart-menu{right:auto;left:0}
+}
+</style>
+
 </head>
 <body>
 
@@ -6368,7 +6474,7 @@ body.finora-v88-sidebar-collapsed .shell{
 </section>
 
 <section class="popup-only-panel panel card-form-panel" id="cardFormPanel">
-  <div class="panel-head"><h2>Cadastrar cartão</h2><button type="button" class="simple-close" onclick="toggleCardForm(false)">Fechar</button></div>
+  <div class="panel-head"><h2>Cadastrar cartão</h2><button type="button" class="simple-close" onclick="finoraCloseCardFormR2()">Fechar</button></div>
   <div class="card-form-grid">
     <input type="hidden" id="cardEditId">
     <div class="field"><label>Nome do cartão</label><input id="cardName" placeholder="Ex.: Carrefour Mastercard"></div>
@@ -6376,6 +6482,7 @@ body.finora-v88-sidebar-collapsed .shell{
     <div class="field"><label>Titular</label><select id="cardOwner"></select></div>
     <div class="field"><label>Tipo do cartão</label>
       <select id="cardType">
+        <option value=""></option>
         <option value="credito">Crédito</option>
         <option value="debito">Débito</option>
         <option value="debito_credito">Débito e crédito</option>
@@ -6388,6 +6495,7 @@ body.finora-v88-sidebar-collapsed .shell{
     <div class="field"><label>Anuidade</label><input id="cardAnnualFee" type="text" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00"><div class="file-note">Campo cadastral; não gera lançamentos automáticos.</div></div>
     <div class="field"><label>Bandeira</label>
       <select id="cardBrand">
+        <option value=""></option>
         <option value="auto">Identificar automaticamente</option>
         <option value="visa">Visa</option>
         <option value="mastercard">Mastercard</option>
@@ -12306,7 +12414,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
     const footer=document.createElement('footer');
     footer.className='finora-v84-footer';
-    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.9</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
+    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.10</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
     home.appendChild(footer);
 
     // quick launch controls
@@ -16626,8 +16734,8 @@ window.FINORA_RELEASE='1.0.10';
         }
       });
       if(changed){
+        // R2: migração local não deve bloquear a primeira hidratação da nuvem.
         saveFinoraCards(cards);
-        fireAndForgetCloud();
       }
     }catch(e){console.warn('FINORA 1.0.10 migração local de cartões',e)}
 
@@ -16672,6 +16780,913 @@ window.FINORA_RELEASE='1.0.10';
     if(overview)overview.classList.toggle('active',tab==='overview');
     if(statement)statement.classList.toggle('active',tab==='statement');
     try{if(typeof renderFinoraReports==='function')renderFinoraReports()}catch(e){}
+  };
+})();
+</script>
+
+
+<script id="finora-v110-r2">
+(function(){
+  'use strict';
+
+  const R2='1.0.10-R2';
+  const PRIVACY_KEY='finora_privacy_values_v110';
+
+  function norm(v){
+    return String(v||'')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .toLowerCase().trim();
+  }
+  function escR2(v=''){
+    return String(v).replace(/[&<>"']/g,c=>({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+  function moneyR2(v){
+    return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  }
+  function txMonth(x){
+    try{
+      if(typeof recordMonth==='function')return recordMonth(x)||'';
+    }catch(e){}
+    return String(x?.vencimento||x?.dataLancamento||'').slice(0,7);
+  }
+  function txDate(x){
+    try{
+      if(typeof referenceDate==='function')return referenceDate(x)||'';
+    }catch(e){}
+    return String(x?.vencimento||x?.dataLancamento||'').slice(0,10);
+  }
+  function effective(x){
+    try{return typeof effectiveStatus==='function'?effectiveStatus(x):(x?.status||'pendente')}
+    catch(e){return x?.status||'pendente'}
+  }
+
+  // ----------------------------------------------------------
+  // A. FONTE CANÔNICA — CARTÕES
+  // ----------------------------------------------------------
+  function canonicalCards(rows){
+    const map=new Map();
+    (Array.isArray(rows)?rows:[]).forEach(raw=>{
+      if(!raw)return;
+      const id=String(raw.id||'').trim();
+      if(!id)return;
+      const row={...raw};
+      const prev=map.get(id);
+      if(!prev){map.set(id,row);return}
+      const rt=Date.parse(row.updatedAt||row.createdAt||0)||0;
+      const pt=Date.parse(prev.updatedAt||prev.createdAt||0)||0;
+      if(rt>=pt)map.set(id,row);
+    });
+    return [...map.values()];
+  }
+  window.finoraCanonicalCardsR2=canonicalCards;
+
+  // Repara apenas o cache local de cartões; não altera o Supabase diretamente.
+  try{
+    const raw=JSON.parse(localStorage.getItem(FINORA_CARDS_KEY)||'[]');
+    const clean=canonicalCards(raw);
+    if(raw.length!==clean.length){
+      localStorage.setItem(FINORA_CARDS_KEY,JSON.stringify(clean));
+      console.info(`FINORA R2: cartões locais normalizados (${raw.length} → ${clean.length}).`);
+    }
+  }catch(e){}
+
+  window.loadFinoraCards=function(){
+    try{
+      return canonicalCards(JSON.parse(localStorage.getItem(FINORA_CARDS_KEY)||'[]'));
+    }catch(e){return[]}
+  };
+  window.saveFinoraCards=function(rows){
+    const clean=canonicalCards(rows);
+    localStorage.setItem(FINORA_CARDS_KEY,JSON.stringify(clean));
+    return clean;
+  };
+  window.accountCards=function(){
+    return loadFinoraCards().filter(c=>String(c.workspaceId||'')===String(currentWorkspaceId||''));
+  };
+
+  function cardType(c){
+    const t=String(c?.cardType||c?.type||'').toLowerCase();
+    if(['credito','debito','debito_credito'].includes(t))return t;
+    return 'credito'; // decisão aprovada para legados
+  }
+  function typeLabel(t){
+    return t==='debito'?'Débito':t==='debito_credito'?'Débito e crédito':'Crédito';
+  }
+  function brandKey(c){
+    let b=c?.brand||'auto';
+    try{if(b==='auto'&&typeof inferCardBrand==='function')b=inferCardBrand(c.name,c.issuer)}catch(e){}
+    return b||'outra';
+  }
+
+  function peopleForCard(){
+    let vals=[];
+    try{vals=typeof people==='function'?people():[]}catch(e){}
+    vals=[...vals,'EMPRESA RL'].map(x=>String(x||'').trim()).filter(Boolean);
+    return [...new Set(vals)];
+  }
+
+  window.fillCardOwners=function(selected=''){
+    const el=document.getElementById('cardOwner');
+    if(!el)return;
+    const vals=peopleForCard();
+    el.innerHTML='<option value=""></option>'+vals.map(v=>`<option value="${escR2(v)}">${escR2(v)}</option>`).join('');
+    if(selected){
+      if(!vals.includes(selected)){
+        const op=document.createElement('option');
+        op.value=selected;op.textContent=selected;el.appendChild(op);
+      }
+      el.value=selected;
+    }else el.value='';
+  };
+
+  function ensureBlankOptions(){
+    ['cardType','cardBrand','cardDefaultCategory'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el)return;
+      if(!el.querySelector('option[value=""]')){
+        const op=document.createElement('option');
+        op.value='';op.textContent='';
+        el.insertBefore(op,el.firstChild);
+      }
+    });
+  }
+
+  function resetNewCard(){
+    ensureBlankOptions();
+    fillCardOwners('');
+    const vals={
+      cardEditId:'',cardName:'',cardIssuer:'',cardOwner:'',cardType:'',
+      cardLast4:'',cardExpiry:'',cardDueDay:'',cardLimit:'',cardAnnualFee:'',
+      cardBrand:'',cardDefaultCategory:''
+    };
+    Object.entries(vals).forEach(([id,val])=>{
+      const el=document.getElementById(id);if(el)el.value=val;
+    });
+    try{if(typeof setCardColor==='function')setCardColor('#0b3d2e')}catch(e){}
+    const title=document.querySelector('#cardFormPanel .panel-head h2');
+    if(title)title.textContent='Cadastrar cartão';
+  }
+
+  window.finoraOpenNewCard=function(){
+    resetNewCard();
+    try{if(typeof installCardColorPicker==='function')installCardColorPicker()}catch(e){}
+    if(typeof openSectionModal==='function')openSectionModal('cardFormPanel');
+    requestAnimationFrame(()=>document.getElementById('cardName')?.focus());
+  };
+
+  window.finoraCloseCardFormR2=function(){
+    try{if(typeof closeSectionModal==='function')closeSectionModal()}catch(e){}
+    requestAnimationFrame(()=>{
+      try{if(typeof renderFinoraCards==='function')renderFinoraCards()}catch(e){}
+      try{if(typeof openSectionModal==='function')openSectionModal('finoraCardsPanel')}catch(e){}
+    });
+  };
+
+  window.editFinoraCard=function(id){
+    const c=accountCards().find(x=>String(x.id)===String(id));
+    if(!c){toast('Cartão não encontrado.');return}
+
+    ensureBlankOptions();
+    fillCardOwners(c.owner||'');
+    if(typeof openSectionModal==='function')openSectionModal('cardFormPanel');
+    try{if(typeof installCardColorPicker==='function')installCardColorPicker()}catch(e){}
+
+    const put=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val??''};
+    put('cardEditId',c.id);
+    put('cardName',c.name||'');
+    put('cardIssuer',c.issuer||'');
+    put('cardOwner',c.owner||'');
+    put('cardType',cardType(c));
+    put('cardLast4',c.last4||'');
+    put('cardExpiry',c.expiry||'');
+    put('cardDueDay',c.dueDay||'');
+    put('cardBrand',c.brand||'auto');
+    put('cardDefaultCategory',c.defaultCategory||'');
+    put('cardLimit',Number(c.limit||0)>0?moneyR2(c.limit):'');
+    put('cardAnnualFee',Number(c.annualFee||0)>0?moneyR2(c.annualFee):'');
+    try{if(typeof setCardColor==='function')setCardColor(c.cardColor||c.color||'#0b3d2e')}catch(e){}
+    const title=document.querySelector('#cardFormPanel .panel-head h2');
+    if(title)title.textContent='Editar cartão';
+    const panel=document.getElementById('cardFormPanel');if(panel)panel.scrollTop=0;
+  };
+
+  // Render canônico: cada ID aparece uma única vez e o titular é o mesmo da edição.
+  window.renderFinoraCards=function(){
+    const all=canonicalCards(accountCards());
+    const q=norm(document.getElementById('finoraCardSearch')?.value||'');
+    const sort=document.getElementById('finoraCardSort')?.value||'default';
+    const cmp=(a,b)=>String(a||'').localeCompare(String(b||''),'pt-BR',{sensitivity:'base'});
+    let rows=all.filter(c=>{
+      const txt=[c.name,c.owner,c.issuer,c.brand,typeLabel(cardType(c))].join(' ');
+      return !q||norm(txt).includes(q);
+    });
+    rows.sort((a,b)=>{
+      if(sort==='name')return cmp(a.name,b.name);
+      if(sort==='owner')return cmp(a.owner,b.owner)||cmp(a.name,b.name);
+      if(sort==='issuer')return cmp(a.issuer,b.issuer)||cmp(a.name,b.name);
+      return cmp(brandKey(a),brandKey(b))||cmp(a.owner,b.owner)||cmp(a.issuer,b.issuer)||cmp(a.name,b.name);
+    });
+
+    const count=document.getElementById('finoraCardsCount');
+    if(count)count.textContent=`${rows.length} de ${all.length} cartão${all.length===1?'':'ões'}`;
+    const box=document.getElementById('finoraCardGrid');
+    if(!box)return;
+
+    box.innerHTML=rows.length?rows.map(c=>{
+      const brand=brandKey(c),type=cardType(c);
+      const limit=Number(c.limit||0),annual=Number(c.annualFee||0);
+      return `<div class="finora-card-item" data-card-id="${escR2(c.id)}">
+        <div class="finora-card-visual" style="--card-user-color:${escR2(c.cardColor||c.color||'#0b3d2e')};background:linear-gradient(135deg,var(--card-user-color) 0%,var(--card-user-color) 76%,rgba(255,255,255,.11) 76%)!important;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div class="brandname">${escR2(c.issuer||'CARTÃO')}</div>
+            <div class="card-brand-logo">${typeof cardBrandMarkup==='function'?cardBrandMarkup(brand):escR2(brand)}</div>
+          </div>
+          <div class="card-chip"></div>
+          <div class="digits">•••• •••• •••• ${escR2(c.last4||'••••')}</div>
+        </div>
+        <span class="finora-v110-card-type">${escR2(typeLabel(type))}</span>
+        <small>${escR2(c.owner||'—')}</small>
+        <strong>${escR2(c.name||'Cartão')}</strong>
+        <div class="finora-v110-card-meta">
+          <small>Validade: ${escR2(c.expiry||'—')}</small>
+          <small>Emissor: ${escR2(c.issuer||'—')}</small>
+          <small>${type==='debito'?'Sem alerta de fatura':`Vencimento: ${c.dueDay?`dia ${c.dueDay}`:'—'}`}</small>
+          <small>Limite: ${limit?moneyR2(limit):'—'}</small>
+          <small>Anuidade: ${annual?moneyR2(annual):'—'}</small>
+        </div>
+        <small>Categoria padrão: ${escR2(c.defaultCategory||'Sem categoria')}</small>
+        <div class="finora-card-actions">
+          <button type="button" onclick="editFinoraCard('${escR2(c.id)}')">Editar</button>
+          <button type="button" data-finora-delete="card" data-id="${escR2(c.id)}">Excluir</button>
+        </div>
+      </div>`;
+    }).join(''):'<div class="empty" style="grid-column:1/-1;padding:20px">Nenhum cartão encontrado.</div>';
+  };
+
+  // ----------------------------------------------------------
+  // B. HIDRATAÇÃO / F5
+  // ----------------------------------------------------------
+  // A R1 já aguardava o pull em openFinora(). O bloqueio vinha de uma mutação
+  // prematura que marcava o state como dirty. Além de remover isso acima,
+  // este health gate só libera a atualização consolidada depois da hidratação.
+  let r2HydrationRefreshPending=false;
+  function refreshAll(){
+    if(r2HydrationRefreshPending)return;
+    r2HydrationRefreshPending=true;
+    requestAnimationFrame(()=>{
+      r2HydrationRefreshPending=false;
+      try{if(typeof render==='function')render()}catch(e){}
+      try{if(typeof renderV84Dashboard==='function')renderV84Dashboard()}catch(e){}
+      try{if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut()}catch(e){}
+      try{if(typeof renderAlerts==='function')renderAlerts()}catch(e){}
+      try{
+        if(document.getElementById('finoraReportsPanel')&&typeof renderFinoraReports==='function')renderFinoraReports();
+      }catch(e){}
+    });
+  }
+  window.finoraRefreshAllR2=refreshAll;
+
+  const oldPull=window.pullCloudState;
+  if(typeof oldPull==='function'){
+    window.pullCloudState=async function(){
+      const ok=await oldPull.apply(this,arguments);
+      if(ok)refreshAll();
+      return ok;
+    };
+  }
+
+  // ----------------------------------------------------------
+  // C. ALERTAS / VALOR PAGO CANÔNICO
+  // ----------------------------------------------------------
+  function paidMarkerKey(cardId,date){return `${String(cardId)}|${String(date).slice(0,7)}`}
+
+  function setPaidMarker(cardId,date,value){
+    try{
+      const s=typeof loadFinoraFeatureState==='function'?loadFinoraFeatureState():{};
+      s.paidCardInvoices={...(s.paidCardInvoices||{})};
+      s.paidCardInvoices[paidMarkerKey(cardId,date)]={
+        paid:true,
+        paidAt:new Date().toISOString(),
+        cardId:String(cardId),
+        month:String(date).slice(0,7),
+        valor:Number(value||0)
+      };
+      s.updatedAt=new Date().toISOString();
+      if(typeof saveFinoraFeatureState==='function')saveFinoraFeatureState(s);
+    }catch(e){console.warn('FINORA R2 marker',e)}
+  }
+
+  function matchesInvoice(x,card,date){
+    if(!x||x.tipo!=='saida'||txMonth(x)!==String(date).slice(0,7))return false;
+    if(String(x.cardId||'')===String(card.id))return true;
+    const d=norm(x.descricao);
+    const n=norm(card.name),issuer=norm(card.issuer);
+    if(n&&d.includes(n))return true;
+    if(issuer&&d.includes('fatura')&&d.includes(issuer))return true;
+    return false;
+  }
+
+  function ensureR2PaymentDialog(){
+    if(document.getElementById('finoraR2PaymentDialog'))return;
+    const root=document.createElement('div');
+    root.id='finoraR2PaymentDialog';
+    root.className='finora-v110-alert-dialog';
+    root.innerHTML=`<div class="finora-v110-alert-card" role="dialog" aria-modal="true">
+      <h3 id="finoraR2PayTitle">Registrar pagamento</h3>
+      <p>Informe o valor efetivamente pago. O registro será atualizado em todas as telas.</p>
+      <div class="field"><label>Valor pago</label><input id="finoraR2PayValue" inputmode="decimal" placeholder="R$ 0,00"></div>
+      <div class="finora-v110-alert-actions">
+        <button type="button" class="btn btn-soft" id="finoraR2PayCancel">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="finoraR2PayConfirm">Confirmar pagamento</button>
+      </div>
+    </div>`;
+    document.body.appendChild(root);
+    document.getElementById('finoraR2PayCancel').onclick=()=>root.classList.remove('open');
+  }
+
+  let r2PayCtx=null;
+  window.finoraV109MarkInvoicePaid=function(cardId,date){
+    ensureR2PaymentDialog();
+    const card=accountCards().find(c=>String(c.id)===String(cardId));
+    if(!card){toast('Cartão não encontrado.');return}
+    r2PayCtx={card,date:String(date).slice(0,10)};
+    document.getElementById('finoraR2PayTitle').textContent=`Registrar ${card.name} como paga`;
+    document.getElementById('finoraR2PayValue').value='';
+    document.getElementById('finoraR2PaymentDialog').classList.add('open');
+    requestAnimationFrame(()=>document.getElementById('finoraR2PayValue')?.focus());
+  };
+
+  function parseMoney(v){
+    try{if(typeof parseBRLInput==='function')return Number(parseBRLInput(v)||0)}catch(e){}
+    let s=String(v||'').replace(/[R$\s]/g,'');
+    if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');
+    const n=Number(s);return Number.isFinite(n)?n:0;
+  }
+
+  async function commitPaid(){
+    if(!r2PayCtx)return;
+    const btn=document.getElementById('finoraR2PayConfirm');
+    if(btn.dataset.busy==='1')return;
+    btn.dataset.busy='1';btn.disabled=true;
+    try{
+      const {card,date}=r2PayCtx;
+      const value=parseMoney(document.getElementById('finoraR2PayValue').value);
+      if(!(value>0)){
+        toast('Informe o valor pago.');
+        return;
+      }
+
+      const now=new Date().toISOString();
+      const candidates=(Array.isArray(data)?data:[]).filter(x=>matchesInvoice(x,card,date));
+      candidates.sort((a,b)=>
+        (Date.parse(b.updatedAt||b.createdAt||0)||0)-(Date.parse(a.updatedAt||a.createdAt||0)||0)
+      );
+      let row=candidates[0];
+
+      if(row){
+        row.valor=value;
+        row.valorPendente=false;
+        row.status='pago';
+        row.dataPagamento=typeof today==='function'?today():new Date().toISOString().slice(0,10);
+        row.cardId=card.id;
+        row.cardName=card.name;
+        row.forma=row.forma||'Cartão de crédito';
+        row.updatedAt=now;
+      }else{
+        row={
+          id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,
+          account:'family',workspaceId:currentWorkspaceId,
+          tipo:'saida',
+          pessoa:card.owner||'',
+          expenseOwner:card.owner||'',
+          descricao:`FATURA ${String(card.name||'CARTÃO').toUpperCase()}`,
+          beneficiario:String(card.issuer||card.name||'').toUpperCase(),
+          categoria:'Cartão de crédito',
+          valor:value,valorPendente:false,
+          dataLancamento:date,vencimento:date,
+          status:'pago',
+          dataPagamento:typeof today==='function'?today():new Date().toISOString().slice(0,10),
+          forma:'Cartão de crédito',
+          cardId:card.id,cardName:card.name,
+          recorrente:'nao',valorRecorrente:'mesmo',
+          source:'card-invoice-alert',
+          createdAt:now,updatedAt:now
+        };
+        data.push(row);
+      }
+
+      data=typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(data):data;
+      setPaidMarker(card.id,date,value);
+      if(typeof save==='function')save();
+
+      if(typeof finoraAuditLog==='function'){
+        finoraAuditLog('ALTEROU STATUS','FATURA_CARTAO',row.id,
+          'Fatura marcada como paga pelo alerta',null,
+          {cardId:card.id,cardName:card.name,month:date.slice(0,7),valor:value});
+      }
+
+      document.getElementById('finoraR2PaymentDialog').classList.remove('open');
+      r2PayCtx=null;
+      refreshAll();
+      toast('Pagamento registrado e refletido nos controles.');
+      try{
+        if(typeof pushCloudState==='function'&&typeof cloudConfigured==='function'&&cloudConfigured()){
+          Promise.resolve().then(()=>pushCloudState(false)).catch(()=>scheduleCloudPush());
+        }else if(typeof scheduleCloudPush==='function')scheduleCloudPush();
+      }catch(e){}
+    }catch(e){
+      console.error('FINORA R2 payment',e);
+      toast('Não foi possível registrar o pagamento.');
+    }finally{
+      btn.disabled=false;delete btn.dataset.busy;
+    }
+  }
+
+  // CardInvoiceAlerts nunca recria alerta já baixado.
+  const oldInvoiceAlerts=window.cardInvoiceAlerts;
+  if(typeof oldInvoiceAlerts==='function'){
+    window.cardInvoiceAlerts=function(){
+      let markers={};
+      try{markers=loadFinoraFeatureState()?.paidCardInvoices||{}}catch(e){}
+      return oldInvoiceAlerts().filter(a=>{
+        const card=accountCards().find(c=>String(c.id)===String(a.cardId||''));
+        if(card&&cardType(card)==='debito')return false;
+        if(a.cardId && markers[paidMarkerKey(a.cardId,a.vencimento||a.dataLancamento)])return false;
+        return true;
+      });
+    };
+  }
+
+  // ----------------------------------------------------------
+  // D. PROPAGAÇÃO ÚNICA / QUICK LAUNCH / DELETE
+  // ----------------------------------------------------------
+  function installQuick(){
+    const btn=document.getElementById('v84QuickSave');
+    if(!btn||btn.dataset.r2==='1')return;
+    btn.dataset.r2='1';
+    btn.onclick=function(){
+      if(btn.dataset.busy==='1')return;
+      const desc=document.getElementById('v84QuickDesc')?.value.trim()||'';
+      const value=parseMoney(document.getElementById('v84QuickValue')?.value||'');
+      const category=document.getElementById('v84QuickCategory')?.value||'';
+      const payment=document.getElementById('v84QuickPayment')?.value||'PIX';
+      const date=document.getElementById('v84QuickDate')?.value||'';
+      const type=document.getElementById('v84QuickExpense')?.classList.contains('active')?'saida':'entrada';
+
+      if(!desc||!(value>0)||!category||!date){
+        toast('Preencha descrição, valor, categoria e data.');
+        return;
+      }
+
+      btn.dataset.busy='1';btn.disabled=true;
+      const old=btn.textContent;btn.textContent='Salvando...';
+      try{
+        let person='';
+        try{
+          person=document.getElementById('pessoa')?.value||'';
+          if(!person)person=currentUser?.name||'';
+          if(!person && typeof people==='function')person=people()[0]||'';
+        }catch(e){}
+        const now=new Date().toISOString();
+        const row={
+          id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,
+          account:'family',workspaceId:currentWorkspaceId,
+          tipo:type,pessoa:person,expenseOwner:type==='saida'?person:'',
+          descricao:desc,categoria:category,essentialType:'',
+          valor:value,dataLancamento:date,vencimento:'',
+          status:'pago',recorrente:'nao',recRule:'fixo',valorRecorrente:'mesmo',
+          valorPendente:false,beneficiario:'',parcelas:'',cardId:'',
+          forma:payment,paymentAccount:'',observacao:'',attachment:null,
+          source:'quick',createdAt:now,updatedAt:now
+        };
+        if(type==='saida'&&typeof inferEssentialType==='function'){
+          try{row.essentialType=inferEssentialType(row)||''}catch(e){}
+        }
+        data.push(row);
+        data=typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(data):data;
+        save();
+        refreshAll();
+
+        document.getElementById('v84QuickDesc').value='';
+        document.getElementById('v84QuickValue').value='';
+        document.getElementById('v84QuickCategory').selectedIndex=0;
+        toast(type==='entrada'?'Entrada registrada.':'Saída registrada.');
+      }catch(e){
+        console.error('FINORA R2 quick',e);toast('Não foi possível salvar o lançamento rápido.');
+      }finally{
+        btn.disabled=false;delete btn.dataset.busy;btn.textContent=old;
+      }
+    };
+  }
+
+  window.deleteRow=async function(id){
+    const row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id));
+    if(!row){toast('Lançamento já excluído.');refreshAll();return true}
+    if(!confirm(`Excluir "${row.descricao||'este lançamento'}" (${moneyR2(row.valor||0)})?`))return false;
+
+    const before={...row};
+    try{
+      if(typeof recordTransactionDeletion==='function')recordTransactionDeletion(row.id);
+      data=data.filter(x=>String(x.id)!==String(row.id));
+      data=typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(data):data;
+      localStorage.setItem(KEY,JSON.stringify(data));
+      try{if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty()}catch(e){}
+      if(typeof finoraAuditLog==='function'){
+        finoraAuditLog('EXCLUIU','LANCAMENTO',row.id,'Lançamento excluído',before,null);
+      }
+      refreshAll();
+      toast('Lançamento excluído. Sincronizando...');
+      try{
+        if(typeof pushCloudState==='function'&&typeof cloudConfigured==='function'&&cloudConfigured()){
+          Promise.resolve().then(()=>pushCloudState(false)).catch(()=>scheduleCloudPush());
+        }else if(typeof scheduleCloudPush==='function')scheduleCloudPush();
+      }catch(e){}
+      return true;
+    }catch(e){
+      console.error('FINORA R2 delete',e);
+      toast('Não foi possível concluir a exclusão.');
+      return false;
+    }
+  };
+
+  // ----------------------------------------------------------
+  // E. STATUS / ORDENAÇÃO
+  // ----------------------------------------------------------
+  function colorRecentStatus(){
+    document.querySelectorAll('#v84RecentRows .finora-v84-status').forEach(el=>{
+      const t=norm(el.textContent);
+      el.classList.remove('finora-status-pago','finora-status-recebido','finora-status-pendente','finora-status-atrasado');
+      if(t.includes('atras'))el.classList.add('finora-status-atrasado');
+      else if(t.includes('pend'))el.classList.add('finora-status-pendente');
+      else if(t.includes('receb'))el.classList.add('finora-status-recebido');
+      else el.classList.add('finora-status-pago');
+    });
+  }
+
+  function sortLaunchRowsR2(){
+    const tbody=document.querySelector('#tableWrap table tbody');
+    if(!tbody)return;
+    const field=document.getElementById('launchSortField')?.value||'date';
+    const dir=document.getElementById('launchSortDirection')?.value||'asc';
+    const sign=dir==='desc'?-1:1;
+    const col={description:0,person:1,date:2,status:3,value:4,file:5}[field]??2;
+    const statusRank=text=>{
+      const t=norm(text);
+      if(t.includes('atras'))return 1;
+      if(t.includes('pend')||t.includes('receber'))return 2;
+      if(t.includes('pago')||t.includes('recebido'))return 3;
+      return 9;
+    };
+    const rows=[...tbody.rows];
+    rows.sort((a,b)=>{
+      let av=a.cells[col]?.textContent.trim()||'',bv=b.cells[col]?.textContent.trim()||'';
+      if(field==='status')return (statusRank(av)-statusRank(bv))*sign;
+      if(field==='value'){
+        const parse=v=>Number(String(v).replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.'))||0;
+        return (parse(av)-parse(bv))*sign;
+      }
+      if(field==='date'){
+        const iso=v=>{
+          const m=String(v).match(/(\d{2})\/(\d{2})\/(\d{4})/);
+          return m?`${m[3]}-${m[2]}-${m[1]}`:String(v);
+        };
+        av=iso(av);bv=iso(bv);
+      }
+      return av.localeCompare(bv,'pt-BR',{numeric:true,sensitivity:'base'})*sign;
+    });
+    rows.forEach(r=>tbody.appendChild(r));
+  }
+
+  // ----------------------------------------------------------
+  // F. PRIVACIDADE DOS VALORES
+  // ----------------------------------------------------------
+  function applyPrivacy(){
+    const hidden=localStorage.getItem(PRIVACY_KEY)==='1';
+    document.body.classList.toggle('finora-values-hidden',hidden);
+    const btn=document.getElementById('finoraPrivacyToggle');
+    if(btn){
+      btn.innerHTML=hidden?'◉ <span>Mostrar valores</span>':'◉ <span>Ocultar valores</span>';
+      btn.setAttribute('aria-pressed',hidden?'true':'false');
+    }
+  }
+  function ensurePrivacyButton(){
+    const home=document.getElementById('simpleHome');
+    if(!home||document.getElementById('finoraPrivacyToggle'))return;
+    const ctx=home.querySelector('.finora-contextbar')||home.querySelector('.simple-kpis');
+    if(!ctx)return;
+    const btn=document.createElement('button');
+    btn.type='button';btn.id='finoraPrivacyToggle';btn.className='finora-privacy-toggle';
+    btn.onclick=()=>{
+      const next=localStorage.getItem(PRIVACY_KEY)==='1'?'0':'1';
+      localStorage.setItem(PRIVACY_KEY,next);applyPrivacy();
+    };
+    ctx.parentNode.insertBefore(btn,ctx.nextSibling);
+    applyPrivacy();
+  }
+
+  // ----------------------------------------------------------
+  // G. CARD DESPESAS POR CATEGORIA — "Período: Este mês" + menu
+  // ----------------------------------------------------------
+  function ensureCategoryTools(){
+    const card=document.getElementById('finoraHomeCategoryCard');
+    const tools=card?.querySelector('.finora-v88-chart-tools');
+    if(!tools)return;
+    const period=tools.querySelector('.finora-v88-chart-period');
+    if(period){
+      period.innerHTML='▣ &nbsp; Período: Este mês';
+      period.title='O gráfico considera o mês atualmente selecionado no FINORA.';
+    }
+    const more=tools.querySelector('.finora-v88-chart-more');
+    if(!more)return;
+    more.title='Configurações do gráfico';
+    if(!tools.querySelector('.finora-r2-chart-menu')){
+      const menu=document.createElement('div');
+      menu.className='finora-r2-chart-menu';
+      menu.innerHTML=`
+        <button type="button" data-action="legend">Mostrar/ocultar legenda <span class="state"></span></button>
+        <button type="button" data-action="type">Alternar Rosca/Barras <span class="state"></span></button>
+        <button type="button" data-action="settings">Abrir configurações do cockpit</button>`;
+      tools.appendChild(menu);
+      const update=()=>{
+        let c={};
+        try{c=loadFinoraFeatureState()?.cockpit||{}}catch(e){}
+        menu.querySelector('[data-action="legend"] .state').textContent=c.chartLegend===false?'Oculta':'Visível';
+        menu.querySelector('[data-action="type"] .state').textContent=c.chartType==='bar'?'Barras':'Rosca';
+      };
+      more.onclick=e=>{e.stopPropagation();menu.classList.toggle('open');update()};
+      menu.onclick=e=>{
+        const b=e.target.closest('button');if(!b)return;
+        const action=b.dataset.action;
+        if(action==='settings'){
+          menu.classList.remove('open');
+          if(typeof openFinoraUtilityPanel==='function')openFinoraUtilityPanel('settings');
+          return;
+        }
+        const s=loadFinoraFeatureState();
+        s.cockpit={...(s.cockpit||{})};
+        if(action==='legend')s.cockpit.chartLegend=s.cockpit.chartLegend===false?true:false;
+        if(action==='type')s.cockpit.chartType=s.cockpit.chartType==='bar'?'pie':'bar';
+        s.updatedAt=new Date().toISOString();
+        saveFinoraFeatureState(s);
+        try{if(typeof applyFinoraCockpit==='function')applyFinoraCockpit()}catch(e){}
+        try{if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut()}catch(e){}
+        update();
+      };
+      document.addEventListener('click',e=>{
+        if(!tools.contains(e.target))menu.classList.remove('open');
+      });
+    }
+  }
+
+  // ----------------------------------------------------------
+  // H. RELATÓRIOS — cartão real, detalhamento e impressão contextual
+  // ----------------------------------------------------------
+  window.reportCardName=function(x){
+    const cards=accountCards();
+    let c=cards.find(c=>String(c.id)===String(x?.cardId||''));
+    if(c)return c.name||'';
+    if(x?.cardName)return x.cardName;
+    if(x?.paymentAccount){
+      c=cards.find(c=>String(c.id)===String(x.paymentAccount)||norm(c.name)===norm(x.paymentAccount));
+      if(c)return c.name||'';
+    }
+    const d=norm(x?.descricao);
+    c=cards.find(c=>{
+      const n=norm(c.name),i=norm(c.issuer);
+      return (n&&d.includes(n))||(i&&d.includes('fatura')&&d.includes(i));
+    });
+    return c?.name||'';
+  };
+
+  function reportMode(){
+    const active=document.querySelector('.report-tabs button.active');
+    return active?.dataset.reportTab||'overview';
+  }
+  function breakdown(rows,mode){
+    const getter=
+      mode==='category'?(x=>x.categoria||'Outros'):
+      mode==='person'?(x=>typeof reportPersonOf==='function'?reportPersonOf(x):(x.pessoa||'Não informado')):
+      mode==='payment'?(x=>typeof reportPaymentOf==='function'?(reportPaymentOf(x)||'Não informado'):(x.forma||'Não informado')):
+      mode==='cards'?(x=>reportCardName(x)||'Sem cartão'):
+      (x=>'Outros');
+
+    const sums={};
+    rows.filter(x=>x.tipo==='saida'&&(!x.valorPendente)).forEach(x=>{
+      const k=getter(x);sums[k]=(sums[k]||0)+Number(x.valor||0);
+    });
+    return Object.entries(sums).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  }
+
+  const oldRenderReports=window.renderFinoraReports;
+  if(typeof oldRenderReports==='function'){
+    window.renderFinoraReports=function(){
+      const r=oldRenderReports.apply(this,arguments);
+      try{
+        const mode=reportMode();
+        if(['category','person','payment','cards'].includes(mode)){
+          const rows=typeof reportRows==='function'?reportRows():[];
+          const items=breakdown(rows,mode);
+          const max=items[0]?.[1]||1;
+          const box=document.getElementById('reportBreakdownRows');
+          if(box){
+            box.innerHTML=items.length?items.map(([k,v])=>
+              `<div class="report-breakdown-row">
+                <strong>${escR2(k)}</strong>
+                <div class="report-breakdown-track"><i style="width:${v/max*100}%"></i></div>
+                <span>${moneyR2(v)}</span>
+              </div>`
+            ).join(''):'<div class="empty">Nenhuma despesa encontrada para esta análise.</div>';
+          }
+        }
+      }catch(e){console.warn('FINORA R2 reports',e)}
+      return r;
+    };
+  }
+
+  function printBars(items){
+    const max=items[0]?.[1]||1;
+    if(!items.length)return '<div class="empty">Nenhum dado para o período.</div>';
+    return `<div class="finora-r2-print-bars">${items.map(([k,v])=>`
+      <div class="finora-r2-print-bar">
+        <b>${escR2(k)}</b>
+        <div class="finora-r2-print-track"><i style="width:${v/max*100}%"></i></div>
+        <span>${moneyR2(v)}</span>
+      </div>`).join('')}</div>`;
+  }
+
+  function detailedTable(rows){
+    return `<table><thead><tr>
+      <th>Data</th><th>Descrição</th><th>Pessoa</th><th>Categoria</th><th>Forma</th><th>Status</th><th class="num">Valor</th>
+    </tr></thead><tbody>${rows.map(x=>`
+      <tr>
+        <td>${escR2(typeof reportBRDate==='function'?reportBRDate(txDate(x)):txDate(x))}</td>
+        <td>${escR2(x.descricao||'Movimentação')}</td>
+        <td>${escR2(typeof reportPersonOf==='function'?reportPersonOf(x):(x.pessoa||'—'))}</td>
+        <td>${escR2(x.categoria||'Outros')}</td>
+        <td>${escR2(typeof reportPaymentOf==='function'?reportPaymentOf(x):(x.forma||'—'))}</td>
+        <td>${escR2(effective(x))}</td>
+        <td class="num">${moneyR2(x.valor||0)}</td>
+      </tr>`).join('')}</tbody></table>`;
+  }
+
+  window.printFinoraReport=function(){
+    try{
+      const mode=reportMode();
+      let rows=typeof reportRows==='function'?reportRows():[];
+      const period=typeof reportPeriodLabel==='function'?reportPeriodLabel():'';
+      const workspace=currentWorkspaceName||'Meu ambiente';
+      const labels={
+        overview:'Visão geral',statement:'Extrato',category:'Gastos por categoria',
+        person:'Gastos por pessoa',payment:'Formas de pagamento',cards:'Cartões',goals:'Metas'
+      };
+      const title=labels[mode]||'Relatório';
+
+      const known=rows.filter(x=>!x.valorPendente);
+      const credits=known.filter(x=>x.tipo==='entrada').reduce((s,x)=>s+Number(x.valor||0),0);
+      const debits=known.filter(x=>x.tipo==='saida').reduce((s,x)=>s+Number(x.valor||0),0);
+
+      let content='';
+      if(mode==='statement'){
+        // Exigência de QA: extrato impresso do menor para o maior.
+        rows=[...rows].sort((a,b)=>txDate(a).localeCompare(txDate(b)) ||
+          String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
+        content=`<h2>Extrato</h2>${detailedTable(rows)}`;
+      }else if(['category','person','payment','cards'].includes(mode)){
+        const items=breakdown(rows,mode);
+        content=`<h2>${escR2(title)}</h2>${printBars(items)}`;
+        if(mode==='cards'||mode==='payment'||mode==='person'){
+          content+=`<h2>Detalhamento</h2>${detailedTable(rows.filter(x=>x.tipo==='saida'&&!x.valorPendente))}`;
+        }
+      }else if(mode==='overview'){
+        content=`<h2>Despesas por categoria</h2>${printBars(breakdown(rows,'category'))}`;
+      }else if(mode==='goals'){
+        content=`<h2>Metas</h2><div>${document.getElementById('reportGoalsBody')?.innerHTML||'Sem dados.'}</div>`;
+      }
+
+      const w=window.open('','_blank');
+      if(!w){toast('Permita pop-ups para imprimir o relatório.');return}
+      w.document.open();
+      w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+        <title>FINORA — ${escR2(title)}</title>
+        <style>
+          @page{size:A4 portrait;margin:9mm}
+          *{box-sizing:border-box}
+          body{font-family:Arial,sans-serif;color:#21322a;font-size:9px;margin:0}
+          header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0f5a3e;padding-bottom:6px;margin-bottom:7px}
+          h1{margin:0;color:#0f5a3e;font:700 18px Georgia,serif}
+          h2{font-size:11px;color:#174b36;margin:10px 0 5px}
+          .meta{text-align:right;color:#66756d;line-height:1.4}
+          .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:6px 0 9px}
+          .kpi{border:1px solid #dce5e0;border-radius:5px;padding:6px}
+          .kpi span{display:block;color:#6b7871;font-size:7px;text-transform:uppercase}
+          .kpi strong{display:block;margin-top:2px;font-size:11px}
+          table{width:100%;border-collapse:collapse;table-layout:fixed}
+          th{background:#eef4f0;color:#315c49;text-align:left;font-size:7px;padding:4px;border-bottom:1px solid #cfdad4}
+          td{padding:4px;border-bottom:1px solid #e8edea;vertical-align:top;word-break:break-word}
+          tr{break-inside:avoid;page-break-inside:avoid}
+          .num{text-align:right;white-space:nowrap}
+          .finora-r2-print-bars{display:grid;gap:6px}
+          .finora-r2-print-bar{display:grid;grid-template-columns:150px 1fr 90px;gap:8px;align-items:center}
+          .finora-r2-print-track{height:8px;background:#edf2ef;border-radius:999px;overflow:hidden}
+          .finora-r2-print-track i{display:block;height:100%;background:#0f5a3e}
+          .finora-r2-print-bar b{font-size:8px}.finora-r2-print-bar span{text-align:right;font-size:8px}
+          .empty{padding:10px;border:1px dashed #ccd9d2;color:#6b7871}
+          footer{margin-top:8px;padding-top:5px;border-top:1px solid #dfe6e2;color:#7a8880;font-size:7px}
+        </style></head><body>
+        <header><div><h1>FINORA</h1><div>${escR2(title)}</div></div>
+        <div class="meta">${escR2(workspace)}<br>${escR2(period)}</div></header>
+        <div class="kpis">
+          <div class="kpi"><span>Créditos</span><strong>${moneyR2(credits)}</strong></div>
+          <div class="kpi"><span>Débitos</span><strong>${moneyR2(debits)}</strong></div>
+          <div class="kpi"><span>Saldo</span><strong>${moneyR2(credits-debits)}</strong></div>
+        </div>
+        ${content}
+        <footer>FINORA · Versão 1.0.10 · ${new Date().toLocaleString('pt-BR')}</footer>
+        <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),120));<\/script>
+        </body></html>`);
+      w.document.close();
+    }catch(e){
+      console.error('FINORA R2 print',e);toast('Não foi possível preparar a impressão.');
+    }
+  };
+
+  // ----------------------------------------------------------
+  // I. PÓS-RENDER ESTÁVEL
+  // ----------------------------------------------------------
+  const oldRender=window.render;
+  if(typeof oldRender==='function'){
+    window.render=function(){
+      // Garante coleção canônica antes de qualquer tela derivar dados.
+      try{data=typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(data):data}catch(e){}
+      const result=oldRender.apply(this,arguments);
+      requestAnimationFrame(()=>{
+        try{sortLaunchRowsR2()}catch(e){}
+        try{colorRecentStatus()}catch(e){}
+        try{installQuick()}catch(e){}
+        try{ensurePrivacyButton()}catch(e){}
+        try{ensureCategoryTools()}catch(e){}
+        try{renderFinoraCards()}catch(e){}
+        applyPrivacy();
+      });
+      return result;
+    };
+  }
+
+  const oldDash=window.renderV84Dashboard;
+  if(typeof oldDash==='function'){
+    window.renderV84Dashboard=function(){
+      const r=oldDash.apply(this,arguments);
+      requestAnimationFrame(()=>{
+        installQuick();
+        colorRecentStatus();
+        ensurePrivacyButton();
+        ensureCategoryTools();
+        applyPrivacy();
+      });
+      return r;
+    };
+  }
+
+  // Reaplica ordenação quando o usuário muda os combos.
+  document.getElementById('launchSortField')?.addEventListener('change',()=>setTimeout(sortLaunchRowsR2,0));
+  document.getElementById('launchSortDirection')?.addEventListener('change',()=>setTimeout(sortLaunchRowsR2,0));
+
+  function install(){
+    ensureBlankOptions();
+    ensureR2PaymentDialog();
+    const payBtn=document.getElementById('finoraR2PayConfirm');
+    if(payBtn)payBtn.onclick=commitPaid;
+    ensurePrivacyButton();
+    ensureCategoryTools();
+    installQuick();
+    applyPrivacy();
+    try{renderFinoraCards()}catch(e){}
+    try{sortLaunchRowsR2()}catch(e){}
+    try{colorRecentStatus()}catch(e){}
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});
+  else install();
+
+  window.finoraV110R2Health=function(){
+    const cards=accountCards();
+    const ids=cards.map(c=>String(c.id||'')).filter(Boolean);
+    const tx=Array.isArray(data)?data:[];
+    const txids=tx.map(x=>String(x.id||'')).filter(Boolean);
+    return {
+      release:R2,
+      hydrated:typeof finoraWorkspaceHydrated==='function'?finoraWorkspaceHydrated():null,
+      cloudDirty:typeof finoraCloudDirty!=='undefined'?finoraCloudDirty:null,
+      cloudPushPending:typeof finoraCloudPushPending!=='undefined'?finoraCloudPushPending:null,
+      cards:cards.length,
+      cardIdsUnicos:new Set(ids).size,
+      cardDuplicados:ids.length-new Set(ids).size,
+      transactions:tx.length,
+      transactionIdsUnicos:new Set(txids).size,
+      transactionDuplicados:txids.length-new Set(txids).size
+    };
   };
 })();
 </script>
