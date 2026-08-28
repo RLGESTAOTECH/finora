@@ -9317,19 +9317,45 @@ $('entryForm').addEventListener('submit',async e=>{
   let recRuleVal=$('recRule').value||'fixo';
 
 
-  const row={id,account:'family',workspaceId:currentWorkspaceId,tipo:$('tipo').value,pessoa:$('pessoa').value,
+  const row={
+    ...(old||{}),
+    id,
+    account:'family',
+    workspaceId:currentWorkspaceId,
+    tipo:$('tipo').value,
+    pessoa:$('pessoa').value,
     expenseOwner:$('tipo').value==='saida'?($('expenseOwner')?.value||$('pessoa').value):'',
     descricao:descVal,
-    categoria:currentCategoryValue(),essentialType:$('tipo').value==='saida'?$('essentialType').value:'',valor:parseBRLInput($('valor').value),dataLancamento:dataLancVal,
-    vencimento:vencVal,status:$('status').value,recorrente:recorrenciaVal,recRule:recRuleVal,
-    valorRecorrente:$('valorRecorrente').value,valorPendente:false,beneficiario:$('beneficiario').value.trim(),parcelas:$('parcelas').value.trim(),cardId:$('launchCard')?.value||'',forma:$('forma').value,
+    categoria:currentCategoryValue(),
+    essentialType:$('tipo').value==='saida'?$('essentialType').value:'',
+    valor:parseBRLInput($('valor').value),
+    dataLancamento:dataLancVal,
+    vencimento:vencVal,
+    status:$('status').value,
+    recorrente:recorrenciaVal,
+    recRule:recRuleVal,
+    valorRecorrente:$('valorRecorrente').value,
+    valorPendente:false,
+    valorReferencia:(old?.valorPendente||old?.generatedReminder)?parseBRLInput($('valor').value):(old?.valorReferencia??null),
+    beneficiario:$('beneficiario').value.trim(),
+    parcelas:$('parcelas').value.trim(),
+    cardId:$('launchCard')?.value||'',
+    forma:$('forma').value,
     paymentAccount:paymentNeedsAccount($('forma').value)?$('paymentAccount').value.trim():'',
     goalId:($('tipo').value==='entrada' && $('goalUseCheck')?.checked)?($('goalUseSelect')?.value||''):(old?.goalId||''),
-    observacao:$('observacao').value.trim(),attachment,createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
+    observacao:$('observacao').value.trim(),
+    attachment,
+    createdAt:old?.createdAt||new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  };
   const idx=data.findIndex(x=>x.id===id); if(idx>=0)data[idx]=row;else data.push(row);
   try{save()}catch(err){toast('Arquivo muito grande para o navegador. Remova o anexo.');return}
-  // v1.0.10: confirmação visual local acontece no mesmo ciclo do primeiro clique.
+  // R3: confirmação visual local acontece no mesmo ciclo do primeiro clique
+  // e todas as visões derivadas são atualizadas a partir do mesmo objeto canônico.
+  data=typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(data):data;
+  localStorage.setItem(KEY,JSON.stringify(data));
   render();
+  try{if(typeof finoraRefreshAllR2==='function')finoraRefreshAllR2()}catch(e){}
   if(typeof finoraAuditLog==='function'){
     finoraAuditLog(idx>=0?'ATUALIZOU':'INCLUIU','LANCAMENTO',row.id,
       idx>=0?'Lançamento atualizado':'Lançamento incluído',old||null,row);
@@ -9341,16 +9367,51 @@ $('entryForm').addEventListener('submit',async e=>{
   toast(idx>=0?(row.tipo==='entrada'?'Entrada atualizada.':'Despesa / saída atualizada.'):(row.tipo==='entrada'?'Entrada salva.':'Despesa / saída salva.'));
 });
 function editRow(id){
-  const x=data.find(r=>r.id===id);if(!x)return;
+  const x=data.find(r=>String(r.id)===String(id));if(!x)return;
   openSectionModal('simpleLaunchPanel');
   applyLaunchMode(x.tipo==='entrada'?'entrada':'saida',{keepForm:true});
-  $('editId').value=x.id;$('tipo').value=x.tipo;fillPeople(x.pessoa);$('pessoa').value=x.pessoa||$('pessoa').value;fillExpenseOwners(x.expenseOwner||x.pessoa||'');$('descricao').value=x.descricao;
-  setCategoryValue(x.categoria||'');$('essentialType').value=x.essentialType||inferEssentialType(x);$('valor').value=formatBRLInput(x.valor);$('dataLancamento').value=x.dataLancamento||today();
-  $('vencimento').value=x.vencimento||'';$('beneficiario').value=x.beneficiario||'';$('parcelas').value=x.parcelas||'';fillLaunchCards(x.cardId||'');$('status').value=x.status;$('recorrente').value=x.recorrente||'nao';$('valorRecorrente').value=x.valorRecorrente||'mesmo';$('recRule').value=x.recRule||'fixo';$('forma').value=x.forma||'Boleto';$('observacao').value=x.observacao||'';
+  $('editId').value=x.id;
+  $('tipo').value=x.tipo;
+  fillPeople(x.pessoa);
+  $('pessoa').value=x.pessoa||$('pessoa').value;
+  fillExpenseOwners(x.expenseOwner||x.pessoa||'');
+  $('descricao').value=x.descricao;
+  setCategoryValue(x.categoria||'');
+  $('essentialType').value=x.essentialType||inferEssentialType(x);
+
+  const isVariableReminder=!!(x.valorPendente || x.generatedReminder || Number(x.valor||0)===0 && x.valorRecorrente==='variavel');
+  $('valor').value=isVariableReminder?'':formatBRLInput(x.valor);
+
+  // R3: ao editar um compromisso recorrente/valor a definir,
+  // "Data do lançamento" começa na data de hoje, mas continua editável.
+  // O vencimento original permanece preservado no campo Vencimento.
+  $('dataLancamento').value=isVariableReminder?today():(x.dataLancamento||today());
+  $('vencimento').value=x.vencimento||'';
+
+  $('beneficiario').value=x.beneficiario||'';
+  $('parcelas').value=x.parcelas||'';
+  fillLaunchCards(x.cardId||'');
+  $('status').value=x.status||'pendente';
+  $('recorrente').value=x.recorrente||'nao';
+  $('valorRecorrente').value=x.valorRecorrente||'mesmo';
+  $('recRule').value=x.recRule||'fixo';
+  $('forma').value=x.forma||'Boleto';
+  $('observacao').value=x.observacao||'';
   fillPaymentAccounts(x.paymentAccount||'');
   updateTypeLabels();
   if($('paymentAccount'))$('paymentAccount').value=x.paymentAccount||'';
-  $('formTitle').textContent=x.tipo==='entrada'?'Editar entrada':'Editar despesa / saída';$('cancelEdit').style.display='block';
+
+  $('formTitle').textContent=x.tipo==='entrada'?'Editar entrada':'Editar despesa / saída';
+  $('cancelEdit').style.display='block';
+
+  const dateNote=$('dataLancamento')?.parentElement?.querySelector('.finora-r3-date-note');
+  if(!dateNote && $('dataLancamento')?.parentElement){
+    const note=document.createElement('div');
+    note.className='file-note finora-r3-date-note';
+    note.textContent='Data sugerida: hoje. Você pode alterar antes de salvar.';
+    $('dataLancamento').parentElement.appendChild(note);
+  }
+
   $('fileInfo').textContent=x.attachment?`Arquivo atual: ${x.attachment.name}`:'O arquivo fica salvo somente neste navegador.';
   const _launch=$('simpleLaunchPanel');if(_launch)_launch.scrollTo({top:0,behavior:'smooth'});
 }
@@ -17686,6 +17747,77 @@ window.FINORA_RELEASE='1.0.10';
       transactions:tx.length,
       transactionIdsUnicos:new Set(txids).size,
       transactionDuplicados:txids.length-new Set(txids).size
+    };
+  };
+})();
+</script>
+
+
+<script id="finora-v110-r3">
+(function(){
+  'use strict';
+
+  function r3Refresh(){
+    try{if(typeof finoraRefreshAllR2==='function')finoraRefreshAllR2()}catch(e){}
+    try{if(typeof render==='function')render()}catch(e){}
+    try{if(typeof renderV84Dashboard==='function')renderV84Dashboard()}catch(e){}
+    try{if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut()}catch(e){}
+    try{if(typeof renderAlerts==='function')renderAlerts()}catch(e){}
+    try{
+      if(document.getElementById('finoraReportsPanel')&&typeof renderFinoraReports==='function'){
+        renderFinoraReports();
+      }
+    }catch(e){}
+  }
+
+  // Confirmação pós-save: se uma edição acabou de ocorrer, a interface
+  // recebe a mesma coleção canônica antes de qualquer pull subsequente.
+  const form=document.getElementById('entryForm');
+  if(form && !form.dataset.r3Bound){
+    form.dataset.r3Bound='1';
+    form.addEventListener('submit',()=>{
+      const editingId=document.getElementById('editId')?.value||'';
+      if(!editingId)return;
+      setTimeout(()=>{
+        try{
+          data=typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(data):data;
+          localStorage.setItem(KEY,JSON.stringify(data));
+          r3Refresh();
+
+          if(typeof pushCloudState==='function' &&
+             typeof cloudConfigured==='function' &&
+             cloudConfigured() &&
+             typeof finoraWorkspaceHydrated==='function' &&
+             finoraWorkspaceHydrated()){
+            Promise.resolve()
+              .then(()=>pushCloudState(false))
+              .catch(()=>{try{scheduleCloudPush()}catch(e){}});
+          }
+        }catch(e){console.error('FINORA R3 pós-edição',e)}
+      },0);
+    },true);
+  }
+
+  window.finoraV110R3Health=function(id){
+    const rows=Array.isArray(data)?data:[];
+    const tx=id?rows.find(x=>String(x.id)===String(id)):null;
+    return {
+      release:'1.0.10-R3',
+      transactions:rows.length,
+      uniqueIds:new Set(rows.map(x=>String(x.id||'')).filter(Boolean)).size,
+      editedTransaction:tx?{
+        id:tx.id,
+        descricao:tx.descricao,
+        valor:tx.valor,
+        valorPendente:tx.valorPendente,
+        dataLancamento:tx.dataLancamento,
+        vencimento:tx.vencimento,
+        status:tx.status,
+        generatedReminder:!!tx.generatedReminder,
+        seriesRootId:tx.seriesRootId||'',
+        parentRecurringId:tx.parentRecurringId||'',
+        updatedAt:tx.updatedAt
+      }:null
     };
   };
 })();
