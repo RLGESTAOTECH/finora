@@ -6105,6 +6105,97 @@ body.finora-values-hidden #homeCategoryLegend .report-legend-row > span::after{
 }
 </style>
 
+
+<style id="finora-v110-r4-style">
+/* ===== FINORA 1.0.10 — Homologação R4 ===== */
+
+.finora-r4-custom-field{margin-top:7px}
+.finora-r4-installment-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 7px;border-radius:999px;
+  background:#eef4f0;color:#285743;
+  font:700 8px Verdana,sans-serif;
+}
+
+/* Tema escuro: todos os templates escuros devem manter contraste branco. */
+body.finora-v84-dark,
+body.finora-v84-dark .shell,
+body.finora-v84-dark main{
+  background:#0b1713!important;
+  color:#f4f8f6!important;
+}
+body.finora-v84-dark :is(
+  .panel,.popup-only-panel,.simple-home,.simple-column,.simple-topline,
+  .simple-kpi,.finora-v84-panel,.finora-v84-quick,.finora-home-category-card,
+  .finora-cards-panel,.finora-card-item,.finora-v84-utility-card,
+  .report-section,.report-shell,.report-card,.family-row,.profile-modal,
+  .profile-modal-head,.profile-modal-body,.auth-card,.sheet-card,.toolbar
+){
+  background:#12231c!important;
+  color:#f4f8f6!important;
+  border-color:#2a4438!important;
+}
+body.finora-v84-dark :is(
+  h1,h2,h3,h4,h5,h6,strong,b,label,.label,.name,.value,
+  .panel-head,.panel-head h2,.simple-column-head,.simple-column-head h3,
+  .finora-v84-panel-head,.finora-v84-panel-head h3,
+  .finora-v84-quick-head,.finora-v84-quick-head h3,
+  .finora-evolution-head,.finora-evolution-head h3,
+  .finora-cards-head,.finora-cards-head h3,
+  .report-tabs button.active,.report-breakdown-row strong,
+  .finora-v88-legend-head,.report-legend-row b
+){
+  color:#f7fbf9!important;
+}
+body.finora-v84-dark :is(
+  small,.file-note,.muted,.hint,.meta,.sub,.simple-eyebrow,
+  .profile-modal-head p,.finora-v84-utility-card p,.report-period
+){
+  color:#c7d4cd!important;
+}
+body.finora-v84-dark :is(input,select,textarea){
+  background:#172b22!important;
+  color:#fff!important;
+  border-color:#3a5749!important;
+}
+body.finora-v84-dark :is(input,textarea)::placeholder{color:#a9bbb2!important}
+body.finora-v84-dark option{background:#172b22!important;color:#fff!important}
+body.finora-v84-dark :is(table,thead,tbody,tr,td,th){
+  color:#f4f8f6!important;
+  border-color:#2c4539!important;
+}
+body.finora-v84-dark th{background:#192e25!important}
+body.finora-v84-dark tr:nth-child(even) td{background:#102019!important}
+body.finora-v84-dark .finora-sidebar,
+body.finora-v84-dark .finora-mobile-nav{
+  color:#fff!important;
+}
+body.finora-v84-dark .finora-sidebar :is(span,b,small,button),
+body.finora-v84-dark .finora-mobile-nav :is(span,b,small,button){
+  color:#fff!important;
+}
+/* badges semânticos mantêm suas próprias cores de status */
+body.finora-v84-dark :is(.finora-status-pendente,.finora-status-atrasado,.finora-status-pago,.finora-status-recebido){
+  color:inherit;
+}
+
+/* impressão por pessoa */
+.finora-r4-person-group{
+  margin:0 0 10px;
+  break-inside:avoid-page;
+  page-break-inside:avoid;
+}
+.finora-r4-person-head{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:6px 7px;
+  background:#edf4f0;
+  border-left:3px solid #0f5a3e;
+  margin-bottom:4px;
+}
+.finora-r4-person-head strong{color:#174b36}
+.finora-r4-person-head span{font-weight:700;color:#174b36}
+</style>
+
 </head>
 <body>
 
@@ -6711,8 +6802,10 @@ body.finora-values-hidden #homeCategoryLegend .report-legend-row > span::after{
       <select id="tipo" required><option value="saida">Despesa / saída</option><option value="entrada">Recebimento / entrada</option></select>
     </div>
     <div class="field">
-      <label>Pessoa</label>
+      <label id="personFieldLabel">Pessoa / origem</label>
       <select id="pessoa" required></select>
+      <input id="customIncomeSource" type="text" autocomplete="off" placeholder="Informe outra pessoa, empresa, herança, venda..." style="display:none;margin-top:7px">
+      <div class="file-note" id="personFieldHelp">Selecione uma pessoa cadastrada ou escolha “Outro / informar...” para digitar uma origem diferente.</div>
     </div>
     <div class="field finora-v94-goal-entry" id="goalUseField">
       <label>Utilizar esta entrada em uma meta?</label>
@@ -6728,7 +6821,8 @@ body.finora-values-hidden #homeCategoryLegend .report-legend-row > span::after{
     <div class="field expense-owner-field" id="expenseOwnerField">
       <label>Despesa de</label>
       <select id="expenseOwner"></select>
-      <div class="file-note">Selecione um integrante deste ambiente ou “Família / compartilhada” quando o gasto for de todos.</div>
+      <input id="customExpenseOwner" type="text" autocomplete="off" placeholder="Informe outra pessoa, empresa ou responsável..." style="display:none;margin-top:7px">
+      <div class="file-note">Selecione um integrante, “Família / compartilhada” ou “Outro / informar...” para uma despesa excepcional.</div>
     </div>
     <div class="field full">
       <label>Descrição</label>
@@ -6806,7 +6900,7 @@ body.finora-values-hidden #homeCategoryLegend .report-legend-row > span::after{
     </div>
     <div class="field" id="installmentsField">
       <label>Parcelas</label>
-      <input id="parcelas" placeholder="Ex.: 1/10 ou à vista">
+      <input id="parcelas" placeholder="Ex.: 1/10, 8/12 ou à vista"><div class="file-note" id="installmentHelp">Em recorrências parceladas, a FINORA avançará automaticamente: 8/12 → 9/12 → 10/12.</div>
     </div>
     
     <div class="field" id="launchCardField">
@@ -6818,6 +6912,7 @@ body.finora-values-hidden #homeCategoryLegend .report-legend-row > span::after{
     <div class="field" id="paymentMethodField">
       <label>Forma de pagamento</label>
       <select id="forma">
+        <option value=""></option>
         <option>PIX</option>
         <option>Débito</option>
         <option>Transferência</option>
@@ -8259,12 +8354,13 @@ async function switchFinoraWorkspace(workspaceId){
   localStorage.setItem('finora_active_workspace_v52',workspaceId);
   $('loggedAccount').textContent=currentWorkspaceName;
   if($('simpleWorkspaceTitle'))$('simpleWorkspaceTitle').textContent=currentWorkspaceName;
-  normalizeVariableReminders();
-  ensureRecurringNextMonths();
+  // R4: ao trocar de ambiente, hidrata primeiro e só depois gera recorrências.
   if(cloudConfigured()){
     await pullCloudState(false);
     await finoraRecoverWorkspaceDataIfEmpty();
   }
+  normalizeVariableReminders();
+  ensureRecurringNextMonths();
   renderWorkspaceSelectors();
   renderFamilyAccess();
   render();
@@ -11051,14 +11147,18 @@ async function openFinora(user){
   $('loggedName').textContent=user.name||'Usuário';
   $('loggedAccount').textContent=currentWorkspaceName;
   $('loggedFamily').textContent=`${user.role==='admin'?'Administrador':'Integrante'} · CPF ${user.cpfMasked||''}`;
-  normalizeVariableReminders();
-  ensureRecurringNextMonths();
-  normalizeVariableReminders();
+  // R4: a fonte remota é hidratada antes de qualquer rotina que possa
+  // gerar/alterar recorrências locais. Isso evita divergência Web x Mobile.
   resetForm();
   if(cloudConfigured()){
     await pullCloudState(false);
     await finoraRecoverWorkspaceDataIfEmpty();
     await ensureOnlineWorkspaceName();
+  }
+  normalizeVariableReminders();
+  ensureRecurringNextMonths();
+  normalizeVariableReminders();
+  if(cloudConfigured()){
     // Um integrante que acabou de aceitar o convite publica imediatamente
     // seu vínculo e o status utilizado, depois de receber o estado atual.
     if(user.role==='member'){
@@ -17051,7 +17151,7 @@ window.FINORA_RELEASE='1.0.10';
     });
 
     const count=document.getElementById('finoraCardsCount');
-    if(count)count.textContent=`${rows.length} de ${all.length} cartão${all.length===1?'':'ões'}`;
+    if(count)count.textContent=`${rows.length} de ${all.length} ${all.length===1?'cartão':'cartões'}`;
     const box=document.getElementById('finoraCardGrid');
     if(!box)return;
 
@@ -17818,6 +17918,536 @@ window.FINORA_RELEASE='1.0.10';
         parentRecurringId:tx.parentRecurringId||'',
         updatedAt:tx.updatedAt
       }:null
+    };
+  };
+})();
+</script>
+
+
+<script id="finora-v110-r4">
+(function(){
+  'use strict';
+  const OTHER='__outro__';
+
+  const esc4=v=>String(v??'').replace(/[&<>"']/g,c=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+  const norm4=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  const money4=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+
+  function refDate4(x){
+    try{return typeof referenceDate==='function'?referenceDate(x):(x.vencimento||x.dataLancamento||'')}
+    catch(e){return x?.vencimento||x?.dataLancamento||''}
+  }
+  function monthDistance4(from,to){
+    if(!from||!to)return 0;
+    const [fy,fm]=String(from).slice(0,7).split('-').map(Number);
+    const [ty,tm]=String(to).slice(0,7).split('-').map(Number);
+    return (ty-fy)*12+(tm-fm);
+  }
+
+  // ----------------------------------------------------------
+  // A. Pessoa/origem editável
+  // ----------------------------------------------------------
+  window.fillPeople=function(selected=''){
+    const el=document.getElementById('pessoa');
+    if(!el)return;
+    let names=[];
+    try{names=typeof people==='function'?people():[]}catch(e){}
+    names=[...new Set(names.map(v=>String(v||'').trim()).filter(Boolean))];
+
+    const custom=String(selected||'').trim();
+    const isKnown=names.includes(custom);
+    el.innerHTML='<option value=""></option>'+
+      names.map(p=>`<option value="${esc4(p)}">${esc4(p)}</option>`).join('')+
+      `<option value="${OTHER}">Outro / informar...</option>`;
+
+    if(custom){
+      el.value=isKnown?custom:OTHER;
+      const inp=document.getElementById('customIncomeSource');
+      if(inp){inp.value=isKnown?'':custom;inp.style.display=isKnown?'none':'block'}
+    }else{
+      el.value='';
+      const inp=document.getElementById('customIncomeSource');
+      if(inp){inp.value='';inp.style.display='none'}
+    }
+
+    const quick=document.getElementById('entradaMesPessoa');
+    if(quick){
+      const keep=quick.value;
+      quick.innerHTML='<option value=""></option>'+
+        names.map(p=>`<option value="${esc4(p)}">${esc4(p)}</option>`).join('')+
+        `<option value="${OTHER}">Outro / informar...</option>`;
+      if([...quick.options].some(o=>o.value===keep))quick.value=keep;
+      else quick.value='';
+    }
+  };
+
+  window.fillExpenseOwners=function(selected=''){
+    const el=document.getElementById('expenseOwner');
+    if(!el)return;
+    let names=[];
+    try{names=typeof expenseOwnerNames==='function'?expenseOwnerNames():[]}catch(e){}
+    names=[...new Set(names.map(v=>String(v||'').trim()).filter(Boolean))];
+    const current=String(selected||'').trim();
+    const known=current==='Família / compartilhada'||names.includes(current);
+
+    el.innerHTML='<option value=""></option>'+
+      '<option value="Família / compartilhada">Família / compartilhada</option>'+
+      names.map(n=>`<option value="${esc4(n)}">${esc4(n)}</option>`).join('')+
+      `<option value="${OTHER}">Outro / informar...</option>`;
+
+    if(current){
+      el.value=known?current:OTHER;
+      const inp=document.getElementById('customExpenseOwner');
+      if(inp){inp.value=known?'':current;inp.style.display=known?'none':'block'}
+    }else{
+      el.value='';
+      const inp=document.getElementById('customExpenseOwner');
+      if(inp){inp.value='';inp.style.display='none'}
+    }
+  };
+
+  function installCustomPersonControls(){
+    const p=document.getElementById('pessoa');
+    const pi=document.getElementById('customIncomeSource');
+    if(p&&!p.dataset.r4){
+      p.dataset.r4='1';
+      p.addEventListener('change',()=>{
+        if(pi){
+          pi.style.display=p.value===OTHER?'block':'none';
+          if(p.value!==OTHER)pi.value='';
+          else requestAnimationFrame(()=>pi.focus());
+        }
+      });
+    }
+    const e=document.getElementById('expenseOwner');
+    const ei=document.getElementById('customExpenseOwner');
+    if(e&&!e.dataset.r4){
+      e.dataset.r4='1';
+      e.addEventListener('change',()=>{
+        if(ei){
+          ei.style.display=e.value===OTHER?'block':'none';
+          if(e.value!==OTHER)ei.value='';
+          else requestAnimationFrame(()=>ei.focus());
+        }
+      });
+    }
+  }
+
+  // Antes do submit original, materializa os valores customizados nos selects.
+  const entryForm=document.getElementById('entryForm');
+  if(entryForm&&!entryForm.dataset.r4Custom){
+    entryForm.dataset.r4Custom='1';
+    entryForm.addEventListener('submit',e=>{
+      const p=document.getElementById('pessoa');
+      const pi=document.getElementById('customIncomeSource');
+      if(p?.value===OTHER){
+        const v=String(pi?.value||'').trim();
+        if(!v){
+          e.preventDefault();e.stopImmediatePropagation();
+          if(typeof toast==='function')toast('Informe a pessoa ou origem do lançamento.');
+          return;
+        }
+        const op=document.createElement('option');op.value=v;op.textContent=v;p.appendChild(op);p.value=v;
+      }
+
+      const owner=document.getElementById('expenseOwner');
+      const oi=document.getElementById('customExpenseOwner');
+      if(document.getElementById('tipo')?.value==='saida' && owner?.value===OTHER){
+        const v=String(oi?.value||'').trim();
+        if(!v){
+          e.preventDefault();e.stopImmediatePropagation();
+          if(typeof toast==='function')toast('Informe de quem é a despesa.');
+          return;
+        }
+        const op=document.createElement('option');op.value=v;op.textContent=v;owner.appendChild(op);owner.value=v;
+      }
+    },true);
+  }
+
+  // Novo lançamento: tudo em branco, exceto data e o tipo definido pelo menu.
+  const oldReset=window.resetForm;
+  if(typeof oldReset==='function'){
+    window.resetForm=function(){
+      oldReset.apply(this,arguments);
+      const mode=typeof currentLaunchMode!=='undefined'?currentLaunchMode:'list';
+      const blankIds=['pessoa','expenseOwner','categoria','categoriaExpense','forma','beneficiario','parcelas','paymentAccount','launchCard'];
+      blankIds.forEach(id=>{
+        const el=document.getElementById(id);
+        if(el)el.value='';
+      });
+      const customIncome=document.getElementById('customIncomeSource');
+      const customExpense=document.getElementById('customExpenseOwner');
+      if(customIncome){customIncome.value='';customIncome.style.display='none'}
+      if(customExpense){customExpense.value='';customExpense.style.display='none'}
+      const status=document.getElementById('status');
+      if(status)status.value='';
+      const date=document.getElementById('dataLancamento');
+      if(date && typeof today==='function')date.value=today();
+      if(document.getElementById('tipo')){
+        if(mode==='entrada')document.getElementById('tipo').value='entrada';
+        else if(mode==='saida')document.getElementById('tipo').value='saida';
+      }
+      fillPeople('');
+      fillExpenseOwners('');
+      installCustomPersonControls();
+    };
+  }
+
+  // ----------------------------------------------------------
+  // B. Recorrência com template e parcelas progressivas
+  // ----------------------------------------------------------
+  function parseInstallment(v){
+    const m=String(v||'').trim().match(/^(\d+)\s*\/\s*(\d+)$/);
+    if(!m)return null;
+    const current=Number(m[1]),total=Number(m[2]);
+    if(current<1||total<1||current>total)return null;
+    return {current,total};
+  }
+  function installmentAt(base,offset){
+    const p=parseInstallment(base);
+    if(!p)return base||'';
+    const n=p.current+offset;
+    if(n>p.total)return null;
+    return `${n}/${p.total}`;
+  }
+
+  function recurrenceTemplate(root){
+    const saved=root.recurrenceTemplate||{};
+    return {
+      pessoa:saved.pessoa??root.pessoa??'',
+      expenseOwner:saved.expenseOwner??root.expenseOwner??'',
+      descricao:saved.descricao??root.descricao??'',
+      categoria:saved.categoria??root.categoria??'',
+      essentialType:saved.essentialType??root.essentialType??'',
+      beneficiario:saved.beneficiario??root.beneficiario??'',
+      cardId:saved.cardId??root.cardId??'',
+      forma:saved.forma??root.forma??'',
+      paymentAccount:saved.paymentAccount??root.paymentAccount??'',
+      observacao:saved.observacao??root.observacao??'',
+      valorRecorrente:saved.valorRecorrente??root.valorRecorrente??'mesmo',
+      recRule:saved.recRule??root.recRule??'fixo',
+      parcelasBase:saved.parcelasBase??root.parcelas??''
+    };
+  }
+
+  function recurringDate(root,offset){
+    try{
+      if(typeof recurringDateAtOffset==='function')return recurringDateAtOffset(root,offset);
+    }catch(e){}
+    const base=refDate4(root);
+    if(!base)return '';
+    const [y,m,d]=base.split('-').map(Number);
+    const dt=new Date(y,m-1+offset,1);
+    const last=new Date(dt.getFullYear(),dt.getMonth()+1,0).getDate();
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(Math.min(d,last)).padStart(2,'0')}`;
+  }
+
+  window.ensureRecurringNextMonths=function(){
+    const rows=Array.isArray(data)?data:[];
+    const roots=rows.filter(x=>x.recorrente==='mensal'&&!x.generatedReminder);
+    const nowMonth=typeof currentMonth==='function'?currentMonth():new Date().toISOString().slice(0,7);
+    let changed=false;
+
+    roots.forEach(root=>{
+      const base=refDate4(root);
+      if(!base)return;
+      const rootId=root.seriesRootId||root.id;
+      root.seriesRootId=rootId;
+      const tpl=recurrenceTemplate(root);
+      root.recurrenceTemplate={...tpl};
+      root.installmentStart=root.installmentStart||tpl.parcelasBase||root.parcelas||'';
+
+      const dist=monthDistance4(base,nowMonth);
+      const start=Math.max(1,dist-1);
+      const end=Math.max(3,dist+3);
+
+      for(let offset=start;offset<=end;offset++){
+        const parcel=installmentAt(root.installmentStart,offset);
+        if(parcel===null)continue; // série parcelada terminou
+        const nextDate=recurringDate(root,offset);
+        if(!nextDate)continue;
+
+        let existing=rows.find(r=>{
+          const sameSeries=String(r.seriesRootId||'')===String(rootId) ||
+            String(r.parentRecurringId||'')===String(root.id);
+          return sameSeries && refDate4(r)===nextDate;
+        });
+
+        if(existing){
+          // Para lembretes ainda não liquidados, restaura a configuração-base
+          // da série sem sobrescrever valor/status já efetivamente lançados.
+          if(existing.generatedReminder && existing.status!=='pago'){
+            const keepValue=existing.valor;
+            const keepPending=existing.valorPendente;
+            Object.assign(existing,{
+              pessoa:tpl.pessoa,
+              expenseOwner:tpl.expenseOwner,
+              descricao:tpl.descricao,
+              categoria:tpl.categoria,
+              essentialType:tpl.essentialType,
+              beneficiario:tpl.beneficiario,
+              cardId:tpl.cardId,
+              forma:tpl.forma,
+              paymentAccount:tpl.paymentAccount,
+              observacao:tpl.observacao,
+              valorRecorrente:tpl.valorRecorrente,
+              recRule:tpl.recRule,
+              parcelas:parcel||existing.parcelas||'',
+              recurrenceTemplate:{...tpl},
+              seriesRootId:rootId,
+              parentRecurringId:root.id
+            });
+            existing.valor=keepValue;
+            existing.valorPendente=keepPending;
+          }
+          continue;
+        }
+
+        const variable=tpl.valorRecorrente==='variavel';
+        rows.push({
+          ...root,
+          ...tpl,
+          id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,
+          seriesRootId:rootId,
+          parentRecurringId:root.id,
+          recurrenceTemplate:{...tpl},
+          parcelas:parcel||'',
+          installmentStart:root.installmentStart,
+          valor:variable?0:root.valor,
+          valorPendente:variable,
+          valorReferencia:variable?root.valor:null,
+          status:'pendente',
+          dataPagamento:'',
+          dataLancamento:nextDate,
+          vencimento:nextDate,
+          attachment:null,
+          generatedReminder:true,
+          recorrente:'nao',
+          createdAt:new Date().toISOString(),
+          updatedAt:new Date().toISOString()
+        });
+        changed=true;
+      }
+    });
+
+    data=typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(rows):rows;
+    if(changed){
+      try{if(typeof save==='function')save()}catch(e){console.error('FINORA R4 recorrência',e)}
+    }
+  };
+
+  // Ao salvar um root recorrente, registra explicitamente a configuração-base.
+  if(entryForm&&!entryForm.dataset.r4Recurring){
+    entryForm.dataset.r4Recurring='1';
+    entryForm.addEventListener('submit',()=>{
+      const recurring=document.getElementById('recorrente')?.value==='mensal';
+      if(!recurring)return;
+      setTimeout(()=>{
+        try{
+          const desc=String(document.getElementById('descricao')?.value||'').trim();
+          const date=document.getElementById('dataLancamento')?.value||'';
+          const candidates=data.filter(x=>!x.generatedReminder&&x.recorrente==='mensal'&&x.descricao===desc);
+          candidates.sort((a,b)=>(Date.parse(b.updatedAt||0)||0)-(Date.parse(a.updatedAt||0)||0));
+          const root=candidates[0];
+          if(!root)return;
+          root.recurrenceTemplate=recurrenceTemplate(root);
+          root.installmentStart=root.installmentStart||root.parcelas||'';
+          root.updatedAt=new Date().toISOString();
+          ensureRecurringNextMonths();
+        }catch(e){console.error('FINORA R4 template recorrente',e)}
+      },0);
+    },false);
+  }
+
+  // ----------------------------------------------------------
+  // C. Mobile/Web: mesma fonte remota e re-hidratação segura
+  // ----------------------------------------------------------
+  let visibilityPullBusy=false;
+  async function refreshFromCloudR4(){
+    if(visibilityPullBusy)return;
+    if(document.visibilityState==='hidden')return;
+    if(typeof cloudConfigured!=='function'||!cloudConfigured())return;
+    if(typeof finoraCloudDirty!=='undefined'&&finoraCloudDirty)return;
+    if(typeof currentWorkspaceId==='undefined'||!currentWorkspaceId)return;
+    visibilityPullBusy=true;
+    try{
+      if(typeof pullCloudState==='function')await pullCloudState(false);
+      try{normalizeVariableReminders()}catch(e){}
+      try{ensureRecurringNextMonths()}catch(e){}
+      try{if(typeof finoraRefreshAllR2==='function')finoraRefreshAllR2();else render()}catch(e){}
+    }catch(e){
+      console.warn('FINORA R4 atualização remota',e);
+    }finally{visibilityPullBusy=false}
+  }
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshFromCloudR4()});
+  window.addEventListener('online',refreshFromCloudR4);
+
+  window.finoraMobileSyncAuditR4=async function(){
+    const local=(Array.isArray(data)?data:[]).filter(x=>String(x.workspaceId||'')===String(currentWorkspaceId||''));
+    const localEntries=local.filter(x=>x.tipo==='entrada');
+    const out={
+      workspaceId:currentWorkspaceId||null,
+      localTotal:local.length,
+      localEntradas:localEntries.length,
+      localIdsUnicos:new Set(local.map(x=>String(x.id||'')).filter(Boolean)).size,
+      cloudTotal:null,
+      cloudEntradas:null,
+      cloudError:null
+    };
+    try{
+      const client=typeof getAuthClient==='function'?getAuthClient():null;
+      if(!client)throw new Error('Cliente Supabase indisponível');
+      const {data:rows,error}=await client.from('finora_workspace_state')
+        .select('workspace_id,state,updated_at')
+        .eq('workspace_id',currentWorkspaceId)
+        .limit(1);
+      if(error)throw error;
+      const tx=rows?.[0]?.state?.transactions||[];
+      out.cloudTotal=Array.isArray(tx)?tx.length:0;
+      out.cloudEntradas=Array.isArray(tx)?tx.filter(x=>x.tipo==='entrada').length:0;
+      out.cloudUpdatedAt=rows?.[0]?.updated_at||null;
+    }catch(e){out.cloudError=String(e?.message||e)}
+    return out;
+  };
+
+  // ----------------------------------------------------------
+  // D. Tema escuro
+  // ----------------------------------------------------------
+  function applyDarkContrastR4(){
+    if(!document.body.classList.contains('finora-v84-dark'))return;
+    document.querySelectorAll('.popup-only-panel,.panel,.report-section,.finora-card-item').forEach(el=>{
+      el.classList.add('finora-r4-dark-ready');
+    });
+  }
+  const observer=new MutationObserver(applyDarkContrastR4);
+  observer.observe(document.body,{attributes:true,attributeFilter:['class'],subtree:false});
+
+  // ----------------------------------------------------------
+  // E. Impressão "Por pessoa" agrupada por pessoa e data decrescente
+  // ----------------------------------------------------------
+  function activeReportMode(){
+    return document.querySelector('.report-tabs button.active')?.dataset.reportTab||'overview';
+  }
+  function reportPerson(x){
+    try{return typeof reportPersonOf==='function'?reportPersonOf(x):(x.expenseOwner||x.pessoa||'Não informado')}
+    catch(e){return x?.expenseOwner||x?.pessoa||'Não informado'}
+  }
+  function reportRows4(){
+    try{return typeof reportRows==='function'?reportRows():[]}
+    catch(e){return[]}
+  }
+  function personPrintHTML(rows){
+    const groups=new Map();
+    rows.filter(x=>x.tipo==='saida'&&!x.valorPendente).forEach(x=>{
+      const p=reportPerson(x)||'Não informado';
+      if(!groups.has(p))groups.set(p,[]);
+      groups.get(p).push(x);
+    });
+    const arr=[...groups.entries()].map(([person,items])=>({
+      person,items,
+      total:items.reduce((s,x)=>s+Number(x.valor||0),0)
+    })).sort((a,b)=>a.person.localeCompare(b.person,'pt-BR',{sensitivity:'base'}));
+
+    return arr.map(g=>{
+      const sorted=[...g.items].sort((a,b)=>String(refDate4(b)).localeCompare(String(refDate4(a))) ||
+        String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+      return `<section class="finora-r4-person-group">
+        <div class="finora-r4-person-head"><strong>${esc4(g.person)}</strong><span>${money4(g.total)}</span></div>
+        <table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Forma</th><th>Status</th><th class="num">Valor</th></tr></thead>
+        <tbody>${sorted.map(x=>`<tr>
+          <td>${esc4(typeof reportBRDate==='function'?reportBRDate(refDate4(x)):refDate4(x))}</td>
+          <td>${esc4(x.descricao||'Movimentação')}</td>
+          <td>${esc4(x.categoria||'Outros')}</td>
+          <td>${esc4(typeof reportPaymentOf==='function'?reportPaymentOf(x):(x.forma||'—'))}</td>
+          <td>${esc4(typeof effectiveStatus==='function'?effectiveStatus(x):(x.status||''))}</td>
+          <td class="num">${money4(x.valor||0)}</td>
+        </tr>`).join('')}</tbody></table>
+      </section>`;
+    }).join('')||'<div class="empty">Nenhuma despesa por pessoa no período.</div>';
+  }
+
+  const oldPrint=window.printFinoraReport;
+  window.printFinoraReport=function(){
+    if(activeReportMode()!=='person'){
+      return typeof oldPrint==='function'?oldPrint.apply(this,arguments):undefined;
+    }
+    try{
+      const rows=reportRows4();
+      const period=typeof reportPeriodLabel==='function'?reportPeriodLabel():'';
+      const workspace=typeof currentWorkspaceName!=='undefined'?currentWorkspaceName:'Meu ambiente';
+      const total=rows.filter(x=>x.tipo==='saida'&&!x.valorPendente).reduce((s,x)=>s+Number(x.valor||0),0);
+      const w=window.open('','_blank');
+      if(!w){if(typeof toast==='function')toast('Permita pop-ups para imprimir o relatório.');return}
+      w.document.open();
+      w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+        <title>FINORA — Gastos por pessoa</title>
+        <style>
+          @page{size:A4 portrait;margin:9mm}
+          *{box-sizing:border-box}
+          body{font-family:Arial,sans-serif;color:#21322a;font-size:9px;margin:0}
+          header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0f5a3e;padding-bottom:6px;margin-bottom:9px}
+          h1{margin:0;color:#0f5a3e;font:700 18px Georgia,serif}
+          .meta{text-align:right;color:#66756d;line-height:1.4}
+          .summary{padding:7px;border:1px solid #dce5e0;border-radius:6px;margin-bottom:9px}
+          .summary strong{font-size:12px;color:#174b36}
+          .finora-r4-person-group{margin:0 0 10px;break-inside:avoid-page}
+          .finora-r4-person-head{display:flex;justify-content:space-between;padding:6px 7px;background:#edf4f0;border-left:3px solid #0f5a3e;margin-bottom:4px}
+          .finora-r4-person-head strong,.finora-r4-person-head span{color:#174b36;font-weight:700}
+          table{width:100%;border-collapse:collapse;table-layout:fixed}
+          th{background:#f4f7f5;text-align:left;font-size:7px;padding:4px;border-bottom:1px solid #cfdad4}
+          td{padding:4px;border-bottom:1px solid #e8edea;vertical-align:top;word-break:break-word}
+          tr{break-inside:avoid}.num{text-align:right;white-space:nowrap}
+          footer{margin-top:8px;padding-top:5px;border-top:1px solid #dfe6e2;color:#7a8880;font-size:7px}
+        </style></head><body>
+        <header><div><h1>FINORA</h1><div>Gastos por pessoa — detalhamento</div></div>
+        <div class="meta">${esc4(workspace)}<br>${esc4(period)}</div></header>
+        <div class="summary">Total de despesas no período: <strong>${money4(total)}</strong></div>
+        ${personPrintHTML(rows)}
+        <footer>FINORA · Versão 1.0.10 · ${new Date().toLocaleString('pt-BR')}</footer>
+        <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),120));<\/script>
+        </body></html>`);
+      w.document.close();
+    }catch(e){
+      console.error('FINORA R4 impressão por pessoa',e);
+      if(typeof toast==='function')toast('Não foi possível preparar a impressão por pessoa.');
+    }
+  };
+
+  // ----------------------------------------------------------
+  // F. Instalação
+  // ----------------------------------------------------------
+  function installR4(){
+    installCustomPersonControls();
+    try{fillPeople('')}catch(e){}
+    try{fillExpenseOwners('')}catch(e){}
+    applyDarkContrastR4();
+
+    // Corrige contador imediatamente.
+    const count=document.getElementById('finoraCardsCount');
+    if(count){
+      count.textContent=count.textContent
+        .replace(/cart[aã]o(?:ões|oões|ões)?/gi, m=>/1 de 1/.test(count.textContent)?'cartão':'cartões');
+    }
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installR4,{once:true});
+  else installR4();
+
+  window.finoraV110R4Health=function(){
+    const rows=Array.isArray(data)?data:[];
+    const wsRows=rows.filter(x=>String(x.workspaceId||'')===String(currentWorkspaceId||''));
+    const recurringRoots=wsRows.filter(x=>x.recorrente==='mensal'&&!x.generatedReminder);
+    return {
+      release:'1.0.10-R4',
+      workspaceId:currentWorkspaceId||null,
+      transactions:wsRows.length,
+      entradas:wsRows.filter(x=>x.tipo==='entrada').length,
+      uniqueIds:new Set(wsRows.map(x=>String(x.id||'')).filter(Boolean)).size,
+      recurringRoots:recurringRoots.length,
+      darkTheme:document.body.classList.contains('finora-v84-dark'),
+      online:navigator.onLine
     };
   };
 })();
