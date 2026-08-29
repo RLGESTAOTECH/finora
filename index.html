@@ -6399,6 +6399,197 @@ body.finora-v84-dark .finora-r72-installment-separator{color:#fff}
 }
 </style>
 
+
+<style id="finora-v110-r74-dark-theme">
+/* =========================================================
+   FINORA 1.0.10 — R7.4
+   Tema escuro:
+   - conteúdo: textos claros;
+   - menu lateral: NÃO é alterado pelo tema;
+   - login/cadastro: SEMPRE mantém o visual claro original.
+   ========================================================= */
+
+/* ----- LOGIN/CADASTRO: totalmente independente do tema ----- */
+body.finora-v84-dark #authScreen.auth-screen{
+  background:linear-gradient(135deg,#052f26 0 49%,#eef4f0 49%)!important;
+  color:#173f32!important;
+}
+body.finora-v84-dark #authScreen .auth-card{
+  background:#fff!important;
+  color:#173f32!important;
+  border-color:rgba(5,47,38,.45)!important;
+}
+body.finora-v84-dark #authScreen .auth-brand{
+  background:#073d2c!important;
+  color:#fff!important;
+}
+body.finora-v84-dark #authScreen .auth-brand h1,
+body.finora-v84-dark #authScreen .auth-brand strong{
+  color:#fff!important;
+}
+body.finora-v84-dark #authScreen .auth-brand p{
+  color:#dbe9e1!important;
+}
+body.finora-v84-dark #authScreen .auth-panel,
+body.finora-v84-dark #authScreen .auth-inner,
+body.finora-v84-dark #authScreen #loginPane,
+body.finora-v84-dark #authScreen #registerPane{
+  background:#fff!important;
+  color:#173f32!important;
+}
+body.finora-v84-dark #authScreen h2{
+  color:#143e31!important;
+}
+body.finora-v84-dark #authScreen .file-note,
+body.finora-v84-dark #authScreen p,
+body.finora-v84-dark #authScreen label{
+  color:#667970!important;
+}
+body.finora-v84-dark #authScreen .auth-tabs{
+  background:#eef3ef!important;
+}
+body.finora-v84-dark #authScreen .auth-tabs button{
+  background:transparent!important;
+  color:#163f32!important;
+}
+body.finora-v84-dark #authScreen .auth-tabs button.active{
+  background:#fff!important;
+  color:#315c49!important;
+}
+body.finora-v84-dark #authScreen input,
+body.finora-v84-dark #authScreen select,
+body.finora-v84-dark #authScreen textarea{
+  background:#fff!important;
+  color:#172c24!important;
+  border-color:#a7bbb1!important;
+  -webkit-text-fill-color:#172c24!important;
+}
+body.finora-v84-dark #authScreen input::placeholder,
+body.finora-v84-dark #authScreen textarea::placeholder{
+  color:#8b9992!important;
+  opacity:1!important;
+}
+body.finora-v84-dark #authScreen .auth-submit{
+  background:#0f6847!important;
+  color:#fff!important;
+}
+
+/* ----- CONTEÚDO PRINCIPAL: tipografia clara ----- */
+/* Não inclui .finora-sidebar e não inclui #authScreen. */
+body.finora-v84-dark .shell,
+body.finora-v84-dark header,
+body.finora-v84-dark .popup-only-panel,
+body.finora-v84-dark .simple-tool-panel,
+body.finora-v84-dark .finora-v84-panel,
+body.finora-v84-dark .finora-v84-quick,
+body.finora-v84-dark .finora-home-category-card,
+body.finora-v84-dark .simple-kpi{
+  color:#f4f8f6!important;
+}
+
+/* Textos gerais da área principal */
+body.finora-v84-dark .shell h1,
+body.finora-v84-dark .shell h2,
+body.finora-v84-dark .shell h3,
+body.finora-v84-dark .shell h4,
+body.finora-v84-dark .shell h5,
+body.finora-v84-dark .shell h6,
+body.finora-v84-dark .shell label,
+body.finora-v84-dark .shell p,
+body.finora-v84-dark .shell small,
+body.finora-v84-dark .shell span:not(.status):not(.badge):not(.tag):not(.ico),
+body.finora-v84-dark .shell strong,
+body.finora-v84-dark .shell th,
+body.finora-v84-dark .shell td,
+body.finora-v84-dark .shell legend,
+body.finora-v84-dark header h1,
+body.finora-v84-dark header h2,
+body.finora-v84-dark header h3,
+body.finora-v84-dark header label,
+body.finora-v84-dark header span:not(.badge),
+body.finora-v84-dark .popup-only-panel h1,
+body.finora-v84-dark .popup-only-panel h2,
+body.finora-v84-dark .popup-only-panel h3,
+body.finora-v84-dark .popup-only-panel h4,
+body.finora-v84-dark .popup-only-panel label,
+body.finora-v84-dark .popup-only-panel p,
+body.finora-v84-dark .popup-only-panel small,
+body.finora-v84-dark .popup-only-panel th,
+body.finora-v84-dark .popup-only-panel td{
+  color:#f4f8f6!important;
+}
+
+/* Textos auxiliares */
+body.finora-v84-dark .shell .file-note,
+body.finora-v84-dark .shell .muted,
+body.finora-v84-dark .shell .hint,
+body.finora-v84-dark .shell .helper,
+body.finora-v84-dark .shell .subtitle,
+body.finora-v84-dark .popup-only-panel .file-note,
+body.finora-v84-dark .popup-only-panel .muted{
+  color:#d6e2dc!important;
+}
+
+/* Inputs do conteúdo escuro */
+body.finora-v84-dark .shell input,
+body.finora-v84-dark .shell select,
+body.finora-v84-dark .shell textarea,
+body.finora-v84-dark .popup-only-panel input,
+body.finora-v84-dark .popup-only-panel select,
+body.finora-v84-dark .popup-only-panel textarea{
+  background:#142a22!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  border-color:#476457!important;
+}
+body.finora-v84-dark .shell input::placeholder,
+body.finora-v84-dark .shell textarea::placeholder,
+body.finora-v84-dark .popup-only-panel input::placeholder,
+body.finora-v84-dark .popup-only-panel textarea::placeholder{
+  color:#bccdc4!important;
+  opacity:1!important;
+}
+body.finora-v84-dark .shell select option,
+body.finora-v84-dark .popup-only-panel select option{
+  background:#142a22!important;
+  color:#fff!important;
+}
+
+/* Cards e tabelas */
+body.finora-v84-dark .simple-kpi,
+body.finora-v84-dark .finora-home-category-card,
+body.finora-v84-dark .finora-v84-quick,
+body.finora-v84-dark .finora-v84-panel,
+body.finora-v84-dark .popup-only-panel{
+  background:#12231c!important;
+  border-color:#2b463a!important;
+}
+body.finora-v84-dark .shell table,
+body.finora-v84-dark .popup-only-panel table{
+  color:#f4f8f6!important;
+}
+body.finora-v84-dark .shell tr,
+body.finora-v84-dark .popup-only-panel tr{
+  border-color:#314a3f!important;
+}
+
+/* Botões de superfície clara no dark mode precisam continuar legíveis. */
+body.finora-v84-dark .shell button:not(.btn-primary):not(.auth-submit):not(.danger),
+body.finora-v84-dark .popup-only-panel button:not(.btn-primary):not(.danger){
+  color:#eef6f2!important;
+}
+
+/* ----- MENU LATERAL: propositalmente fora das regras de tema ----- */
+/* Reaplica o visual fixo do menu para garantir que o dark mode não o modifique. */
+body.finora-v84-dark .finora-sidebar{
+  background:linear-gradient(180deg,#00382d 0%,#00503d 100%)!important;
+}
+body.finora-v84-dark .finora-sidebar,
+body.finora-v84-dark .finora-sidebar *{
+  /* não força branco global; deixa as regras próprias do menu prevalecerem */
+}
+</style>
+
 </head>
 <body>
 
@@ -19983,6 +20174,43 @@ window.finoraR73Health=async function(){
   };
 };
 
+})();
+</script>
+
+
+<script id="finora-v110-r74-dark-theme">
+(function(){
+  'use strict';
+
+  // A tela de autenticação deve ignorar completamente o tema armazenado.
+  // O tema continua salvo para ser aplicado somente depois de entrar no FINORA.
+  function syncAuthThemeIsolation(){
+    const auth=document.getElementById('authScreen');
+    if(!auth)return;
+    const visible=getComputedStyle(auth).display!=='none';
+    auth.classList.toggle('finora-auth-theme-isolated',visible);
+  }
+
+  document.getElementById('tabLogin')?.addEventListener('click',syncAuthThemeIsolation);
+  document.getElementById('tabRegister')?.addEventListener('click',syncAuthThemeIsolation);
+  document.getElementById('logoutBtn')?.addEventListener('click',()=>setTimeout(syncAuthThemeIsolation,0));
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',syncAuthThemeIsolation,{once:true});
+  }else{
+    syncAuthThemeIsolation();
+  }
+
+  window.finoraR74ThemeHealth=function(){
+    const auth=document.getElementById('authScreen');
+    return {
+      release:'1.0.10-R7.4',
+      darkTheme:document.body.classList.contains('finora-v84-dark'),
+      authVisible:!!auth && getComputedStyle(auth).display!=='none',
+      authIsolated:!!auth?.classList.contains('finora-auth-theme-isolated'),
+      sidebarPresent:!!document.querySelector('.finora-sidebar')
+    };
+  };
 })();
 </script>
 
