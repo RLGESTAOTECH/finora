@@ -19220,15 +19220,23 @@ const AVATAR_CACHE_PREFIX='finora_avatar_cache_v110_';
 function userKey(){
   try{return String(currentUser?.id||'').trim()}catch(e){return ''}
 }
-function avatarCacheKey(){return AVATAR_CACHE_PREFIX+(userKey()||'anon')}
+function avatarCacheKey(){
+  const key=userKey();
+  return key?AVATAR_CACHE_PREFIX+key:'';
+}
 function cacheAvatar(photo){
   try{
-    if(photo)localStorage.setItem(avatarCacheKey(),photo);
-    else localStorage.removeItem(avatarCacheKey());
+    const key=avatarCacheKey();
+    if(!key)return;
+    if(photo)localStorage.setItem(key,photo);
+    else localStorage.removeItem(key);
   }catch(e){}
 }
 function cachedAvatar(){
-  try{return localStorage.getItem(avatarCacheKey())||''}catch(e){return ''}
+  try{
+    const key=avatarCacheKey();
+    return key?(localStorage.getItem(key)||''):'';
+  }catch(e){return ''}
 }
 function initialsFromName(){
   const name=String(currentUser?.name||$8('loggedName')?.textContent||'U').trim();
@@ -19255,6 +19263,8 @@ function applyAvatarR8(photo){
 window.finoraApplyAvatarR8=applyAvatarR8;
 
 async function hydrateAvatarR8(){
+  // R8.1: nunca consultar Auth/cache durante a tela de login.
+  if(typeof currentUser==='undefined' || !currentUser)return '';
   // Mostra imediatamente o cache local para evitar "piscar" iniciais.
   const local=cachedAvatar();
   if(local)applyAvatarR8(local);
@@ -19488,23 +19498,19 @@ function openProfilePhotoR8(){
   hydrateAvatarR8();
 }
 
-// Garante foto após qualquer render que possa tocar no avatar.
-const avatarObserver=new MutationObserver(()=>{
-  const avatar=$8('userAvatarInitials');
-  if(!avatar)return;
-  const photo=cachedAvatar();
-  if(photo && (!avatar.classList.contains('finora-has-photo') || avatar.textContent.trim())){
-    applyAvatarR8(photo);
-  }else if(!photo && !avatar.style.backgroundImage && !avatar.textContent.trim()){
-    applyAvatarR8('');
-  }
-});
-if(document.documentElement)avatarObserver.observe(document.documentElement,{subtree:true,childList:true,characterData:true});
+// R8.1: sem MutationObserver global.
+// O avatar é atualizado apenas em eventos finitos e previsíveis.
+function safeHydrateAvatarR81(){
+  try{
+    if(typeof currentUser==='undefined' || !currentUser)return;
+    hydrateAvatarR8();
+  }catch(e){}
+}
 
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible')hydrateAvatarR8();
+  if(document.visibilityState==='visible')safeHydrateAvatarR81();
 });
-window.addEventListener('focus',()=>hydrateAvatarR8());
+window.addEventListener('focus',safeHydrateAvatarR81);
 
 // ----------------------------------------------------------
 // Novo lançamento: boleto é opcional e formulário permanece visível.
@@ -19651,10 +19657,10 @@ function installR8(){
   replaceSaveButtonR8();
   installInstallmentCombos();
   showLaunchFormAlways();
-  hydrateAvatarR8();
 
-  // Perfil sempre abre com a imagem correta, quando houver.
+  // R8.1: avatar só é hidratado depois que existe uma sessão FINORA.
   $8('profileBtn')?.addEventListener('click',()=>setTimeout(openProfilePhotoR8,0));
+  $8('userChip')?.addEventListener('click',()=>setTimeout(safeHydrateAvatarR81,0));
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installR8,{once:true});
 else installR8();
@@ -19677,6 +19683,25 @@ window.finoraV110R8Health=async function(){
     installmentCombos:!!$8('parcelaAtual')&&!!$8('parcelaTotal')
   };
 };
+})();
+</script>
+
+
+<script id="finora-v110-r81-hotfix">
+(function(){
+  'use strict';
+  window.finoraV110R81Health=function(){
+    let hasCurrent=false;
+    try{hasCurrent=!!currentUser}catch(e){}
+    return {
+      release:'1.0.10-R8.1',
+      currentUser:hasCurrent,
+      globalAvatarObserver:false,
+      avatarCacheKey:hasCurrent?('finora_avatar_cache_v110_'+String(currentUser.id||'')):'',
+      loginSafe:true,
+      installmentCombos:!!document.getElementById('parcelaAtual')&&!!document.getElementById('parcelaTotal')
+    };
+  };
 })();
 </script>
 
