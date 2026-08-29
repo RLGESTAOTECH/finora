@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.9">
+<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.11">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -10034,7 +10034,14 @@ $('entryForm').addEventListener('submit',async e=>{
     recRule:recRuleVal,
     valorRecorrente:$('valorRecorrente').value,
     valorPendente:false,
-    valorReferencia:(old?.valorPendente||old?.generatedReminder)?parseBRLInput($('valor').value):(old?.valorReferencia??null),
+    generatedReminder:false,
+    materializedOccurrence:!!(old?.valorPendente||old?.generatedReminder||old?.materializedOccurrence),
+    materializedAt:(old?.valorPendente||old?.generatedReminder)
+      ? new Date().toISOString()
+      : (old?.materializedAt||null),
+    valorReferencia:(old?.valorPendente||old?.generatedReminder)
+      ? parseBRLInput($('valor').value)
+      : (old?.valorReferencia??null),
     beneficiario:$('beneficiario').value.trim(),
     codigoBoleto:$('codigoBoleto')?.value.trim()||'',
     parcelado:$('parcelado')?.value||'',
@@ -20447,6 +20454,16 @@ window.finoraR73Health=async function(){
       // possam reclassificar a ocorrência como "Valor a definir".
       setTimeout(()=>{
         try{
+          const existing=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id));
+          if(existing &&
+             existing.materializedOccurrence &&
+             !existing.valorPendente &&
+             !existing.generatedReminder &&
+             Number(existing.valor)===Number(value)){
+            refreshEveryView();
+            return;
+          }
+
           const row=materializeEditedOccurrence(id,value);
           if(!row)return;
 
@@ -20735,6 +20752,213 @@ window.finoraR79SyncHealth=function(id){
     pendingCount:pending.length,
     pendingIds:pending.map(x=>x.id),
     transaction:row?finoraTxComparableV79(row):null
+  };
+};
+})();
+</script>
+
+
+<style id="finora-dark-theme-r710">
+/* FINORA R7.10 — normalização visual exclusiva do tema escuro.
+   Não altera login, persistência, sincronização, dados ou tema claro. */
+html[data-theme="dark"] body:not(.login-page),
+body[data-theme="dark"]:not(.login-page),
+body.dark-theme:not(.login-page),
+body.theme-dark:not(.login-page) {
+  --fd-bg: #071a14;
+  --fd-surface: #0d241c;
+  --fd-surface-2: #123026;
+  --fd-border: #315247;
+  --fd-text: #ffffff;
+  --fd-muted: #d5e2dd;
+  --fd-input: #102a21;
+  --fd-accent: #0b8b57;
+  background: var(--fd-bg) !important;
+  color: var(--fd-text) !important;
+}
+
+/* Aplicado via classe pelo observador abaixo para cobrir todas as telas/modais. */
+body.finora-dark-normalized:not(.login-page),
+body.finora-dark-normalized:not(.login-page) main,
+body.finora-dark-normalized:not(.login-page) .main,
+body.finora-dark-normalized:not(.login-page) .content,
+body.finora-dark-normalized:not(.login-page) .page,
+body.finora-dark-normalized:not(.login-page) .modal,
+body.finora-dark-normalized:not(.login-page) .modal-content,
+body.finora-dark-normalized:not(.login-page) .modal-body,
+body.finora-dark-normalized:not(.login-page) .panel,
+body.finora-dark-normalized:not(.login-page) .card,
+body.finora-dark-normalized:not(.login-page) .section,
+body.finora-dark-normalized:not(.login-page) .table-wrap,
+body.finora-dark-normalized:not(.login-page) table,
+body.finora-dark-normalized:not(.login-page) thead,
+body.finora-dark-normalized:not(.login-page) tbody,
+body.finora-dark-normalized:not(.login-page) tr,
+body.finora-dark-normalized:not(.login-page) td,
+body.finora-dark-normalized:not(.login-page) th {
+  color: #fff !important;
+}
+
+body.finora-dark-normalized:not(.login-page) .modal-content,
+body.finora-dark-normalized:not(.login-page) .modal-body,
+body.finora-dark-normalized:not(.login-page) .panel,
+body.finora-dark-normalized:not(.login-page) .card,
+body.finora-dark-normalized:not(.login-page) .section,
+body.finora-dark-normalized:not(.login-page) .table-wrap {
+  background-color: #0d241c !important;
+  border-color: #315247 !important;
+}
+
+/* Cabeçalhos que estavam permanecendo brancos. */
+body.finora-dark-normalized:not(.login-page) .modal-header,
+body.finora-dark-normalized:not(.login-page) .page-header,
+body.finora-dark-normalized:not(.login-page) .section-header,
+body.finora-dark-normalized:not(.login-page) .toolbar,
+body.finora-dark-normalized:not(.login-page) .filters,
+body.finora-dark-normalized:not(.login-page) .filter-bar {
+  background-color: #0d241c !important;
+  color: #fff !important;
+  border-color: #315247 !important;
+}
+
+/* Campos e combos. */
+body.finora-dark-normalized:not(.login-page) input:not([type="checkbox"]):not([type="radio"]),
+body.finora-dark-normalized:not(.login-page) select,
+body.finora-dark-normalized:not(.login-page) textarea {
+  background-color: #102a21 !important;
+  color: #fff !important;
+  border-color: #45675c !important;
+  color-scheme: dark;
+}
+body.finora-dark-normalized:not(.login-page) input::placeholder,
+body.finora-dark-normalized:not(.login-page) textarea::placeholder {
+  color: #b9cbc5 !important;
+  opacity: 1 !important;
+}
+body.finora-dark-normalized:not(.login-page) option {
+  background: #102a21 !important;
+  color: #fff !important;
+}
+
+/* Textos auxiliares e labels. */
+body.finora-dark-normalized:not(.login-page) label,
+body.finora-dark-normalized:not(.login-page) h1,
+body.finora-dark-normalized:not(.login-page) h2,
+body.finora-dark-normalized:not(.login-page) h3,
+body.finora-dark-normalized:not(.login-page) h4,
+body.finora-dark-normalized:not(.login-page) p,
+body.finora-dark-normalized:not(.login-page) small,
+body.finora-dark-normalized:not(.login-page) .muted,
+body.finora-dark-normalized:not(.login-page) .subtitle,
+body.finora-dark-normalized:not(.login-page) .helper,
+body.finora-dark-normalized:not(.login-page) .hint {
+  color: #fff !important;
+}
+
+/* Meses: elimina os blocos brancos do seletor no dark. */
+body.finora-dark-normalized:not(.login-page) [class*="month"] button:not(.active):not(.selected),
+body.finora-dark-normalized:not(.login-page) [class*="months"] button:not(.active):not(.selected),
+body.finora-dark-normalized:not(.login-page) .month-btn:not(.active):not(.selected) {
+  background: #173229 !important;
+  color: #eaf3f0 !important;
+  border-color: #294c40 !important;
+}
+body.finora-dark-normalized:not(.login-page) [class*="month"] button.active,
+body.finora-dark-normalized:not(.login-page) [class*="month"] button.selected,
+body.finora-dark-normalized:not(.login-page) .month-btn.active,
+body.finora-dark-normalized:not(.login-page) .month-btn.selected {
+  background: #078451 !important;
+  color: #fff !important;
+}
+
+/* Tabelas. */
+body.finora-dark-normalized:not(.login-page) table,
+body.finora-dark-normalized:not(.login-page) thead,
+body.finora-dark-normalized:not(.login-page) tbody,
+body.finora-dark-normalized:not(.login-page) tr {
+  background-color: #0d241c !important;
+}
+body.finora-dark-normalized:not(.login-page) th {
+  background-color: #173229 !important;
+}
+body.finora-dark-normalized:not(.login-page) td,
+body.finora-dark-normalized:not(.login-page) th,
+body.finora-dark-normalized:not(.login-page) tr {
+  border-color: #315247 !important;
+}
+
+/* Botões neutros que antes viravam faixas brancas. Mantém ações coloridas existentes. */
+body.finora-dark-normalized:not(.login-page) button:not(.primary):not(.danger):not(.active):not(.selected):not([class*="success"]):not([class*="green"]):not([class*="delete"]) {
+  background-color: #173229;
+  color: #fff;
+  border-color: #45675c;
+}
+
+/* Menu lateral permanece independente do tema conforme requisito anterior. */
+body.finora-dark-normalized .sidebar,
+body.finora-dark-normalized aside,
+body.finora-dark-normalized nav.sidebar {
+  color: inherit;
+}
+</style>
+<script id="finora-dark-theme-r710-js">
+(function(){
+  function loginVisible(){
+    const txt=(document.body && document.body.innerText || '').slice(0,1800).toLowerCase();
+    const hasPassword=!!document.querySelector('input[type="password"]');
+    return hasPassword && (txt.includes('bem-vindo') || txt.includes('criar conta') || txt.includes('entrar'));
+  }
+  function darkRequested(){
+    const h=document.documentElement, b=document.body;
+    const attrs=[
+      h&&h.getAttribute('data-theme'), b&&b.getAttribute('data-theme'),
+      h&&h.getAttribute('data-mode'), b&&b.getAttribute('data-mode')
+    ].filter(Boolean).join(' ').toLowerCase();
+    const cls=((h&&h.className)||'')+' '+((b&&b.className)||'');
+    if(/dark|escuro/i.test(attrs+' '+cls)) return true;
+    try{
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i), v=localStorage.getItem(k);
+        if(/theme|tema/i.test(k||'') && /dark|escuro/i.test(v||'')) return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  function apply(){
+    if(!document.body) return;
+    const login=loginVisible();
+    document.body.classList.toggle('login-page', login);
+    document.body.classList.toggle('finora-dark-normalized', !login && darkRequested());
+  }
+  document.addEventListener('DOMContentLoaded',apply);
+  document.addEventListener('click',()=>setTimeout(apply,50),true);
+  const obs=new MutationObserver(()=>apply());
+  if(document.documentElement) obs.observe(document.documentElement,{attributes:true,childList:true,subtree:true,attributeFilter:['class','data-theme','data-mode','style']});
+  apply();
+})();
+</script>
+
+
+<script id="finora-r711-health">
+(function(){
+window.finoraR711Health=function(id){
+  let row=null;
+  try{row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id))||null}catch(e){}
+  return {
+    release:'1.0.10-R7.11',
+    transaction:row?{
+      id:row.id,descricao:row.descricao,valor:row.valor,
+      valorPendente:!!row.valorPendente,
+      generatedReminder:!!row.generatedReminder,
+      materializedOccurrence:!!row.materializedOccurrence,
+      materializedAt:row.materializedAt||null,
+      recorrente:row.recorrente||'',
+      parentRecurringId:row.parentRecurringId||'',
+      updatedAt:row.updatedAt||''
+    }:null,
+    pendingSync:(typeof finoraPendingTxForWorkspaceV79==='function')
+      ? finoraPendingTxForWorkspaceV79(currentWorkspaceId).map(x=>x.id)
+      : []
   };
 };
 })();
