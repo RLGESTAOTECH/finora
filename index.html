@@ -6590,6 +6590,152 @@ body.finora-v84-dark .finora-sidebar *{
 }
 </style>
 
+
+<style id="finora-v110-r75-fixes">
+/* R7.5 — Lançamentos no mobile: rolagem vertical explícita e estável */
+@media (max-width: 760px){
+  #simpleLaunchPanel.section-modal-active,
+  #simpleLaunchPanel.popup-only-panel,
+  .launch-modal-layout.section-modal-active{
+    max-height:100dvh!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior:contain;
+    touch-action:pan-y!important;
+  }
+  #simpleLaunchPanel #launchFormPanel,
+  #simpleLaunchPanel #launchListPanel,
+  #simpleLaunchPanel #tableWrap{
+    max-height:none!important;
+    overflow:visible!important;
+  }
+  #simpleLaunchPanel #tableWrap{
+    overflow-x:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+  }
+  body.section-modal-open{
+    overflow:hidden!important;
+  }
+}
+</style>
+
+
+<style id="finora-v110-r76-privacy-dark">
+/* =========================================================
+   FINORA 1.0.10 — R7.6
+   1) Privacidade global de valores monetários
+   2) Correção de faixas claras residuais no modo escuro
+   ========================================================= */
+
+/* Botão de privacidade também respeita o dark mode */
+body.finora-v84-dark .finora-privacy-toggle{
+  background:#152a22!important;
+  color:#f4f8f6!important;
+  border-color:#476457!important;
+}
+
+/* MODO ESCURO — componentes que ainda herdavam superfícies claras */
+body.finora-v84-dark .month-tabs,
+body.finora-v84-dark .finora-context-item,
+body.finora-v84-dark .finora-v84-quick-tabs,
+body.finora-v84-dark .finora-v88-chart-period,
+body.finora-v84-dark .finora-v88-chart-more,
+body.finora-v84-dark .finora-r2-chart-menu,
+body.finora-v84-dark .finora-v84-panel-head,
+body.finora-v84-dark .finora-v84-table-head,
+body.finora-v84-dark .simple-table-head,
+body.finora-v84-dark .toolbar,
+body.finora-v84-dark .footer-tools{
+  background:#14271f!important;
+  color:#f4f8f6!important;
+  border-color:#345044!important;
+}
+
+/* meses */
+body.finora-v84-dark .month-tab{
+  background:#14271f!important;
+  color:#eaf2ee!important;
+  border-color:#345044!important;
+}
+body.finora-v84-dark .month-tab:hover{
+  background:#1d352b!important;
+  color:#fff!important;
+}
+body.finora-v84-dark .month-tab.active{
+  background:#0b8a56!important;
+  color:#fff!important;
+}
+
+/* tabs do lançamento rápido */
+body.finora-v84-dark .finora-v84-quick-tabs button{
+  background:#14271f!important;
+  color:#eaf2ee!important;
+  border-color:#345044!important;
+}
+body.finora-v84-dark .finora-v84-quick-tabs button:first-child{
+  color:#72d6a2!important;
+}
+body.finora-v84-dark .finora-v84-quick-tabs button:last-child{
+  color:#ff8585!important;
+}
+body.finora-v84-dark .finora-v84-quick-tabs button.active{
+  background:#1d352b!important;
+  box-shadow:inset 0 -2px 0 currentColor!important;
+}
+
+/* ferramentas do gráfico */
+body.finora-v84-dark .finora-v88-chart-period,
+body.finora-v84-dark .finora-v88-chart-more{
+  background:#14271f!important;
+  color:#f4f8f6!important;
+  border-color:#345044!important;
+}
+body.finora-v84-dark .finora-v88-chart-more:hover{
+  background:#1d352b!important;
+}
+body.finora-v84-dark .finora-r2-chart-menu button{
+  color:#f4f8f6!important;
+}
+body.finora-v84-dark .finora-r2-chart-menu button:hover{
+  background:#1d352b!important;
+  color:#fff!important;
+}
+body.finora-v84-dark .finora-r2-chart-menu .state{
+  color:#cbd8d1!important;
+}
+
+/* botões secundários claros que ficavam "faixa branca" */
+body.finora-v84-dark .shell .btn-soft,
+body.finora-v84-dark .shell .iconbtn,
+body.finora-v84-dark .shell .simple-action:not(.primary),
+body.finora-v84-dark .shell .finora-v84-icon-btn,
+body.finora-v84-dark .popup-only-panel .btn-soft,
+body.finora-v84-dark .popup-only-panel .iconbtn{
+  background:#14271f!important;
+  color:#f4f8f6!important;
+  border-color:#345044!important;
+}
+
+/* preserva botões semânticos */
+body.finora-v84-dark .btn-danger{
+  color:#ffb4ad!important;
+  border-color:#78433e!important;
+  background:#301e1c!important;
+}
+
+/* Privacidade global: elementos já mascarados pela versão anterior
+   continuam consistentes com o novo marcador. */
+body.finora-values-hidden #simpleEntradas::after,
+body.finora-values-hidden #simpleDespesas::after,
+body.finora-values-hidden #simpleSaldo::after,
+body.finora-values-hidden #v84SaldoGeral::after,
+body.finora-values-hidden #homeCategoryDonutTotal::after,
+body.finora-values-hidden #homeCategoryLegend .report-legend-row > span::after{
+  content:'••••••'!important;
+}
+</style>
+
 </head>
 <body>
 
@@ -20211,6 +20357,343 @@ window.finoraR73Health=async function(){
       sidebarPresent:!!document.querySelector('.finora-sidebar')
     };
   };
+})();
+</script>
+
+
+<script id="finora-v110-r75-fixes">
+(function(){
+  'use strict';
+  const RELEASE='1.0.10-R7.5';
+
+  function refreshEveryView(){
+    try{ if(typeof render==='function')render(); }catch(e){}
+    try{ if(typeof finoraRefreshAllR2==='function')finoraRefreshAllR2(); }catch(e){}
+    try{ if(typeof renderV84Dashboard==='function')renderV84Dashboard(); }catch(e){}
+    try{ if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut(); }catch(e){}
+    try{ if(typeof renderAlerts==='function')renderAlerts(); }catch(e){}
+    try{
+      if(document.getElementById('finoraReportsPanel') &&
+         typeof renderFinoraReports==='function') renderFinoraReports();
+    }catch(e){}
+  }
+
+  /*
+   * Um generatedReminder é apenas uma previsão enquanto valorPendente=true.
+   * Depois que o usuário informa um valor, ele vira uma ocorrência materializada.
+   * As rotinas de recorrência antigas usam generatedReminder para decidir se
+   * devem zerar novamente o valor; por isso a edição precisa encerrar esse estado.
+   */
+  function materializeEditedOccurrence(id, value){
+    if(!id || !Number.isFinite(value)) return null;
+    const row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id));
+    if(!row)return null;
+
+    row.valor=value;
+    row.valorPendente=false;
+    row.generatedReminder=false;
+    row.materializedOccurrence=true;
+    row.materializedAt=new Date().toISOString();
+    row.updatedAt=new Date().toISOString();
+
+    // Mantém os vínculos da série para histórico/parcelas, mas impede que
+    // normalizeVariableReminders volte a tratar esta ocorrência como previsão.
+    return row;
+  }
+
+  const form=document.getElementById('entryForm');
+  if(form && !form.dataset.r75Materialize){
+    form.dataset.r75Materialize='1';
+
+    // Capture: guarda ID/valor ANTES que o submit original faça resetForm().
+    form.addEventListener('submit',()=>{
+      const id=document.getElementById('editId')?.value||'';
+      if(!id)return;
+
+      let value=NaN;
+      try{
+        value=typeof parseBRLInput==='function'
+          ? parseBRLInput(document.getElementById('valor')?.value||'')
+          : Number(String(document.getElementById('valor')?.value||'')
+              .replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.'));
+      }catch(e){}
+
+      if(!Number.isFinite(value))return;
+
+      // Executa após o handler original, mas antes que sincronizações futuras
+      // possam reclassificar a ocorrência como "Valor a definir".
+      setTimeout(()=>{
+        try{
+          const row=materializeEditedOccurrence(id,value);
+          if(!row)return;
+
+          if(typeof finoraCanonicalTransactions==='function'){
+            data=finoraCanonicalTransactions(data);
+          }
+          localStorage.setItem(KEY,JSON.stringify(data));
+
+          // Marca mutação e salva na mesma fonte usada por Web/Mobile.
+          try{
+            if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
+          }catch(e){}
+          try{
+            if(typeof save==='function')save();
+          }catch(e){ console.error('FINORA R7.5 save',e); }
+
+          refreshEveryView();
+
+          // Confirma o estado consolidado no Supabase; o updatedAt novo vence
+          // qualquer cópia remota anterior ainda marcada como valorPendente.
+          try{
+            if(typeof cloudConfigured==='function' && cloudConfigured() &&
+               typeof pushCloudState==='function'){
+              Promise.resolve()
+                .then(()=>pushCloudState(false))
+                .then(()=>refreshEveryView())
+                .catch(()=>{try{scheduleCloudPush()}catch(e){}});
+            }
+          }catch(e){}
+
+        }catch(e){
+          console.error('FINORA R7.5 materialização do lançamento',e);
+        }
+      },0);
+    },true);
+  }
+
+  // Defesa adicional: uma ocorrência explicitamente materializada nunca deve
+  // reaparecer como "Valor a definir" após pull, login, F5 ou troca de aparelho.
+  const oldNormalize=window.normalizeVariableReminders;
+  if(typeof oldNormalize==='function'){
+    window.normalizeVariableReminders=function(){
+      const protectedRows=(Array.isArray(data)?data:[])
+        .filter(x=>x.materializedOccurrence && !x.valorPendente)
+        .map(x=>({id:String(x.id),valor:x.valor,updatedAt:x.updatedAt}));
+      const result=oldNormalize.apply(this,arguments);
+      let repaired=false;
+      protectedRows.forEach(p=>{
+        const row=data.find(x=>String(x.id)===p.id);
+        if(row && row.valorPendente){
+          row.valor=p.valor;
+          row.valorPendente=false;
+          row.generatedReminder=false;
+          row.materializedOccurrence=true;
+          row.updatedAt=p.updatedAt||new Date().toISOString();
+          repaired=true;
+        }
+      });
+      if(repaired){
+        try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}
+      }
+      return result;
+    };
+  }
+
+  window.finoraR75Health=function(id){
+    const row=id && Array.isArray(data)
+      ? data.find(x=>String(x.id)===String(id))
+      : null;
+    const panel=document.getElementById('simpleLaunchPanel');
+    return {
+      release:RELEASE,
+      transaction:row?{
+        id:row.id,
+        valor:row.valor,
+        valorPendente:!!row.valorPendente,
+        generatedReminder:!!row.generatedReminder,
+        materializedOccurrence:!!row.materializedOccurrence,
+        updatedAt:row.updatedAt
+      }:null,
+      mobileScroll:panel?{
+        overflowY:getComputedStyle(panel).overflowY,
+        scrollHeight:panel.scrollHeight,
+        clientHeight:panel.clientHeight
+      }:null
+    };
+  };
+})();
+</script>
+
+
+<script id="finora-v110-r76-privacy-dark">
+(function(){
+'use strict';
+
+const RELEASE='1.0.10-R7.6';
+const PRIVACY_KEY_R76='finora_privacy_values_v110';
+const maskedNodes=new Set();
+const originalText=new WeakMap();
+let privacyBusy=false;
+let privacyScheduled=false;
+
+/* Mascara SOMENTE valores monetários.
+   Percentuais, datas, quantidades e textos continuam visíveis. */
+const moneyPattern=/([+\-−–—]?\s*)R\$\s*(?:-?\s*(?:\d{1,3}(?:\.\d{3})*|\d+)(?:,\d{2})?|[—-])/g;
+
+function privacyEnabled(){
+  return localStorage.getItem(PRIVACY_KEY_R76)==='1';
+}
+
+function shouldSkipTextNode(node){
+  const p=node.parentElement;
+  if(!p)return true;
+  if(p.closest('script,style,noscript,template'))return true;
+  if(p.closest('#authScreen'))return true;
+  if(p.closest('.finora-sidebar'))return true;
+  return false;
+}
+
+function maskTextNode(node){
+  if(!node || shouldSkipTextNode(node))return;
+  const text=node.nodeValue||'';
+  if(!/R\$/i.test(text))return;
+
+  const masked=text.replace(moneyPattern,(full,prefix='')=>`${prefix}••••••`);
+  if(masked===text)return;
+
+  originalText.set(node,text);
+  maskedNodes.add(node);
+  node.nodeValue=masked;
+}
+
+function walkAndMask(root){
+  if(!root)return;
+  if(root.nodeType===Node.TEXT_NODE){
+    maskTextNode(root);
+    return;
+  }
+  if(root.nodeType!==Node.ELEMENT_NODE && root.nodeType!==Node.DOCUMENT_FRAGMENT_NODE)return;
+
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+  let n;
+  while((n=walker.nextNode()))maskTextNode(n);
+}
+
+function restoreValues(){
+  privacyBusy=true;
+  try{
+    for(const node of [...maskedNodes]){
+      if(!node?.isConnected){
+        maskedNodes.delete(node);
+        continue;
+      }
+      const original=originalText.get(node);
+      if(typeof original==='string')node.nodeValue=original;
+      maskedNodes.delete(node);
+    }
+  }finally{
+    privacyBusy=false;
+  }
+}
+
+function updatePrivacyButton(){
+  const btn=document.getElementById('finoraPrivacyToggle');
+  if(!btn)return;
+  const hidden=privacyEnabled();
+  btn.innerHTML=hidden?'◉ <span>Mostrar valores</span>':'◉ <span>Ocultar valores</span>';
+  btn.setAttribute('aria-pressed',hidden?'true':'false');
+}
+
+function applyGlobalPrivacy(){
+  privacyBusy=true;
+  try{
+    const hidden=privacyEnabled();
+    document.body.classList.toggle('finora-values-hidden',hidden);
+    updatePrivacyButton();
+    if(hidden)walkAndMask(document.body);
+    else restoreValues();
+  }finally{
+    privacyBusy=false;
+  }
+}
+window.finoraApplyGlobalPrivacyR76=applyGlobalPrivacy;
+
+function schedulePrivacy(){
+  if(privacyBusy||privacyScheduled)return;
+  privacyScheduled=true;
+  requestAnimationFrame(()=>{
+    privacyScheduled=false;
+    applyGlobalPrivacy();
+  });
+}
+
+/* O app re-renderiza várias áreas depois de salvar/sincronizar.
+   Este observer reaplica a privacidade somente quando ela está ativa. */
+const observer=new MutationObserver(mutations=>{
+  if(privacyBusy||!privacyEnabled())return;
+
+  privacyBusy=true;
+  try{
+    for(const mutation of mutations){
+      if(mutation.type==='characterData'){
+        const node=mutation.target;
+        const text=node.nodeValue||'';
+        if(/R\$/i.test(text)){
+          maskTextNode(node);
+        }
+      }else{
+        mutation.addedNodes.forEach(node=>walkAndMask(node));
+      }
+    }
+  }finally{
+    privacyBusy=false;
+  }
+});
+observer.observe(document.body,{
+  subtree:true,
+  childList:true,
+  characterData:true
+});
+
+/* Captura o clique no botão já existente e sincroniza após a lógica legada. */
+document.addEventListener('click',e=>{
+  if(e.target?.closest?.('#finoraPrivacyToggle')){
+    setTimeout(schedulePrivacy,0);
+  }
+},true);
+
+/* Reaplica após mudanças de tela/tema. */
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')schedulePrivacy();
+});
+window.addEventListener('pageshow',schedulePrivacy);
+
+/* Reforço após renderizações conhecidas sem substituir a lógica original. */
+['render','renderV84Dashboard','renderFinoraReports','renderAlerts','renderHomeCategoryDonut']
+  .forEach(name=>{
+    const fn=window[name];
+    if(typeof fn!=='function'||fn.__r76Privacy)return;
+    const wrapped=function(){
+      const result=fn.apply(this,arguments);
+      schedulePrivacy();
+      return result;
+    };
+    wrapped.__r76Privacy=true;
+    window[name]=wrapped;
+  });
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',schedulePrivacy,{once:true});
+}else{
+  schedulePrivacy();
+}
+
+window.finoraR76Health=function(){
+  const sample=[...document.querySelectorAll('body *')]
+    .filter(el=>el.childNodes.length===1 && el.firstChild?.nodeType===Node.TEXT_NODE)
+    .map(el=>el.textContent||'')
+    .filter(t=>/R\$/i.test(t))
+    .slice(0,20);
+
+  return {
+    release:RELEASE,
+    privacyEnabled:privacyEnabled(),
+    maskedNodeCount:[...maskedNodes].filter(n=>n?.isConnected).length,
+    visibleCurrencySamples:sample,
+    darkTheme:document.body.classList.contains('finora-v84-dark')
+  };
+};
+
 })();
 </script>
 
