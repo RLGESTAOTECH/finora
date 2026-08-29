@@ -6196,6 +6196,117 @@ body.finora-v84-dark :is(.finora-status-pendente,.finora-status-atrasado,.finora
 .finora-r4-person-head span{font-weight:700;color:#174b36}
 </style>
 
+
+<style id="finora-v110-r5-style">
+/* ===== FINORA 1.0.10 — Homologação R5 ===== */
+
+/* Menu do usuário com leitura confortável */
+@media (min-width:821px){
+  .finora-v89-user-menu{
+    width:248px!important;
+    padding:10px!important;
+    border-radius:16px!important;
+  }
+  .finora-v89-user-menu-head{
+    padding:12px 13px 11px!important;
+    margin-bottom:7px!important;
+  }
+  .finora-v89-user-menu-head strong{
+    max-width:210px!important;
+    font-size:13px!important;
+    line-height:1.3!important;
+  }
+  .finora-v89-user-menu-head span{
+    margin-top:5px!important;
+    font-size:10px!important;
+    line-height:1.4!important;
+  }
+  .finora-v89-user-menu button{
+    min-height:44px!important;
+    padding:11px 13px!important;
+    border-radius:10px!important;
+    font-size:11px!important;
+  }
+}
+
+/* Foto do perfil */
+.finora-r5-photo-panel{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:14px;
+  margin:0 0 14px;
+  padding:12px 14px;
+  border:1px solid #dce7e1;
+  border-radius:12px;
+  background:#f8fbf9;
+}
+.finora-r5-photo-panel strong{
+  display:block;
+  margin-bottom:3px;
+  color:#174b36;
+  font-size:10px;
+}
+.finora-r5-photo-panel small{
+  display:block;
+  max-width:420px;
+  color:#708078;
+  font-size:8px;
+  line-height:1.45;
+}
+.finora-r5-photo-actions{display:flex;gap:7px;flex-wrap:wrap}
+.finora-r5-photo-label{display:inline-flex;align-items:center;cursor:pointer}
+#profileAvatar,
+#userAvatarInitials{
+  background-position:center!important;
+  background-size:cover!important;
+  background-repeat:no-repeat!important;
+}
+
+/* Parcelamento */
+#installmentFlagField select,
+#installmentsField input{min-height:42px}
+.finora-r5-installment-preview{
+  display:inline-flex;
+  padding:3px 7px;
+  border-radius:999px;
+  background:#eef4f0;
+  color:#285743;
+  font:700 8px Verdana,sans-serif;
+}
+
+@media(max-width:640px){
+  .finora-r5-photo-panel{align-items:flex-start;flex-direction:column}
+}
+</style>
+
+
+<style id="finora-v110-r6-style">
+.finora-r6-boleto-entry{margin-bottom:2px}
+.finora-r6-boleto-button{width:100%;min-height:70px;display:grid;grid-template-columns:42px 1fr 24px;align-items:center;gap:12px;border:1px solid #c9ded2;background:linear-gradient(135deg,#edf8f1 0%,#f8fcf9 100%);color:#174b36;border-radius:14px;padding:12px 14px;cursor:pointer;text-align:left;transition:.18s ease}
+.finora-r6-boleto-button:hover{border-color:#81b39a;transform:translateY(-1px);box-shadow:0 8px 20px rgba(20,84,58,.08)}
+.finora-r6-boleto-button strong{display:block;font-size:13px;color:#174b36}.finora-r6-boleto-button small{display:block;margin-top:3px;font:9px/1.35 Verdana,sans-serif;color:#65766d}
+.finora-r6-boleto-icon{display:grid;place-items:center;width:40px;height:40px;border-radius:11px;background:#0f6847;color:#fff;font-size:20px}.finora-r6-boleto-arrow{font-size:26px;color:#2c6a50;text-align:center}
+.finora-r6-reader{display:none;position:fixed;inset:0;z-index:20000;background:rgba(11,32,23,.62);backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:18px}.finora-r6-reader.open{display:flex}
+.finora-r6-reader-card{width:min(620px,96vw);max-height:min(780px,92vh);overflow:auto;background:#fff;border-radius:18px;box-shadow:0 28px 90px rgba(10,30,21,.30);padding:20px}
+.finora-r6-reader-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding-bottom:13px;border-bottom:1px solid #e3ebe7}.finora-r6-reader-head h3{margin:0;color:#174b36;font-size:20px}.finora-r6-reader-head p{margin:5px 0 0;color:#68786f;font:9px/1.45 Verdana,sans-serif}
+.finora-r6-reader-close{width:36px;height:36px;border-radius:50%;border:1px solid #d6e2dc;background:#f5f9f7;color:#295b45;font-size:22px;cursor:pointer}
+.finora-r6-reader-upload{margin:16px 0 11px}.finora-r6-reader-pick{width:100%;min-height:82px;border:1.5px dashed #91bca5;background:#f6fbf8;border-radius:13px;cursor:pointer;color:#174b36}.finora-r6-reader-pick strong{display:block;font-size:13px}.finora-r6-reader-pick span{display:block;margin-top:5px;color:#74827b;font-size:9px}
+.finora-r6-reader-file{margin-top:7px;color:#62726a;font:9px Verdana,sans-serif}.finora-r6-reader-or{display:flex;align-items:center;gap:10px;color:#8b9891;font:8px Verdana,sans-serif;margin:10px 0}.finora-r6-reader-or:before,.finora-r6-reader-or:after{content:'';height:1px;background:#e1e8e4;flex:1}
+.finora-r6-reader-actions-top{display:flex;justify-content:flex-end;margin-top:12px}.finora-r6-reader-progress{margin-top:15px;padding:12px;border-radius:11px;background:#f1f7f4;display:flex;align-items:center;gap:9px;color:#3d5e4e;font:9px Verdana,sans-serif}
+.finora-r6-reader-spinner{width:16px;height:16px;border:2px solid #b7cec2;border-top-color:#0f6847;border-radius:50%;animation:finoraR6Spin .75s linear infinite}@keyframes finoraR6Spin{to{transform:rotate(360deg)}}
+.finora-r6-reader-result{margin-top:15px;border-top:1px solid #e3ebe7;padding-top:14px}.finora-r6-reader-result-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.finora-r6-reader-result-head strong{color:#174b36}.finora-r6-reader-result-head span{font:8px Verdana,sans-serif;color:#6f7f77}
+.finora-r6-reader-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}.finora-r6-reader-grid>div{border:1px solid #e0e9e4;border-radius:10px;padding:10px;background:#fbfdfc}
+.finora-r6-reader-grid span,.finora-r6-reader-code span{display:block;text-transform:uppercase;letter-spacing:.05em;font:7px Verdana,sans-serif;color:#75837c}.finora-r6-reader-grid strong{display:block;margin-top:4px;color:#223b30;font-size:11px}
+.finora-r6-reader-code{margin-top:8px;border:1px solid #e0e9e4;border-radius:10px;padding:10px;background:#fbfdfc}.finora-r6-reader-code code{display:block;margin-top:5px;white-space:normal;word-break:break-all;color:#174b36;font:9px/1.45 Consolas,monospace}
+.finora-r6-reader-warning{margin-top:10px;padding:9px 10px;border-radius:9px;background:#fff8e7;border:1px solid #eadcae;color:#775f24;font:8px/1.45 Verdana,sans-serif}.finora-r6-reader-result-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:13px}
+body.finora-v84-dark .finora-r6-boleto-button{background:#163027;color:#fff;border-color:#395b4c}body.finora-v84-dark .finora-r6-boleto-button strong,body.finora-v84-dark .finora-r6-boleto-button small{color:#fff!important}
+body.finora-v84-dark .finora-r6-reader-card{background:#12231c;color:#fff}body.finora-v84-dark .finora-r6-reader-head,body.finora-v84-dark .finora-r6-reader-result{border-color:#2a4438}body.finora-v84-dark .finora-r6-reader-head h3,body.finora-v84-dark .finora-r6-reader-grid strong,body.finora-v84-dark .finora-r6-reader-code code{color:#fff}
+body.finora-v84-dark .finora-r6-reader-head p,body.finora-v84-dark .finora-r6-reader-file,body.finora-v84-dark .finora-r6-reader-grid span,body.finora-v84-dark .finora-r6-reader-code span{color:#c6d3cc}
+body.finora-v84-dark .finora-r6-reader-pick,body.finora-v84-dark .finora-r6-reader-grid>div,body.finora-v84-dark .finora-r6-reader-code{background:#172b22;border-color:#3a5749;color:#fff}
+@media(max-width:560px){.finora-r6-reader-grid{grid-template-columns:1fr}.finora-r6-reader-card{padding:15px}.finora-r6-boleto-button{grid-template-columns:38px 1fr 18px;padding:10px}}
+</style>
+
 </head>
 <body>
 
@@ -6784,6 +6895,16 @@ body.finora-v84-dark :is(.finora-status-pendente,.finora-status-atrasado,.finora
   <form class="form" id="entryForm">
     <input type="hidden" id="editId">
     <input type="hidden" id="recRule" value="fixo">
+
+    <div class="field full finora-r6-boleto-entry" id="boletoReaderEntry">
+      <button type="button" class="finora-r6-boleto-button" id="openBoletoReader">
+        <span class="finora-r6-boleto-icon">▤</span>
+        <span><strong>Ler boleto</strong><small>Selecione PDF ou imagem para preencher automaticamente o que for identificado.</small></span>
+        <span class="finora-r6-boleto-arrow">›</span>
+      </button>
+      <div class="file-note">Leitura assistida: confirme vencimento, valor, beneficiário, código e parcela antes de salvar.</div>
+    </div>
+
 <div class="field full" id="quickIncomeBlock" style="background:#eaf2ec;border:1px solid #cfded3;border-radius:14px;padding:14px">
       <label style="color:#315c49">Entradas do mês</label>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:5px">
@@ -6831,6 +6952,11 @@ body.finora-v84-dark :is(.finora-status-pendente,.finora-status-atrasado,.finora
     <div class="field">
       <label id="beneficiaryLabel">Beneficiário / Favorecido</label>
       <input id="beneficiario" placeholder="Ex.: Vivo, imobiliária, mercado...">
+    </div>
+    <div class="field">
+      <label>Código de barras / linha digitável</label>
+      <input id="codigoBoleto" inputmode="numeric" autocomplete="off" placeholder="Código identificado ou digitado manualmente">
+      <div class="file-note">O FINORA guarda o código junto ao lançamento para consulta.</div>
     </div>
     <div class="field" id="categoryField">
       <label>Categoria</label>
@@ -6898,9 +7024,19 @@ body.finora-v84-dark :is(.finora-status-pendente,.finora-status-atrasado,.finora
         <option value="variavel">Valor variável / definir depois</option>
       </select>
     </div>
-    <div class="field" id="installmentsField">
-      <label>Parcelas</label>
-      <input id="parcelas" placeholder="Ex.: 1/10, 8/12 ou à vista"><div class="file-note" id="installmentHelp">Em recorrências parceladas, a FINORA avançará automaticamente: 8/12 → 9/12 → 10/12.</div>
+    <div class="field" id="installmentFlagField">
+      <label>É parcelamento?</label>
+      <select id="parcelado">
+        <option value=""></option>
+        <option value="nao">Não</option>
+        <option value="sim">Sim</option>
+      </select>
+      <div class="file-note">Marque Sim quando o lançamento tiver uma sequência definida de parcelas.</div>
+    </div>
+    <div class="field" id="installmentsField" style="display:none">
+      <label>Parcela atual / total</label>
+      <input id="parcelas" inputmode="numeric" placeholder="Ex.: 1/60, 8/12">
+      <div class="file-note" id="installmentHelp">Nos meses seguintes a sequência avança automaticamente: 8/12 → 9/12 → 10/12, até a última parcela.</div>
     </div>
     
     <div class="field" id="launchCardField">
@@ -9434,7 +9570,9 @@ $('entryForm').addEventListener('submit',async e=>{
     valorPendente:false,
     valorReferencia:(old?.valorPendente||old?.generatedReminder)?parseBRLInput($('valor').value):(old?.valorReferencia??null),
     beneficiario:$('beneficiario').value.trim(),
-    parcelas:$('parcelas').value.trim(),
+    codigoBoleto:$('codigoBoleto')?.value.trim()||'',
+    parcelado:$('parcelado')?.value||'',
+    parcelas:$('parcelado')?.value==='sim'?$('parcelas').value.trim():'',
     cardId:$('launchCard')?.value||'',
     forma:$('forma').value,
     paymentAccount:paymentNeedsAccount($('forma').value)?$('paymentAccount').value.trim():'',
@@ -9485,10 +9623,17 @@ function editRow(id){
   $('vencimento').value=x.vencimento||'';
 
   $('beneficiario').value=x.beneficiario||'';
-  $('parcelas').value=x.parcelas||'';
+  if($('codigoBoleto'))$('codigoBoleto').value=x.codigoBoleto||'';
+  const installmentValue=x.parcelas||'';
+  const isInstallment=x.parcelado==='sim'||/^\d+\s*\/\s*\d+$/.test(installmentValue);
+  if($('parcelado'))$('parcelado').value=isInstallment?'sim':'nao';
+  $('parcelas').value=installmentValue;
+  const installmentsField=$('installmentsField');
+  if(installmentsField)installmentsField.style.display=isInstallment?'block':'none';
   fillLaunchCards(x.cardId||'');
   $('status').value=x.status||'pendente';
-  $('recorrente').value=x.recorrente||'nao';
+  // R5: ocorrências mensais geradas permanecem identificadas como recorrentes.
+  $('recorrente').value=(x.recorrente==='mensal'||x.generatedReminder)?'mensal':'nao';
   $('valorRecorrente').value=x.valorRecorrente||'mesmo';
   $('recRule').value=x.recRule||'fixo';
   $('forma').value=x.forma||'Boleto';
@@ -11800,6 +11945,17 @@ $('adminAuthPassword')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.pre
           <strong id="profileSummaryName">Usuário</strong>
           <span id="profileSummaryRole">Integrante</span>
           <small id="profileSummaryWorkspace">Ambiente financeiro</small>
+        </div>
+      </div>
+      <div class="finora-r5-photo-panel">
+        <div>
+          <strong>Foto do perfil</strong>
+          <small>A foto é reduzida para uso no FINORA e acompanha sua conta entre dispositivos.</small>
+        </div>
+        <div class="finora-r5-photo-actions">
+          <label class="btn btn-soft finora-r5-photo-label" for="profilePhotoInput">Escolher foto</label>
+          <input id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+          <button type="button" class="btn btn-soft" id="removeProfilePhotoBtn">Remover foto</button>
         </div>
       </div>
 
@@ -18072,7 +18228,7 @@ window.FINORA_RELEASE='1.0.10';
     window.resetForm=function(){
       oldReset.apply(this,arguments);
       const mode=typeof currentLaunchMode!=='undefined'?currentLaunchMode:'list';
-      const blankIds=['pessoa','expenseOwner','categoria','categoriaExpense','forma','beneficiario','parcelas','paymentAccount','launchCard'];
+      const blankIds=['pessoa','expenseOwner','categoria','categoriaExpense','forma','beneficiario','codigoBoleto','parcelas','paymentAccount','launchCard'];
       blankIds.forEach(id=>{
         const el=document.getElementById(id);
         if(el)el.value='';
@@ -18128,7 +18284,8 @@ window.FINORA_RELEASE='1.0.10';
       observacao:saved.observacao??root.observacao??'',
       valorRecorrente:saved.valorRecorrente??root.valorRecorrente??'mesmo',
       recRule:saved.recRule??root.recRule??'fixo',
-      parcelasBase:saved.parcelasBase??root.parcelas??''
+      parcelasBase:saved.parcelasBase??root.parcelas??'',
+      parcelado:saved.parcelado??root.parcelado??''
     };
   }
 
@@ -18146,7 +18303,7 @@ window.FINORA_RELEASE='1.0.10';
 
   window.ensureRecurringNextMonths=function(){
     const rows=Array.isArray(data)?data:[];
-    const roots=rows.filter(x=>x.recorrente==='mensal'&&!x.generatedReminder);
+    const roots=rows.filter(x=>(x.recorrente==='mensal'||x.parcelado==='sim')&&!x.generatedReminder);
     const nowMonth=typeof currentMonth==='function'?currentMonth():new Date().toISOString().slice(0,7);
     let changed=false;
 
@@ -18195,6 +18352,8 @@ window.FINORA_RELEASE='1.0.10';
               valorRecorrente:tpl.valorRecorrente,
               recRule:tpl.recRule,
               parcelas:parcel||existing.parcelas||'',
+              parcelado:tpl.parcelado||existing.parcelado||'',
+              recorrente:'mensal',
               recurrenceTemplate:{...tpl},
               seriesRootId:rootId,
               parentRecurringId:root.id
@@ -18214,6 +18373,7 @@ window.FINORA_RELEASE='1.0.10';
           parentRecurringId:root.id,
           recurrenceTemplate:{...tpl},
           parcelas:parcel||'',
+          parcelado:tpl.parcelado||root.parcelado||'',
           installmentStart:root.installmentStart,
           valor:variable?0:root.valor,
           valorPendente:variable,
@@ -18224,7 +18384,7 @@ window.FINORA_RELEASE='1.0.10';
           vencimento:nextDate,
           attachment:null,
           generatedReminder:true,
-          recorrente:'nao',
+          recorrente:'mensal',
           createdAt:new Date().toISOString(),
           updatedAt:new Date().toISOString()
         });
@@ -18450,6 +18610,488 @@ window.FINORA_RELEASE='1.0.10';
       online:navigator.onLine
     };
   };
+})();
+</script>
+
+
+<script id="finora-v110-r5">
+(function(){
+  'use strict';
+
+  let profilePhotoDraft=null;
+  let profilePhotoRemove=false;
+
+  function $(id){return document.getElementById(id)}
+  function esc5(v=''){
+    return String(v).replace(/[&<>"']/g,c=>({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+  function reportMode5(){
+    return document.querySelector('.report-tabs button.active')?.dataset.reportTab||'overview';
+  }
+  function money5(v){
+    return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  }
+
+  // ----------------------------------------------------------
+  // A. RECORRÊNCIA E PARCELAMENTO
+  // ----------------------------------------------------------
+  function parseInstallment5(v){
+    const m=String(v||'').trim().match(/^(\d+)\s*\/\s*(\d+)$/);
+    if(!m)return null;
+    const current=Number(m[1]),total=Number(m[2]);
+    if(current<1||total<1||current>total)return null;
+    return {current,total};
+  }
+
+  function syncInstallmentUI(){
+    const flag=$('parcelado'),field=$('installmentsField'),input=$('parcelas');
+    if(!flag||!field)return;
+    field.style.display=flag.value==='sim'?'block':'none';
+    if(flag.value!=='sim'&&input)input.value='';
+  }
+
+  function installInstallmentControls(){
+    const flag=$('parcelado');
+    if(flag&&!flag.dataset.r5){
+      flag.dataset.r5='1';
+      flag.addEventListener('change',()=>{
+        syncInstallmentUI();
+        if(flag.value==='sim'){
+          // Parcelamento é uma série mensal finita.
+          if($('recorrente'))$('recorrente').value='mensal';
+          requestAnimationFrame(()=>$('parcelas')?.focus());
+        }
+      });
+    }
+
+    const input=$('parcelas');
+    if(input&&!input.dataset.r5){
+      input.dataset.r5='1';
+      input.addEventListener('blur',()=>{
+        if($('parcelado')?.value!=='sim')return;
+        const p=parseInstallment5(input.value);
+        if(!p){
+          input.setCustomValidity('Informe no formato parcela atual/total. Ex.: 1/60.');
+        }else{
+          input.value=`${p.current}/${p.total}`;
+          input.setCustomValidity('');
+        }
+      });
+    }
+    syncInstallmentUI();
+  }
+
+  // Valida o parcelamento antes do submit original.
+  const entryForm=$('entryForm');
+  if(entryForm&&!entryForm.dataset.r5Installment){
+    entryForm.dataset.r5Installment='1';
+    entryForm.addEventListener('submit',e=>{
+      if($('parcelado')?.value==='sim'){
+        const p=parseInstallment5($('parcelas')?.value);
+        if(!p){
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          $('parcelas')?.setCustomValidity('Informe a parcela no formato atual/total. Ex.: 1/60.');
+          $('parcelas')?.reportValidity();
+          return;
+        }
+        // A série parcelada precisa continuar mensal até a última parcela.
+        if($('recorrente'))$('recorrente').value='mensal';
+      }
+    },true);
+  }
+
+  // R5: reforça que reminders gerados continuam mensais ao abrir para edição.
+  const oldEdit=window.editRow;
+  if(typeof oldEdit==='function'){
+    window.editRow=function(id){
+      const r=oldEdit.apply(this,arguments);
+      try{
+        const x=(Array.isArray(data)?data:[]).find(v=>String(v.id)===String(id));
+        if(x?.generatedReminder||x?.seriesRootId||x?.parentRecurringId){
+          if($('recorrente'))$('recorrente').value='mensal';
+        }
+        const hasInstallment=x?.parcelado==='sim'||!!parseInstallment5(x?.parcelas||'');
+        if($('parcelado'))$('parcelado').value=hasInstallment?'sim':'nao';
+        if($('parcelas'))$('parcelas').value=x?.parcelas||'';
+        syncInstallmentUI();
+      }catch(e){}
+      return r;
+    };
+  }
+
+  // ----------------------------------------------------------
+  // B. FOTO DO USUÁRIO VIA SUPABASE AUTH USER_METADATA
+  // Sem coluna nova no banco.
+  // ----------------------------------------------------------
+  function applyAvatarPhoto(dataUrl){
+    const targets=[$('profileAvatar'),$('userAvatarInitials')].filter(Boolean);
+    targets.forEach(el=>{
+      if(dataUrl){
+        el.style.backgroundImage=`url("${dataUrl}")`;
+        el.textContent='';
+      }else{
+        el.style.backgroundImage='';
+        const name=(window.currentUser?.name||$('loggedName')?.textContent||'U').trim();
+        el.textContent=(name.charAt(0)||'U').toUpperCase();
+      }
+    });
+  }
+  window.finoraApplyAvatarPhotoR5=applyAvatarPhoto;
+
+  async function loadProfilePhoto(){
+    try{
+      const client=typeof getAuthClient==='function'?getAuthClient():null;
+      if(!client)return;
+      const {data}=await client.auth.getUser();
+      const photo=data?.user?.user_metadata?.finora_avatar||'';
+      window.finoraProfileAvatarData=photo;
+      applyAvatarPhoto(photo);
+    }catch(e){console.warn('FINORA R5 foto perfil',e)}
+  }
+
+  function resizeProfilePhoto(file){
+    return new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onerror=()=>reject(new Error('Não foi possível ler a imagem.'));
+      reader.onload=()=>{
+        const img=new Image();
+        img.onerror=()=>reject(new Error('Formato de imagem inválido.'));
+        img.onload=()=>{
+          const size=160;
+          const canvas=document.createElement('canvas');
+          canvas.width=size;canvas.height=size;
+          const ctx=canvas.getContext('2d');
+          const scale=Math.max(size/img.width,size/img.height);
+          const w=img.width*scale,h=img.height*scale;
+          ctx.drawImage(img,(size-w)/2,(size-h)/2,w,h);
+          resolve(canvas.toDataURL('image/jpeg',0.72));
+        };
+        img.src=reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function installPhotoControls(){
+    const input=$('profilePhotoInput');
+    if(input&&!input.dataset.r5){
+      input.dataset.r5='1';
+      input.addEventListener('change',async()=>{
+        const file=input.files?.[0];
+        if(!file)return;
+        if(file.size>8*1024*1024){
+          if(typeof profileErr==='function')profileErr('A foto deve ter no máximo 8 MB.');
+          input.value='';
+          return;
+        }
+        try{
+          profilePhotoDraft=await resizeProfilePhoto(file);
+          profilePhotoRemove=false;
+          applyAvatarPhoto(profilePhotoDraft);
+          if(typeof profileOk==='function')profileOk('Foto selecionada. Clique em Salvar alterações para confirmar.');
+        }catch(e){
+          if(typeof profileErr==='function')profileErr(e.message||'Não foi possível preparar a foto.');
+        }
+      });
+    }
+
+    const remove=$('removeProfilePhotoBtn');
+    if(remove&&!remove.dataset.r5){
+      remove.dataset.r5='1';
+      remove.addEventListener('click',()=>{
+        profilePhotoDraft=null;
+        profilePhotoRemove=true;
+        applyAvatarPhoto('');
+        if(typeof profileOk==='function')profileOk('Foto marcada para remoção. Clique em Salvar alterações para confirmar.');
+      });
+    }
+  }
+
+  // Antes do handler legado salvar os dados, atualizamos metadata.
+  const saveBtn=$('saveProfileBtn');
+  if(saveBtn&&!saveBtn.dataset.r5Photo){
+    saveBtn.dataset.r5Photo='1';
+    saveBtn.addEventListener('click',async e=>{
+      if(profilePhotoDraft===null&&!profilePhotoRemove)return;
+      try{
+        const client=typeof getAuthClient==='function'?getAuthClient():null;
+        if(!client)return;
+        const avatar=profilePhotoRemove?'':profilePhotoDraft;
+        const {error}=await client.auth.updateUser({data:{finora_avatar:avatar}});
+        if(error)throw error;
+        window.finoraProfileAvatarData=avatar;
+        applyAvatarPhoto(avatar);
+        profilePhotoDraft=null;
+        profilePhotoRemove=false;
+      }catch(err){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if(typeof profileErr==='function')profileErr(err?.message||'Não foi possível salvar a foto.');
+      }
+    },true);
+  }
+
+  // Perfil aberto sempre reaplica a foto real da conta.
+  const oldOpenProfile=window.openProfileModal;
+  if(typeof oldOpenProfile==='function'){
+    window.openProfileModal=function(){
+      const r=oldOpenProfile.apply(this,arguments);
+      installPhotoControls();
+      applyAvatarPhoto(window.finoraProfileAvatarData||'');
+      return r;
+    };
+  }
+
+  // ----------------------------------------------------------
+  // C. RELATÓRIO CARTÕES — IMPRESSÃO EXCLUSIVAMENTE POR CARTÃO
+  // ----------------------------------------------------------
+  function reportRows5(){
+    try{return typeof reportRows==='function'?reportRows():[]}
+    catch(e){return[]}
+  }
+  function cardName5(x){
+    try{return typeof reportCardName==='function'?reportCardName(x):''}
+    catch(e){return x?.cardName||''}
+  }
+  function cardBreakdown5(rows){
+    const sums=new Map();
+    rows.filter(x=>x.tipo==='saida'&&!x.valorPendente).forEach(x=>{
+      const card=cardName5(x)||'Sem cartão identificado';
+      sums.set(card,(sums.get(card)||0)+Number(x.valor||0));
+    });
+    return [...sums.entries()].filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  }
+
+  const previousPrint=window.printFinoraReport;
+  window.printFinoraReport=function(){
+    if(reportMode5()!=='cards'){
+      return typeof previousPrint==='function'?previousPrint.apply(this,arguments):undefined;
+    }
+    const rows=reportRows5();
+    const items=cardBreakdown5(rows);
+    const period=typeof reportPeriodLabel==='function'?reportPeriodLabel():'';
+    const workspace=window.currentWorkspaceName||'Meu ambiente';
+    const total=items.reduce((s,[,v])=>s+v,0);
+    const max=items[0]?.[1]||1;
+    const bars=items.length?items.map(([name,value])=>`
+      <div class="card-row">
+        <strong>${esc5(name)}</strong>
+        <div class="track"><i style="width:${Math.max(2,value/max*100)}%"></i></div>
+        <span>${money5(value)}</span>
+      </div>`).join(''):'<div class="empty">Nenhum gasto associado a cartão no período.</div>';
+
+    const w=window.open('','_blank');
+    if(!w){if(typeof toast==='function')toast('Permita pop-ups para imprimir o relatório.');return}
+    w.document.open();
+    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+      <title>FINORA — Gastos por cartões</title>
+      <style>
+        @page{size:A4 portrait;margin:10mm}
+        *{box-sizing:border-box}
+        body{font-family:Arial,sans-serif;color:#21322a;font-size:10px;margin:0}
+        header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0f5a3e;padding-bottom:7px;margin-bottom:11px}
+        h1{margin:0;color:#0f5a3e;font:700 19px Georgia,serif}
+        .meta{text-align:right;color:#66756d;line-height:1.45}
+        .summary{padding:8px 10px;border:1px solid #dce5e0;border-radius:7px;margin-bottom:12px}
+        .summary strong{color:#174b36;font-size:13px}
+        .card-row{display:grid;grid-template-columns:180px 1fr 100px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #e7ece9;break-inside:avoid}
+        .track{height:10px;background:#edf2ef;border-radius:999px;overflow:hidden}
+        .track i{display:block;height:100%;background:#0f5a3e}
+        .card-row span{text-align:right;font-weight:700}
+        .empty{padding:12px;border:1px dashed #ccd9d2;color:#6b7871}
+        footer{margin-top:12px;padding-top:6px;border-top:1px solid #dfe6e2;color:#7a8880;font-size:8px}
+      </style></head><body>
+      <header><div><h1>FINORA</h1><div>Gastos por cartões</div></div>
+      <div class="meta">${esc5(workspace)}<br>${esc5(period)}</div></header>
+      <div class="summary">Total associado a cartões: <strong>${money5(total)}</strong></div>
+      ${bars}
+      <footer>FINORA · Versão 1.0.10 · ${new Date().toLocaleString('pt-BR')}</footer>
+      <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),120));<\/script>
+      </body></html>`);
+    w.document.close();
+  };
+
+  // ----------------------------------------------------------
+  // D. INSTALAÇÃO / SAÚDE
+  // ----------------------------------------------------------
+  function installR5(){
+    installInstallmentControls();
+    installPhotoControls();
+    loadProfilePhoto();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installR5,{once:true});
+  else installR5();
+
+  window.finoraV110R5Health=function(){
+    const rows=Array.isArray(data)?data:[];
+    const ws=rows.filter(x=>String(x.workspaceId||'')===String(window.currentWorkspaceId||''));
+    return {
+      release:'1.0.10-R5',
+      recurringMonthly:ws.filter(x=>x.recorrente==='mensal').length,
+      generatedMonthly:ws.filter(x=>x.generatedReminder&&x.recorrente==='mensal').length,
+      installments:ws.filter(x=>x.parcelado==='sim'||parseInstallment5(x.parcelas)).length,
+      avatarConfigured:!!window.finoraProfileAvatarData,
+      total:ws.length,
+      uniqueIds:new Set(ws.map(x=>String(x.id||'')).filter(Boolean)).size
+    };
+  };
+})();
+</script>
+
+
+<div class="finora-r6-reader" id="finoraBoletoReader" aria-hidden="true">
+  <div class="finora-r6-reader-card" role="dialog" aria-modal="true" aria-labelledby="finoraBoletoReaderTitle">
+    <div class="finora-r6-reader-head">
+      <div>
+        <h3 id="finoraBoletoReaderTitle">Ler boleto</h3>
+        <p>O arquivo é analisado no navegador. O FINORA apenas sugere os campos que conseguir identificar.</p>
+      </div>
+      <button type="button" class="finora-r6-reader-close" id="closeBoletoReader" aria-label="Fechar">×</button>
+    </div>
+    <div class="finora-r6-reader-upload">
+      <input id="boletoReaderFile" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*" hidden>
+      <button type="button" class="finora-r6-reader-pick" id="pickBoletoReaderFile">
+        <strong>Selecionar boleto</strong><span>PDF, JPG, PNG ou WEBP</span>
+      </button>
+      <div class="finora-r6-reader-file" id="boletoReaderFileName">Nenhum arquivo selecionado.</div>
+    </div>
+    <div class="finora-r6-reader-or"><span>ou</span></div>
+    <div class="field">
+      <label>Linha digitável / código de barras</label>
+      <textarea id="boletoReaderManualCode" rows="2" placeholder="Cole ou digite o código se preferir"></textarea>
+    </div>
+    <div class="finora-r6-reader-actions-top"><button type="button" class="btn btn-primary" id="analyzeBoletoReader">Analisar boleto</button></div>
+    <div class="finora-r6-reader-progress" id="boletoReaderProgress" style="display:none"><span class="finora-r6-reader-spinner"></span><span id="boletoReaderProgressText">Analisando...</span></div>
+    <div class="finora-r6-reader-result" id="boletoReaderResult" style="display:none">
+      <div class="finora-r6-reader-result-head"><strong>Informações identificadas</strong><span id="boletoReaderConfidence"></span></div>
+      <div class="finora-r6-reader-grid">
+        <div><span>Vencimento</span><strong id="boletoResultDue">—</strong></div>
+        <div><span>Valor</span><strong id="boletoResultValue">—</strong></div>
+        <div><span>Beneficiário</span><strong id="boletoResultBeneficiary">—</strong></div>
+        <div><span>Parcela</span><strong id="boletoResultInstallment">—</strong></div>
+      </div>
+      <div class="finora-r6-reader-code"><span>Código / linha digitável</span><code id="boletoResultCode">—</code></div>
+      <div class="finora-r6-reader-warning" id="boletoReaderWarning">Confira os dados antes de salvar. A leitura automática pode não reconhecer todos os campos.</div>
+      <div class="finora-r6-reader-result-actions">
+        <button type="button" class="btn btn-soft" id="discardBoletoReader">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="applyBoletoReader">Aplicar ao lançamento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script id="finora-v110-r6">
+(function(){
+'use strict';
+let selectedBoletoFile=null,extractedBoleto=null,pdfJsPromise=null;
+const $6=id=>document.getElementById(id),digits=v=>String(v||'').replace(/\D/g,'');
+const moneyText=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+function isoFromBR(v){const m=String(v||'').match(/(\d{2})\/(\d{2})\/(\d{4})/);return m?`${m[3]}-${m[2]}-${m[1]}`:''}
+function brFromISO(v){const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}/${m[2]}/${m[1]}`:v||''}
+function validISO(v){if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;return !Number.isNaN(new Date(v+'T12:00:00').getTime())}
+function addDaysISO(base,days){const d=new Date(base+'T12:00:00');d.setDate(d.getDate()+Number(days||0));return d.toISOString().slice(0,10)}
+function line47ToBarcode44(line){const d=digits(line);return d.length===47?d.slice(0,4)+d.slice(32,33)+d.slice(33,47)+d.slice(4,9)+d.slice(10,20)+d.slice(21,31):''}
+function parseBankBarcode(code){
+ let d=digits(code);if(d.length===47)d=line47ToBarcode44(d);if(d.length!==44||d.startsWith('8'))return {};
+ const factor=d.slice(5,9),valueDigits=d.slice(9,19),value=Number(valueDigits)/100;let due='';
+ if(factor!=='0000'){const f=Number(factor);if(f>=1000)due=addDaysISO('2025-02-22',f-1000)}
+ return {code:d,originalCode:digits(code),value:Number.isFinite(value)&&value>0?value:null,due:validISO(due)?due:''};
+}
+function candidateCodeFromText(text){
+ const chunks=String(text||'').match(/(?:\d[\s.\-]*){44,55}/g)||[];
+ return chunks.map(x=>digits(x)).filter(x=>[44,47,48].includes(x.length)).sort((a,b)=>((a.length===47?1:a.length===44?2:3)-(b.length===47?1:b.length===44?2:3)))[0]||'';
+}
+function firstLabeledDate(text){
+ for(const p of [/(?:data\s+de\s+)?vencimento\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i,/venc\.\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i,/(\d{2}\/\d{2}\/\d{4})/]){
+  const m=String(text||'').match(p);if(m)return isoFromBR(m[1]);
+ }return '';
+}
+function parseBRMoney(raw){let s=String(raw||'').replace(/[R$\s]/g,'');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const n=Number(s);return Number.isFinite(n)?n:null}
+function firstLabeledValue(text){
+ for(const p of [/valor\s+(?:do\s+)?documento\s*[:\-]?\s*R?\$?\s*([\d.]+,\d{2})/i,/valor\s+(?:cobrado|a\s+pagar|total)\s*[:\-]?\s*R?\$?\s*([\d.]+,\d{2})/i,/total\s+a\s+pagar\s*[:\-]?\s*R?\$?\s*([\d.]+,\d{2})/i]){
+  const m=String(text||'').match(p);if(m){const n=parseBRMoney(m[1]);if(n!==null&&n>0)return n}
+ }return null;
+}
+function extractBeneficiary(lines,text){
+ for(let i=0;i<(lines||[]).length;i++){
+  const line=String(lines[i]||'').trim();let m=line.match(/(?:benefici[aá]rio|cedente|favorecido)\s*[:\-]\s*(.+)$/i);
+  if(m&&m[1].trim().length>2)return m[1].trim().slice(0,100);
+  if(/^(?:benefici[aá]rio|cedente|favorecido)\s*[:\-]?$/i.test(line)&&lines[i+1])return String(lines[i+1]).trim().slice(0,100);
+ }const m=String(text||'').match(/(?:benefici[aá]rio|cedente|favorecido)\s*[:\-]\s*([A-ZÀ-Ú0-9][A-ZÀ-Ú0-9 .&\-]{2,80})/i);return m?m[1].trim().slice(0,100):'';
+}
+function extractInstallment(text){
+ for(const p of [/parcela\s*(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})/i,/parc(?:ela)?\.?\s*(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})/i,/(\d{1,3})\s*\/\s*(\d{1,3})\s*(?:parcela|parcelas)/i]){
+  const m=String(text||'').match(p);if(m){const a=Number(m[1]),b=Number(m[2]);if(a>=1&&b>=1&&a<=b)return `${a}/${b}`}}
+ return '';
+}
+function mergeExtraction(base,extra){
+ const out={...base};['due','beneficiary','installment','code','source'].forEach(k=>{if(!out[k]&&extra[k])out[k]=extra[k]});
+ if((out.value===null||out.value===undefined)&&extra.value!==null&&extra.value!==undefined)out.value=extra.value;
+ out.text=out.text||extra.text||'';out.file=out.file||extra.file||null;return out;
+}
+function extractFromText(text,lines=[]){
+ const code=candidateCodeFromText(text);let result={source:'texto do boleto',code,due:firstLabeledDate(text),value:firstLabeledValue(text),beneficiary:extractBeneficiary(lines,text),installment:extractInstallment(text),text};
+ if(code){const parsed=parseBankBarcode(code);result=mergeExtraction(result,{code,due:parsed.due||'',value:parsed.value,source:'linha digitável / código'})}
+ return result;
+}
+async function barcodeDetector(){
+ if(!('BarcodeDetector'in window))return null;let supported=[];try{supported=await BarcodeDetector.getSupportedFormats()}catch(e){}
+ const preferred=['itf','code_128','codabar','qr_code'].filter(x=>supported.includes(x));return preferred.length?new BarcodeDetector({formats:preferred}):null;
+}
+async function readBarcodeFromBitmap(bitmap){const detector=await barcodeDetector();if(!detector)return '';try{for(const r of await detector.detect(bitmap)||[]){const d=digits(r.rawValue||'');if([44,47,48].includes(d.length))return d}}catch(e){}return ''}
+async function analyzeImage(file){const bitmap=await createImageBitmap(file);try{const code=await readBarcodeFromBitmap(bitmap);let r={source:'código de barras da imagem',code,value:null,due:'',beneficiary:'',installment:'',file};if(code){const p=parseBankBarcode(code);r=mergeExtraction(r,{value:p.value,due:p.due,code})}return r}finally{try{bitmap.close()}catch(e){}}}
+async function loadPdfJs(){if(pdfJsPromise)return pdfJsPromise;pdfJsPromise=(async()=>{const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';return pdfjs})();return pdfJsPromise}
+async function analyzePdf(file,onProgress){
+ const pdfjs=await loadPdfJs(),bytes=await file.arrayBuffer(),pdf=await pdfjs.getDocument({data:bytes}).promise,pages=Math.min(pdf.numPages,3);let allText='',lines=[],barcode='';
+ for(let p=1;p<=pages;p++){onProgress?.(`Lendo página ${p} de ${pages}...`);const page=await pdf.getPage(p),content=await page.getTextContent();let line='';
+  for(const item of content.items||[]){const t=String(item.str||'').trim();if(t)line+=(line?' ':'')+t;if(item.hasEOL&&line){lines.push(line);allText+=line+'\n';line=''}}if(line){lines.push(line);allText+=line+'\n'}
+  if(!barcode&&'BarcodeDetector'in window){try{const viewport=page.getViewport({scale:1.65}),canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);await page.render({canvasContext:ctx,viewport}).promise;barcode=await readBarcodeFromBitmap(canvas)}catch(e){}}
+ }
+ let r=extractFromText(allText,lines);r.file=file;if(barcode){const p=parseBankBarcode(barcode);r=mergeExtraction(r,{code:barcode,value:p.value,due:p.due,source:'PDF / código de barras'})}return r;
+}
+function analyzeManualCode(raw){const code=digits(raw);if(![44,47,48].includes(code.length))throw new Error('A linha digitável/código deve ter 44, 47 ou 48 dígitos.');const p=parseBankBarcode(code);return {source:'código informado manualmente',code,due:p.due||'',value:p.value,beneficiary:'',installment:'',file:null}}
+function extractionScore(r){let n=0;for(const ok of [r.due,r.value!==null&&r.value!==undefined,r.beneficiary,r.installment,r.code])if(ok)n++;return {n,total:5}}
+function renderResult(r){const s=extractionScore(r);$6('boletoResultDue').textContent=r.due?brFromISO(r.due):'Não identificado';$6('boletoResultValue').textContent=r.value!==null&&r.value!==undefined?moneyText(r.value):'Não identificado';$6('boletoResultBeneficiary').textContent=r.beneficiary||'Não identificado';$6('boletoResultInstallment').textContent=r.installment||'Não identificado';$6('boletoResultCode').textContent=r.code||'Não identificado';$6('boletoReaderConfidence').textContent=`${s.n} de 5 campos identificados`;$6('boletoReaderWarning').textContent=s.n===5?'Todos os campos principais foram identificados. Confira antes de salvar.':'Leitura parcial: campos não identificados permanecerão para preenchimento manual.';$6('boletoReaderResult').style.display='block'}
+function setProgress(show,text='Analisando...'){$6('boletoReaderProgress').style.display=show?'flex':'none';$6('boletoReaderProgressText').textContent=text;$6('analyzeBoletoReader').disabled=show}
+function openReader(){selectedBoletoFile=null;extractedBoleto=null;$6('boletoReaderFile').value='';$6('boletoReaderFileName').textContent='Nenhum arquivo selecionado.';$6('boletoReaderManualCode').value='';$6('boletoReaderResult').style.display='none';setProgress(false);$6('finoraBoletoReader').classList.add('open');$6('finoraBoletoReader').setAttribute('aria-hidden','false')}
+function closeReader(){$6('finoraBoletoReader').classList.remove('open');$6('finoraBoletoReader').setAttribute('aria-hidden','true')}
+async function analyze(){
+ const manual=$6('boletoReaderManualCode').value.trim();if(!selectedBoletoFile&&!manual){toast('Selecione um boleto ou informe a linha digitável.');return}setProgress(true,'Preparando leitura...');$6('boletoReaderResult').style.display='none';
+ try{let result={source:'',code:'',due:'',value:null,beneficiary:'',installment:'',file:selectedBoletoFile};if(manual)result=mergeExtraction(result,analyzeManualCode(manual));
+  if(selectedBoletoFile){const type=(selectedBoletoFile.type||'').toLowerCase(),name=(selectedBoletoFile.name||'').toLowerCase();
+   if(type==='application/pdf'||name.endsWith('.pdf')){try{result=mergeExtraction(result,await analyzePdf(selectedBoletoFile,msg=>setProgress(true,msg)))}catch(e){console.warn('FINORA R6 PDF',e);if(!manual)throw new Error('Não consegui ler o PDF automaticamente. Você pode informar a linha digitável manualmente.')}}
+   else if(type.startsWith('image/')||/\.(png|jpe?g|webp)$/i.test(name)){try{result=mergeExtraction(result,await analyzeImage(selectedBoletoFile))}catch(e){console.warn('FINORA R6 imagem',e);if(!manual)throw new Error('Não consegui localizar o código de barras na imagem. Informe a linha digitável manualmente.')}}
+   else throw new Error('Formato de arquivo não suportado.');
+  }
+  if(!result.code&&manual)result.code=digits(manual);extractedBoleto=result;renderResult(result);
+ }catch(err){console.error('FINORA R6 leitura boleto',err);toast(err.message||'Não foi possível analisar o boleto.')}finally{setProgress(false)}
+}
+function attachSourceFile(file){if(!file)return;const input=$6('arquivo');if(!input)return;try{const dt=new DataTransfer();dt.items.add(file);input.files=dt.files;if($6('fileInfo'))$6('fileInfo').textContent=`Arquivo selecionado pelo leitor: ${file.name}`}catch(e){}}
+function applyExtraction(){
+ const r=extractedBoleto;if(!r)return;if($6('tipo'))$6('tipo').value='saida';try{if(typeof applyLaunchMode==='function')applyLaunchMode('saida',{keepForm:true})}catch(e){}
+ if(r.due&&$6('vencimento'))$6('vencimento').value=r.due;
+ if(r.value!==null&&r.value!==undefined&&$6('valor')){try{$6('valor').value=typeof formatBRLInput==='function'?formatBRLInput(r.value):moneyText(r.value)}catch(e){$6('valor').value=moneyText(r.value)}}
+ if(r.beneficiary&&$6('beneficiario')){$6('beneficiario').value=r.beneficiary;if(!$6('descricao').value.trim())$6('descricao').value=`BOLETO ${r.beneficiary}`.slice(0,120)}
+ if(r.code&&$6('codigoBoleto'))$6('codigoBoleto').value=r.code;
+ if(r.installment){if($6('parcelado'))$6('parcelado').value='sim';if($6('parcelas'))$6('parcelas').value=r.installment;if($6('installmentsField'))$6('installmentsField').style.display='block';if($6('recorrente'))$6('recorrente').value='mensal'}
+ const forma=$6('forma');if(forma&&[...forma.options].some(o=>o.value==='Boleto'||o.textContent==='Boleto')){forma.value='Boleto';try{updatePaymentAccountField()}catch(e){}}
+ if($6('dataLancamento')&&!$6('dataLancamento').value&&typeof today==='function')$6('dataLancamento').value=today();
+ attachSourceFile(r.file);
+ const obs=$6('observacao');if(obs&&!obs.value.includes('Leitura assistida de boleto'))obs.value=(obs.value.trim()?obs.value.trim()+'\n':'')+['Leitura assistida de boleto',r.code?`Código: ${r.code}`:'','Confira os dados antes de salvar.'].filter(Boolean).join(' | ');
+ closeReader();toast('Dados do boleto aplicados. Confira os campos antes de salvar.');requestAnimationFrame(()=>$6('descricao')?.scrollIntoView({behavior:'smooth',block:'center'}));
+}
+function updateReaderVisibility(){const box=$6('boletoReaderEntry');if(box)box.style.display=($6('tipo')?.value||'saida')==='entrada'?'none':'block'}
+function install(){
+ $6('openBoletoReader')?.addEventListener('click',openReader);$6('closeBoletoReader')?.addEventListener('click',closeReader);$6('discardBoletoReader')?.addEventListener('click',closeReader);$6('pickBoletoReaderFile')?.addEventListener('click',()=>$6('boletoReaderFile')?.click());
+ $6('boletoReaderFile')?.addEventListener('change',()=>{selectedBoletoFile=$6('boletoReaderFile').files?.[0]||null;$6('boletoReaderFileName').textContent=selectedBoletoFile?`${selectedBoletoFile.name} · ${(selectedBoletoFile.size/1024).toFixed(0)} KB`:'Nenhum arquivo selecionado.'});
+ $6('analyzeBoletoReader')?.addEventListener('click',analyze);$6('applyBoletoReader')?.addEventListener('click',applyExtraction);$6('finoraBoletoReader')?.addEventListener('click',e=>{if(e.target===$6('finoraBoletoReader'))closeReader()});$6('tipo')?.addEventListener('change',updateReaderVisibility);updateReaderVisibility();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+window.finoraBoletoReaderHealthR6=function(){return {release:'1.0.10-R6',barcodeDetector:'BarcodeDetector'in window,pdfTextReader:'pdf.js carregado sob demanda',supportedFiles:['PDF','JPG','PNG','WEBP'],fields:['vencimento','valor','beneficiario','codigoBoleto','parcelas'],dataPolicy:'arquivo processado localmente no navegador'}};
 })();
 </script>
 
