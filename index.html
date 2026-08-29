@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.10">
+<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.8">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -7978,13 +7978,10 @@ function addMonths(dateStr, n=1){
 function normalizeVariableReminders(){
   let changed=false;
   data.forEach(x=>{
-    // R7.7: uma ocorrência já materializada pelo usuário é definitiva.
-    // Mesmo que dados antigos ainda tragam generatedReminder=true, não a zere.
     if(x.materializedOccurrence && !x.valorPendente){
-      if(x.generatedReminder){ x.generatedReminder=false; changed=true; }
+      if(x.generatedReminder){x.generatedReminder=false;changed=true}
       return;
     }
-
     // Any generated monthly reminder marked as variable must not retain the prior month's amount.
     if(x.generatedReminder && x.valorRecorrente==='variavel'){
       if(x.valor!==0 || !x.valorPendente){
@@ -10013,8 +10010,6 @@ $('entryForm').addEventListener('submit',async e=>{
     recRule:recRuleVal,
     valorRecorrente:$('valorRecorrente').value,
     valorPendente:false,
-    // R7.7: uma previsão que recebeu valor deixa de ser "generatedReminder".
-    // Isso impede normalizeVariableReminders() de zerar novamente o lançamento.
     generatedReminder:false,
     materializedOccurrence:!!(old?.valorPendente||old?.generatedReminder||old?.materializedOccurrence),
     materializedAt:(old?.valorPendente||old?.generatedReminder)
@@ -17461,132 +17456,7 @@ window.FINORA_RELEASE='1.0.10';
         ${printRowsTable(rows)}
         <footer>FINORA · Versão 1.0.10 · Relatório gerado em ${new Date().toLocaleString('pt-BR')}</footer>
         <script>window.addEventListener('load',()=>{setTimeout(()=>window.print(),120)});<\/script>
-        
-<style id="finora-v110-r77-dark-persistence">
-/* FINORA R7.7 — dark mode coerente. Login e menu lateral permanecem isolados. */
-body.finora-v84-dark:not(:has(#authScreen[style*="display: flex"])) {
-  --bg:#09150f; --paper:#10231a; --ink:#f4f8f6; --muted:#c4d2cb;
-  --line:#2d493c; --green2:#193b2c; --red2:#351f1d; --gold2:#382e1b;
-}
-body.finora-v84-dark{background:#09150f!important;color:#f4f8f6!important}
-body.finora-v84-dark .shell{background:#09150f!important}
-
-/* seletor de ano/mês */
-body.finora-v84-dark .month-tabs{
-  background:#10231a!important;border-color:#2d493c!important;
-  box-shadow:none!important
-}
-body.finora-v84-dark .month-tab{
-  background:#14271f!important;color:#dce8e2!important;border-color:#29463a!important
-}
-body.finora-v84-dark .month-tab.active{
-  background:#07864f!important;color:#fff!important;border-color:#07864f!important
-}
-
-/* superfícies do conteúdo — exclui sidebar e autenticação */
-body.finora-v84-dark .simple-topline,
-body.finora-v84-dark .simple-column,
-body.finora-v84-dark .simple-kpi,
-body.finora-v84-dark .simple-table-head,
-body.finora-v84-dark .simple-group-head,
-body.finora-v84-dark .simple-total,
-body.finora-v84-dark .finora-category-strip,
-body.finora-v84-dark .finora-figure,
-body.finora-v84-dark .finora-cards-panel,
-body.finora-v84-dark .finora-card-item,
-body.finora-v84-dark .finora-monthly-sheet,
-body.finora-v84-dark .finora-family-panel,
-body.finora-v84-dark .panel,
-body.finora-v84-dark .panel-head,
-body.finora-v84-dark .toolbar,
-body.finora-v84-dark .alert-toolbar,
-body.finora-v84-dark .alert-month-block,
-body.finora-v84-dark .alert-summary-card,
-body.finora-v84-dark .finora-v84-panel,
-body.finora-v84-dark .finora-v84-panel-head,
-body.finora-v84-dark .finora-v84-quick,
-body.finora-v84-dark .finora-v84-quick-tabs,
-body.finora-v84-dark .finora-home-category-card,
-body.finora-v84-dark .popup-only-panel.section-modal-active,
-body.finora-v84-dark .section-modal-active .panel-head{
-  background:#10231a!important;color:#f4f8f6!important;border-color:#2d493c!important
-}
-body.finora-v84-dark .simple-row:hover,
-body.finora-v84-dark .finora-sheet-table tr:hover td{
-  background:#172d23!important
-}
-body.finora-v84-dark th{
-  background:#14271f!important;color:#dbe7e1!important;border-color:#2d493c!important
-}
-body.finora-v84-dark td,
-body.finora-v84-dark .simple-row{
-  color:#f4f8f6!important;border-color:#294239!important
-}
-body.finora-v84-dark .simple-row .name,
-body.finora-v84-dark .simple-row .value,
-body.finora-v84-dark .simple-group-head span,
-body.finora-v84-dark .simple-total span,
-body.finora-v84-dark .finora-category-strip h3,
-body.finora-v84-dark .finora-figure strong,
-body.finora-v84-dark .finora-card-item strong{
-  color:#f4f8f6!important
-}
-body.finora-v84-dark .simple-kpi span,
-body.finora-v84-dark .simple-kpi small,
-body.finora-v84-dark .finora-figure span,
-body.finora-v84-dark .file-note{
-  color:#c4d2cb!important
-}
-body.finora-v84-dark input,
-body.finora-v84-dark select,
-body.finora-v84-dark textarea{
-  background:#142a22!important;color:#fff!important;
-  -webkit-text-fill-color:#fff!important;border-color:#476457!important
-}
-
-/* Botões claros residuais */
-body.finora-v84-dark .finora-v84-panel-head button,
-body.finora-v84-dark .simple-action:not(.primary),
-body.finora-v84-dark .iconbtn,
-body.finora-v84-dark .btn-soft{
-  background:#172d23!important;color:#f4f8f6!important;border-color:#3b594c!important
-}
-
-/* Login: visual fixo claro, independentemente do tema salvo */
-body.finora-v84-dark #authScreen,
-body.finora-v84-dark #authScreen .auth-card,
-body.finora-v84-dark #authScreen .auth-panel,
-body.finora-v84-dark #authScreen .auth-inner{
-  color:#173f32!important
-}
-body.finora-v84-dark #authScreen .auth-card,
-body.finora-v84-dark #authScreen .auth-panel,
-body.finora-v84-dark #authScreen .auth-inner{
-  background:#fff!important
-}
-</style>
-
-<script id="finora-v110-r77-health">
-(function(){
-  'use strict';
-  window.finoraR77Health=function(id){
-    const row=(Array.isArray(window.data)?window.data:[]).find(x=>String(x.id)===String(id));
-    return {
-      release:'1.0.10-R7.7',
-      transaction:row?{
-        id:row.id, valor:row.valor, valorPendente:!!row.valorPendente,
-        generatedReminder:!!row.generatedReminder,
-        materializedOccurrence:!!row.materializedOccurrence,
-        updatedAt:row.updatedAt
-      }:null,
-      darkTheme:document.body.classList.contains('finora-v84-dark'),
-      monthTabsBackground:getComputedStyle(document.querySelector('.month-tabs')||document.body).backgroundColor
-    };
-  };
-})();
-</script>
-
-</body></html>`);
+        </body></html>`);
       w.document.close();
     }catch(err){
       console.error('FINORA 1.0.10 print',err);
@@ -20833,6 +20703,88 @@ window.finoraR76Health=function(){
   };
 };
 
+})();
+</script>
+
+
+<style id="finora-r78-dark-final">
+body.finora-v84-dark{background:#08150f!important;color:#f5faf7!important}
+body.finora-v84-dark .shell,body.finora-v84-dark main,body.finora-v84-dark #simpleHome{background:#08150f!important}
+body.finora-v84-dark .finora-v84-periodbar,
+body.finora-v84-dark .month-tabs{background:#10231b!important;border-color:#2f4b3f!important;box-shadow:none!important}
+body.finora-v84-dark .finora-v84-periodbar select,
+body.finora-v84-dark .month-tab{background:#152a21!important;color:#eaf3ee!important;border-color:#315044!important}
+body.finora-v84-dark .month-tab:hover{background:#1d352a!important;color:#fff!important}
+body.finora-v84-dark .month-tab.active{background:#078650!important;color:#fff!important;border-color:#078650!important}
+
+body.finora-v84-dark :is(
+.simple-kpi,.simple-column,.simple-topline,.simple-table-head,.simple-group-head,.simple-total,
+.finora-home-category-card,.finora-v84-quick,.finora-v84-panel,.finora-v84-panel-head,
+.finora-category-strip,.finora-figure,.finora-cards-panel,.finora-card-item,.finora-monthly-sheet,
+.finora-family-panel,.panel,.panel-head,.toolbar,.footer-tools,.alert-toolbar,.alert-month-block,
+.alert-summary-card,.report-section,.report-shell,.profile-modal,.profile-modal-head,.profile-summary
+){background:#10231b!important;color:#f5faf7!important;border-color:#2f4b3f!important;box-shadow:none!important}
+
+body.finora-v84-dark .finora-v84-quick-tabs,
+body.finora-v84-dark .finora-v84-quick-tabs button,
+body.finora-v84-dark .finora-v88-chart-period,
+body.finora-v84-dark .finora-v88-chart-more,
+body.finora-v84-dark .finora-r2-chart-menu,
+body.finora-v84-dark .finora-privacy-toggle,
+body.finora-v84-dark .simple-action:not(.primary),
+body.finora-v84-dark .btn-soft,
+body.finora-v84-dark .iconbtn{
+  background:#152a21!important;color:#f5faf7!important;border-color:#38574a!important
+}
+body.finora-v84-dark .finora-v84-quick-tabs button:first-child{color:#7ee0ad!important}
+body.finora-v84-dark .finora-v84-quick-tabs button:last-child{color:#ff9191!important}
+body.finora-v84-dark .finora-v84-quick-tabs button.active{background:#1d352a!important}
+
+body.finora-v84-dark .shell :is(input,select,textarea),
+body.finora-v84-dark .popup-only-panel :is(input,select,textarea),
+body.finora-v84-dark .profile-modal :is(input,select,textarea){
+  background:#152a21!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border-color:#49675a!important
+}
+body.finora-v84-dark th{background:#152a21!important;color:#e7f1ec!important;border-color:#315044!important}
+body.finora-v84-dark td{background:#10231b!important;color:#f5faf7!important;border-color:#294238!important}
+body.finora-v84-dark tr:hover td{background:#172e24!important}
+
+body.finora-v84-dark .popup-only-panel.section-modal-active,
+body.finora-v84-dark .section-modal-active .panel-head{
+  background:#10231b!important;color:#f5faf7!important;border-color:#2f4b3f!important
+}
+
+/* menu lateral independente do tema */
+body.finora-v84-dark .finora-sidebar{background:linear-gradient(180deg,#00382d 0%,#00503d 100%)!important}
+
+/* login sempre claro */
+body.finora-v84-dark #authScreen .auth-card,
+body.finora-v84-dark #authScreen .auth-panel,
+body.finora-v84-dark #authScreen .auth-inner,
+body.finora-v84-dark #authScreen #loginPane,
+body.finora-v84-dark #authScreen #registerPane{background:#fff!important;color:#173f32!important}
+body.finora-v84-dark #authScreen :is(input,select,textarea){
+  background:#fff!important;color:#172c24!important;-webkit-text-fill-color:#172c24!important;border-color:#a7bbb1!important
+}
+</style>
+
+<script id="finora-r78-health">
+(function(){
+  window.finoraR78Health=function(id){
+    let row=null;
+    try{row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id))||null}catch(e){}
+    return {
+      release:'1.0.10-R7.8',
+      transaction:row?{
+        id:row.id,descricao:row.descricao,valor:row.valor,
+        valorPendente:!!row.valorPendente,
+        generatedReminder:!!row.generatedReminder,
+        materializedOccurrence:!!row.materializedOccurrence,
+        updatedAt:row.updatedAt
+      }:null,
+      dark:document.body.classList.contains('finora-v84-dark')
+    };
+  };
 })();
 </script>
 
