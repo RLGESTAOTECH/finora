@@ -6375,6 +6375,30 @@ body.finora-v84-dark .finora-r72-installment-separator{color:#fff}
 }
 </style>
 
+
+<style id="finora-v110-r73-style">
+/* Perfil */
+#userAvatarInitials.finora-r73-photo,
+#profileAvatar.finora-r73-photo{
+  color:transparent!important;
+  text-shadow:none!important;
+  background-position:center!important;
+  background-size:cover!important;
+  background-repeat:no-repeat!important;
+}
+
+/* Nova despesa: os campos permanecem visíveis, independentemente de boleto */
+#simpleLaunchPanel.launch-expense-mode #installmentFlagField,
+#simpleLaunchPanel.launch-expense-mode #installmentsField{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+#simpleLaunchPanel.launch-expense-mode #entryForm{
+  display:grid!important;
+}
+</style>
+
 </head>
 <body>
 
@@ -19589,6 +19613,373 @@ window.finoraR72InstallmentHealth=function(){
     totalOptions:$72('parcelaTotal')?.options.length||0,
     hiddenValue:$72('parcelas')?.value||'',
     expenseMode:$72('simpleLaunchPanel')?.classList.contains('launch-expense-mode')||false
+  };
+};
+
+})();
+</script>
+
+
+<script id="finora-v110-r73">
+(function(){
+'use strict';
+
+const $73=id=>document.getElementById(id);
+const AVATAR_KEY_PREFIX='finora_avatar_user_v73_';
+let photoDraft73=null;
+let photoRemove73=false;
+
+function appUser73(){
+  try{return (typeof currentUser!=='undefined'&&currentUser)?currentUser:null}catch(e){return null}
+}
+function userId73(){return String(appUser73()?.id||'')}
+function avatarKey73(){const id=userId73();return id?AVATAR_KEY_PREFIX+id:''}
+
+function initials73(){
+  const name=String(appUser73()?.name||$73('loggedName')?.textContent||'U').trim();
+  const p=name.split(/\s+/).filter(Boolean);
+  return (p.length>1?(p[0][0]+p[p.length-1][0]):(p[0]?.slice(0,2)||'U')).toUpperCase();
+}
+
+function applyAvatar73(photo){
+  const uid=userId73();
+  [$73('userAvatarInitials'),$73('profileAvatar')].filter(Boolean).forEach(el=>{
+    if(photo){
+      el.style.setProperty('background-image',`url("${photo}")`,'important');
+      el.style.setProperty('background-position','center','important');
+      el.style.setProperty('background-size','cover','important');
+      el.style.setProperty('background-repeat','no-repeat','important');
+      el.classList.add('finora-r73-photo','finora-has-photo');
+      el.textContent='';
+      el.dataset.avatarUserId=uid;
+    }else{
+      el.style.removeProperty('background-image');
+      el.classList.remove('finora-r73-photo','finora-has-photo');
+      el.textContent=initials73();
+      el.dataset.avatarUserId=uid;
+    }
+  });
+}
+
+function saveLocalAvatar73(photo){
+  try{
+    const key=avatarKey73();
+    if(!key)return;
+    if(photo)localStorage.setItem(key,photo);
+    else localStorage.removeItem(key);
+  }catch(e){}
+}
+function loadLocalAvatar73(){
+  try{
+    const key=avatarKey73();
+    return key?(localStorage.getItem(key)||''):'';
+  }catch(e){return ''}
+}
+
+async function loadAvatar73(){
+  const user=appUser73();
+  if(!user?.id)return;
+
+  // Nunca herda foto de outro usuário.
+  applyAvatar73('');
+  const local=loadLocalAvatar73();
+  if(local)applyAvatar73(local);
+
+  try{
+    const client=typeof getAuthClient==='function'?getAuthClient():null;
+    if(!client)return;
+    const {data:sessionData}=await client.auth.getSession();
+    const sessionUser=sessionData?.session?.user;
+    if(!sessionUser || String(sessionUser.id)!==String(user.id))return;
+
+    const remote=sessionUser.user_metadata?.finora_avatar||'';
+    if(remote){
+      saveLocalAvatar73(remote);
+      applyAvatar73(remote);
+    }else if(!local){
+      applyAvatar73('');
+    }
+  }catch(e){
+    console.warn('FINORA R7.3 avatar',e);
+  }
+}
+window.finoraLoadAvatarR73=loadAvatar73;
+
+function resizePhoto73(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>reject(new Error('Não foi possível ler a foto.'));
+    reader.onload=()=>{
+      const img=new Image();
+      img.onerror=()=>reject(new Error('Formato de imagem inválido.'));
+      img.onload=()=>{
+        const size=160;
+        const canvas=document.createElement('canvas');
+        canvas.width=size;canvas.height=size;
+        const ctx=canvas.getContext('2d');
+        const scale=Math.max(size/img.width,size/img.height);
+        const w=img.width*scale,h=img.height*scale;
+        ctx.drawImage(img,(size-w)/2,(size-h)/2,w,h);
+        resolve(canvas.toDataURL('image/jpeg',0.72));
+      };
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function wirePhoto73(){
+  const old=$73('profilePhotoInput');
+  if(old&&!old.dataset.r73){
+    const input=old.cloneNode(true);
+    input.dataset.r73='1';
+    old.replaceWith(input);
+    input.addEventListener('change',async()=>{
+      const f=input.files?.[0];
+      if(!f)return;
+      try{
+        photoDraft73=await resizePhoto73(f);
+        photoRemove73=false;
+        applyAvatar73(photoDraft73);
+        if(typeof profileOk==='function')profileOk('Foto preparada. Clique em Salvar alterações para gravar.');
+      }catch(e){
+        if(typeof profileErr==='function')profileErr(e.message||'Não foi possível preparar a foto.');
+      }
+    });
+  }
+
+  const oldRemove=$73('removeProfilePhotoBtn');
+  if(oldRemove&&!oldRemove.dataset.r73){
+    const btn=oldRemove.cloneNode(true);
+    btn.dataset.r73='1';
+    oldRemove.replaceWith(btn);
+    btn.addEventListener('click',()=>{
+      photoDraft73=null;
+      photoRemove73=true;
+      applyAvatar73('');
+      if(typeof profileOk==='function')profileOk('Foto marcada para remoção. Clique em Salvar alterações para confirmar.');
+    });
+  }
+}
+
+async function ensureAuthSession73(){
+  const client=typeof getAuthClient==='function'?getAuthClient():null;
+  if(!client)return {client:null,user:null};
+  try{
+    let {data}=await client.auth.getSession();
+    let session=data?.session||null;
+    if(!session){
+      try{
+        const refreshed=await client.auth.refreshSession();
+        session=refreshed?.data?.session||null;
+      }catch(e){}
+    }
+    return {client,user:session?.user||null};
+  }catch(e){
+    return {client,user:null};
+  }
+}
+
+async function saveProfile73(btn){
+  const user=appUser73();
+  if(!user||btn.dataset.busy==='1')return;
+
+  if(typeof clearProfileMessages==='function')clearProfileMessages();
+
+  const name=$73('profileName')?.value.trim()||'';
+  const email=$73('profileEmail')?.value.trim().toLowerCase()||'';
+  const cpfLogin=typeof normalizeCPF==='function'?normalizeCPF($73('profileCpfLogin')?.value||''):'';
+  const currentPassword=$73('profileCurrentPassword')?.value||'';
+  const newPassword=$73('profileNewPassword')?.value||'';
+  const newPassword2=$73('profileNewPassword2')?.value||'';
+
+  if(!name)return profileErr('Informe seu nome.');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return profileErr('Informe um e-mail válido.');
+  if(cpfLogin&&typeof validCPF==='function'&&!validCPF(cpfLogin))return profileErr('Informe um CPF válido.');
+
+  const wantsPass=!!(newPassword||newPassword2);
+  const wantsCpf=!!cpfLogin;
+  const wantsPhoto=photoDraft73!==null||photoRemove73;
+
+  btn.dataset.busy='1';
+  btn.disabled=true;
+  const oldText=btn.textContent;
+  btn.textContent='Salvando...';
+
+  try{
+    const {client, user:authUser}=await ensureAuthSession73();
+    if(!client)throw new Error('Autenticação online indisponível.');
+
+    // Se houver mudança sensível, exige sessão válida e senha atual.
+    if(wantsPass||wantsCpf){
+      if(!authUser)throw new Error('Sua sessão expirou. Saia e entre novamente antes de alterar senha ou CPF.');
+      if(!currentPassword)throw new Error('Informe sua senha atual para confirmar a alteração.');
+      const verify=await client.auth.signInWithPassword({email:String(user.email||email).toLowerCase(),password:currentPassword});
+      if(verify.error)throw new Error('A senha atual está incorreta.');
+    }
+
+    if(wantsPass){
+      if(newPassword.length<6)throw new Error('A nova senha precisa ter pelo menos 6 caracteres.');
+      if(newPassword!==newPassword2)throw new Error('A confirmação da nova senha não confere.');
+      const {error}=await client.auth.updateUser({password:newPassword});
+      if(error)throw error;
+    }
+
+    // Foto: primeiro persiste localmente por user_id, depois tenta nuvem.
+    // Isso evita perder a foto ao relogar no mesmo navegador, mesmo se a sessão estiver temporariamente indisponível.
+    if(wantsPhoto){
+      const finalPhoto=photoRemove73?'':photoDraft73;
+      saveLocalAvatar73(finalPhoto);
+      applyAvatar73(finalPhoto);
+
+      const fresh=await ensureAuthSession73();
+      if(fresh.user && String(fresh.user.id)===String(user.id)){
+        const {error}=await fresh.client.auth.updateUser({data:{finora_avatar:finalPhoto}});
+        if(error)throw error;
+      }
+    }
+
+    // E-mail exige sessão.
+    if(email!==String(user.email||'').toLowerCase()){
+      const fresh=await ensureAuthSession73();
+      if(!fresh.user)throw new Error('Sua sessão expirou. Entre novamente para alterar o e-mail.');
+      const {error}=await fresh.client.auth.updateUser({email});
+      if(error)throw error;
+    }
+
+    // Perfil FINORA pode ser atualizado pela tabela autenticada.
+    let uid=user.id;
+    const fresh=await ensureAuthSession73();
+    if(fresh.user && String(fresh.user.id)===String(user.id))uid=fresh.user.id;
+
+    const profile=await upsertOwnFinoraProfile({
+      user_id:uid,
+      name,
+      email,
+      cpf_hash:wantsCpf?await finoraHash(cpfLogin):(user.cpfHash||''),
+      cpf_masked:wantsCpf?maskCPF(cpfLogin):(user.cpfMasked||''),
+      workspace_id:user.workspaceId,
+      role:user.role
+    });
+
+    const updated=await cacheAuthProfile(profile);
+    currentUser=updated;
+    localStorage.setItem(FINORA_SESSION_KEY,updated.id);
+
+    if($73('loggedName'))$73('loggedName').textContent=updated.name||'Usuário';
+    if($73('profileSummaryName'))$73('profileSummaryName').textContent=updated.name||'Usuário';
+    if($73('profileCpf'))$73('profileCpf').value=updated.cpfMasked||'CPF cadastrado';
+
+    photoDraft73=null;
+    photoRemove73=false;
+
+    try{renderFamilyAccess()}catch(e){}
+    try{fillPeople()}catch(e){}
+    try{render()}catch(e){}
+    await loadAvatar73();
+
+    profileOk('Alterações gravadas com sucesso.');
+    if(typeof toast==='function')toast('Alterações gravadas com sucesso.');
+  }catch(e){
+    console.error('FINORA R7.3 perfil',e);
+    profileErr(e?.message||'Não foi possível salvar as alterações.');
+  }finally{
+    btn.disabled=false;
+    delete btn.dataset.busy;
+    btn.textContent=oldText;
+  }
+}
+
+function replaceSave73(){
+  const old=$73('saveProfileBtn');
+  if(!old||old.dataset.r73)return;
+  const btn=old.cloneNode(true); // remove listeners antigos que disputavam o clique
+  btn.dataset.r73='1';
+  old.replaceWith(btn);
+  btn.addEventListener('click',()=>saveProfile73(btn));
+}
+
+function guaranteeExpenseFields73(){
+  const panel=$73('simpleLaunchPanel');
+  if(!panel?.classList.contains('launch-expense-mode'))return;
+
+  const flag=$73('installmentFlagField');
+  const field=$73('installmentsField');
+  if(flag){
+    flag.style.setProperty('display','block','important');
+    flag.hidden=false;
+  }
+  if(field){
+    field.style.setProperty('display','block','important');
+    field.hidden=false;
+  }
+
+  // Mantém os combos visíveis. Só ficam desabilitados quando "Não".
+  const parcelado=$73('parcelado')?.value||'';
+  const cur=$73('parcelaAtual');
+  const total=$73('parcelaTotal');
+  if(cur)cur.disabled=parcelado!=='sim';
+  if(total)total.disabled=parcelado!=='sim';
+}
+
+function install73(){
+  wirePhoto73();
+  replaceSave73();
+
+  // Só tenta carregar avatar se já existe usuário ativo.
+  if(appUser73()?.id)loadAvatar73();
+
+  $73('profileBtn')?.addEventListener('click',()=>{
+    setTimeout(()=>{
+      wirePhoto73();
+      replaceSave73();
+      loadAvatar73();
+    },0);
+  });
+
+  $73('parcelado')?.addEventListener('change',guaranteeExpenseFields73);
+
+  // Reforço na abertura das jornadas.
+  const oldOpen=window.openLaunchModal;
+  if(typeof oldOpen==='function'&&!oldOpen.__r73){
+    const wrapped=function(mode='list'){
+      const result=oldOpen.apply(this,arguments);
+      if(mode==='saida')setTimeout(guaranteeExpenseFields73,0);
+      return result;
+    };
+    wrapped.__r73=true;
+    window.openLaunchModal=wrapped;
+  }
+
+  // Reforço na aplicação de modo.
+  const oldApply=window.applyLaunchMode;
+  if(typeof oldApply==='function'&&!oldApply.__r73){
+    const wrapped=function(mode,opts){
+      const result=oldApply.apply(this,arguments);
+      if(mode==='saida')setTimeout(guaranteeExpenseFields73,0);
+      return result;
+    };
+    wrapped.__r73=true;
+    window.applyLaunchMode=wrapped;
+  }
+
+  guaranteeExpenseFields73();
+}
+
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install73,{once:true});
+else install73();
+
+window.finoraR73Health=async function(){
+  const {user}=await ensureAuthSession73();
+  return {
+    release:'1.0.10-R7.3',
+    currentUserId:userId73(),
+    authUserId:String(user?.id||''),
+    sameUser:!!user&&String(user.id)===userId73(),
+    localPhoto:!!loadLocalAvatar73(),
+    topPhoto:$73('userAvatarInitials')?.classList.contains('finora-r73-photo')||false,
+    installmentQuestionVisible:!!$73('installmentFlagField') && getComputedStyle($73('installmentFlagField')).display!=='none',
+    installmentFieldVisible:!!$73('installmentsField') && getComputedStyle($73('installmentsField')).display!=='none'
   };
 };
 
