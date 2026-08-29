@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.12">
+<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.13">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -6937,6 +6937,328 @@ body.finora-v84-dark #authScreen :is(input,select,textarea) {
 }
 </style>
 
+
+<style id="finora-dark-class-r713">
+/* FINORA R7.13 — Dark Mode por classe `.dark`
+   Ativa se `.dark` estiver em <html> OU <body>.
+   No modo claro, nenhuma regra abaixo é aplicada. */
+
+html.dark,
+html:has(body.dark){color-scheme:dark}
+
+html.dark body,
+body.dark{
+  --dark-bg:#022c22;
+  --dark-surface:#064e3b;
+  --dark-surface-2:#043327;
+  --dark-input:#022c22;
+  --dark-border:rgba(17,94,89,.48);
+  --dark-text:#fff;
+  --dark-muted:#e2e8f0;
+  background:#022c22!important;
+  color:#fff!important;
+}
+
+/* Fundo geral */
+html.dark body :is(.shell,.simple-home,.main,.main-content,.content-area,.finora-v84-main,.finora-v84-content,.finora-v84-dashboard),
+body.dark :is(.shell,.simple-home,.main,.main-content,.content-area,.finora-v84-main,.finora-v84-content,.finora-v84-dashboard){
+  background:#022c22!important;
+  color:#fff!important;
+}
+
+/* Superfícies e cards */
+html.dark body :is(
+  .card,.panel,.simple-kpi,.simple-column,.simple-topline,.simple-table-head,
+  .simple-group-head,.simple-total,.finora-category-strip,.finora-figure,
+  .finora-cards-panel,.finora-card-item,.finora-family-panel,.finora-monthly-sheet,
+  .finora-v84-panel,.finora-v84-panel-head,.finora-v84-quick,
+  .finora-home-category-card,.alert-month-block,.alert-summary-card,
+  .profile-modal,.profile-modal-head,.profile-summary,.cloud-status,
+  .cloud-info-grid>div,.workspace-share,.family-help,.family-row,
+  .popup-only-panel.section-modal-active,.finora-import-modal,.finora-import-option,
+  .visual-empty,.section-modal-active
+),
+body.dark :is(
+  .card,.panel,.simple-kpi,.simple-column,.simple-topline,.simple-table-head,
+  .simple-group-head,.simple-total,.finora-category-strip,.finora-figure,
+  .finora-cards-panel,.finora-card-item,.finora-family-panel,.finora-monthly-sheet,
+  .finora-v84-panel,.finora-v84-panel-head,.finora-v84-quick,
+  .finora-home-category-card,.alert-month-block,.alert-summary-card,
+  .profile-modal,.profile-modal-head,.profile-summary,.cloud-status,
+  .cloud-info-grid>div,.workspace-share,.family-help,.family-row,
+  .popup-only-panel.section-modal-active,.finora-import-modal,.finora-import-option,
+  .visual-empty,.section-modal-active
+){
+  background:#064e3b!important;
+  color:#fff!important;
+  border-color:rgba(17,94,89,.48)!important;
+  box-shadow:none!important;
+}
+
+/* Cabeçalhos e barras internas */
+html.dark body :is(
+  header,.panel-head,.toolbar,.footer-tools,.alert-toolbar,
+  .finora-modal-head,.finora-sheet-head,.finora-family-head,.finora-cards-head,
+  .finora-contextbar,.finora-v84-periodbar,.finora-v84-quick-tabs,
+  .finora-v88-chart-tools,.finora-r2-chart-menu
+),
+body.dark :is(
+  header,.panel-head,.toolbar,.footer-tools,.alert-toolbar,
+  .finora-modal-head,.finora-sheet-head,.finora-family-head,.finora-cards-head,
+  .finora-contextbar,.finora-v84-periodbar,.finora-v84-quick-tabs,
+  .finora-v88-chart-tools,.finora-r2-chart-menu
+){
+  background:#043327!important;
+  color:#fff!important;
+  border-color:rgba(17,94,89,.48)!important;
+}
+
+/* Textos */
+html.dark body .shell :is(h1,h2,h3,h4,h5,h6,p,label,legend,strong,span,small,td,th),
+html.dark body .popup-only-panel :is(h1,h2,h3,h4,h5,h6,p,label,legend,strong,span,small,td,th),
+html.dark body .profile-modal :is(h1,h2,h3,h4,h5,h6,p,label,legend,strong,span,small),
+body.dark .shell :is(h1,h2,h3,h4,h5,h6,p,label,legend,strong,span,small,td,th),
+body.dark .popup-only-panel :is(h1,h2,h3,h4,h5,h6,p,label,legend,strong,span,small,td,th),
+body.dark .profile-modal :is(h1,h2,h3,h4,h5,h6,p,label,legend,strong,span,small){
+  color:#fff!important;
+}
+
+html.dark body :is(.muted,.file-note,.hint,.helper,.subtitle,.user-family),
+body.dark :is(.muted,.file-note,.hint,.helper,.subtitle,.user-family){
+  color:#e2e8f0!important;
+}
+
+/* Inputs, selects e textareas */
+html.dark body .shell :is(input,select,textarea),
+html.dark body .popup-only-panel :is(input,select,textarea),
+html.dark body .profile-modal :is(input,select,textarea),
+html.dark body .finora-import-modal :is(input,select,textarea),
+body.dark .shell :is(input,select,textarea),
+body.dark .popup-only-panel :is(input,select,textarea),
+body.dark .profile-modal :is(input,select,textarea),
+body.dark .finora-import-modal :is(input,select,textarea){
+  background:#022c22!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  border:1px solid rgba(17,94,89,.62)!important;
+  box-shadow:none!important;
+}
+
+html.dark body :is(input,textarea)::placeholder,
+body.dark :is(input,textarea)::placeholder{
+  color:#cbd5e1!important;
+  opacity:1!important;
+}
+
+html.dark body option,
+body.dark option{
+  background:#022c22!important;
+  color:#fff!important;
+}
+
+/* Meses */
+html.dark body .month-tabs,
+body.dark .month-tabs{
+  background:#043327!important;
+  border-color:rgba(17,94,89,.48)!important;
+  box-shadow:none!important;
+}
+
+html.dark body .month-tab,
+body.dark .month-tab{
+  background:#064e3b!important;
+  color:#f1f5f9!important;
+  border-color:rgba(17,94,89,.48)!important;
+}
+
+html.dark body .month-tab:hover,
+body.dark .month-tab:hover{
+  background:#0b5f49!important;
+  color:#fff!important;
+}
+
+html.dark body .month-tab.active,
+body.dark .month-tab.active{
+  background:#10b981!important;
+  color:#022c22!important;
+  border-color:#10b981!important;
+}
+
+/* Tabelas */
+html.dark body table,
+html.dark body thead,
+html.dark body tbody,
+html.dark body tr,
+body.dark table,
+body.dark thead,
+body.dark tbody,
+body.dark tr{
+  background:#064e3b!important;
+  color:#fff!important;
+}
+
+html.dark body th,
+body.dark th{
+  background:#043327!important;
+  color:#f8fafc!important;
+  border-color:rgba(17,94,89,.48)!important;
+}
+
+html.dark body td,
+body.dark td{
+  background:#064e3b!important;
+  color:#fff!important;
+  border-color:rgba(17,94,89,.38)!important;
+}
+
+html.dark body tr:hover td,
+body.dark tr:hover td{
+  background:#075c46!important;
+}
+
+/* Botões neutros */
+html.dark body :is(
+  .btn-soft,.iconbtn,.simple-action:not(.primary),.finora-v84-icon-btn,
+  .finora-v88-chart-period,.finora-v88-chart-more,.finora-privacy-toggle,
+  .popup-modal-close,.finora-modal-close
+),
+body.dark :is(
+  .btn-soft,.iconbtn,.simple-action:not(.primary),.finora-v84-icon-btn,
+  .finora-v88-chart-period,.finora-v88-chart-more,.finora-privacy-toggle,
+  .popup-modal-close,.finora-modal-close
+){
+  background:#043327!important;
+  color:#fff!important;
+  border-color:rgba(17,94,89,.55)!important;
+}
+
+/* Sidebar acompanha o dark */
+html.dark body .finora-sidebar,
+body.dark .finora-sidebar{
+  background:#022c22!important;
+  color:#fff!important;
+  border-right-color:rgba(17,94,89,.48)!important;
+}
+
+html.dark body .finora-sidebar-brand,
+body.dark .finora-sidebar-brand{
+  border-bottom-color:rgba(17,94,89,.4)!important;
+}
+
+html.dark body .finora-sidebar-brand .logo,
+html.dark body .finora-sidebar-brand small,
+html.dark body .finora-nav button,
+body.dark .finora-sidebar-brand .logo,
+body.dark .finora-sidebar-brand small,
+body.dark .finora-nav button{
+  color:#fff!important;
+}
+
+html.dark body .finora-nav button:hover,
+html.dark body .finora-nav button.active,
+body.dark .finora-nav button:hover,
+body.dark .finora-nav button.active{
+  background:#064e3b!important;
+  color:#fff!important;
+}
+
+html.dark body .finora-sidebar-reserve,
+body.dark .finora-sidebar-reserve{
+  background:#043327!important;
+  color:#fff!important;
+  border-color:rgba(17,94,89,.48)!important;
+}
+
+html.dark body .finora-sidebar-reserve :is(span,strong),
+body.dark .finora-sidebar-reserve :is(span,strong){
+  color:#fff!important;
+}
+
+/* Mobile */
+html.dark body .finora-mobile-topbar,
+html.dark body .finora-mobile-nav,
+body.dark .finora-mobile-topbar,
+body.dark .finora-mobile-nav{
+  background:#022c22!important;
+  color:#fff!important;
+  border-color:rgba(17,94,89,.48)!important;
+}
+
+html.dark body .finora-mobile-topbar :is(.m-brand,.m-workspace),
+html.dark body .finora-mobile-nav button,
+body.dark .finora-mobile-topbar :is(.m-brand,.m-workspace),
+body.dark .finora-mobile-nav button{
+  color:#fff!important;
+}
+
+html.dark body .finora-mobile-nav button.active,
+body.dark .finora-mobile-nav button.active{
+  background:#064e3b!important;
+  color:#fff!important;
+}
+
+/* Alertas com contraste */
+html.dark body .alert-item,
+body.dark .alert-item{
+  color:#fff!important;
+}
+html.dark body .alert-item.expense,
+body.dark .alert-item.expense{
+  background:#4a2d20!important;
+  border-color:#754c37!important;
+}
+html.dark body .alert-item.income,
+body.dark .alert-item.income{
+  background:#0b4937!important;
+  border-color:#17664e!important;
+}
+html.dark body .alert-item.late,
+body.dark .alert-item.late{
+  background:#4d2525!important;
+  border-color:#7a3b3b!important;
+}
+html.dark body .alert-item :is(.meta,.amount,strong,span),
+body.dark .alert-item :is(.meta,.amount,strong,span){
+  color:#fff!important;
+}
+
+/* Login permanece no visual claro/original */
+html.dark body #authScreen .auth-card,
+html.dark body #authScreen .auth-panel,
+html.dark body #authScreen .auth-inner,
+html.dark body #authScreen #loginPane,
+html.dark body #authScreen #registerPane,
+body.dark #authScreen .auth-card,
+body.dark #authScreen .auth-panel,
+body.dark #authScreen .auth-inner,
+body.dark #authScreen #loginPane,
+body.dark #authScreen #registerPane{
+  background:#fff!important;
+  color:#173f32!important;
+}
+
+html.dark body #authScreen :is(h1,h2,h3,p,label,span,strong,small),
+body.dark #authScreen :is(h1,h2,h3,p,label,span,strong,small){
+  color:#173f32!important;
+}
+
+html.dark body #authScreen .auth-brand,
+html.dark body #authScreen .auth-brand :is(h1,p,strong,span),
+body.dark #authScreen .auth-brand,
+body.dark #authScreen .auth-brand :is(h1,p,strong,span){
+  background:#073d2c!important;
+  color:#fff!important;
+}
+
+html.dark body #authScreen :is(input,select,textarea),
+body.dark #authScreen :is(input,select,textarea){
+  background:#fff!important;
+  color:#172c24!important;
+  -webkit-text-fill-color:#172c24!important;
+  border-color:#a7bbb1!important;
+}
+</style>
+
 </head>
 <body>
 
@@ -13334,9 +13656,18 @@ setTimeout(renderHomeCategoryDonut,0);
     try{return typeof simpleKnownValue==='function'?simpleKnownValue(x):!x.valorPendente}catch{return !x.valorPendente}
   }
 
+  window.finoraSetDarkMode=function(enabled){
+    const dark=!!enabled;
+    document.documentElement.classList.toggle('dark',dark);
+    document.body.classList.toggle('dark',dark);
+    document.body.classList.toggle('finora-v84-dark',dark);
+    localStorage.setItem('finora-v84-theme',dark?'dark':'light');
+  };
   window.toggleFinoraTheme=function(){
-    document.body.classList.toggle('finora-v84-dark');
-    localStorage.setItem('finora-v84-theme',document.body.classList.contains('finora-v84-dark')?'dark':'light');
+    const active=document.documentElement.classList.contains('dark') ||
+                 document.body.classList.contains('dark') ||
+                 document.body.classList.contains('finora-v84-dark');
+    window.finoraSetDarkMode(!active);
   };
 
   window.openFinoraUtilityPanel=function(type){
@@ -13620,7 +13951,8 @@ setTimeout(renderHomeCategoryDonut,0);
 
   function boot(){
     buildApprovedHome();
-    if(localStorage.getItem('finora-v84-theme')==='dark')document.body.classList.add('finora-v84-dark');
+    const storedDark=localStorage.getItem('finora-v84-theme')==='dark';
+    if(typeof window.finoraSetDarkMode==='function')window.finoraSetDarkMode(storedDark);
     renderV84Dashboard();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);
@@ -20994,6 +21326,40 @@ window.finoraR711Health=function(id){
     document.addEventListener('DOMContentLoaded',clean,{once:true});
   }else{
     clean();
+  }
+})();
+</script>
+
+
+<script id="finora-dark-class-r713-sync">
+(function(){
+  let syncing=false;
+
+  function syncDarkClasses(){
+    if(syncing || !document.body)return;
+    syncing=true;
+    try{
+      const dark=document.documentElement.classList.contains('dark') ||
+                 document.body.classList.contains('dark');
+      document.documentElement.classList.toggle('dark',dark);
+      document.body.classList.toggle('dark',dark);
+      document.body.classList.toggle('finora-v84-dark',dark);
+    }finally{
+      syncing=false;
+    }
+  }
+
+  const observer=new MutationObserver(syncDarkClasses);
+  observer.observe(document.documentElement,{attributes:true,attributeFilter:['class']});
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',()=>{
+      observer.observe(document.body,{attributes:true,attributeFilter:['class']});
+      syncDarkClasses();
+    },{once:true});
+  }else{
+    observer.observe(document.body,{attributes:true,attributeFilter:['class']});
+    syncDarkClasses();
   }
 })();
 </script>
