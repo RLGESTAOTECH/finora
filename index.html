@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.8">
+<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.9">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -7564,6 +7564,33 @@ const KEY='controleFinanceiroFamiliar_v1';
 let account='family';
 let currentWorkspaceId='';
 let currentWorkspaceName='Meu ambiente';
+
+const FINORA_PENDING_TX_V79_KEY='finora_pending_transactions_v79';
+function finoraLoadPendingTxV79(){try{const r=JSON.parse(localStorage.getItem(FINORA_PENDING_TX_V79_KEY)||'{}');return r&&typeof r==='object'?r:{}}catch(e){return {}}}
+function finoraSavePendingTxV79(s){try{localStorage.setItem(FINORA_PENDING_TX_V79_KEY,JSON.stringify(s||{}))}catch(e){}}
+function finoraPendingTxForWorkspaceV79(workspaceId=currentWorkspaceId){const ws=String(workspaceId||''),s=finoraLoadPendingTxV79(),r=s[ws];return Array.isArray(r)?r:[]}
+function finoraTxComparableV79(x){if(!x)return {};return {id:String(x.id||''),tipo:x.tipo||'',descricao:x.descricao||'',pessoa:x.pessoa||'',categoria:x.categoria||'',forma:x.forma||'',valor:Number(x.valor||0),valorPendente:!!x.valorPendente,generatedReminder:!!x.generatedReminder,materializedOccurrence:!!x.materializedOccurrence,status:x.status||'',dataLancamento:x.dataLancamento||'',vencimento:x.vencimento||'',recorrente:x.recorrente||'',valorRecorrente:x.valorRecorrente||'',parentRecurringId:x.parentRecurringId||'',seriesRootId:x.seriesRootId||'',updatedAt:x.updatedAt||x.createdAt||''}}
+function finoraTxSameV79(a,b){return JSON.stringify(finoraTxComparableV79(a))===JSON.stringify(finoraTxComparableV79(b))}
+function finoraRememberPendingTxV79(rows,workspaceId=currentWorkspaceId){
+  const ws=String(workspaceId||'');if(!ws||!Array.isArray(rows)||!rows.length)return;
+  const s=finoraLoadPendingTxV79(),m=new Map((Array.isArray(s[ws])?s[ws]:[]).map(x=>[String(x.id||''),x]));
+  rows.forEach(x=>{if(!x?.id)return;const id=String(x.id),p=m.get(id);const xt=Date.parse(x.updatedAt||x.createdAt||0)||0,pt=Date.parse(p?.updatedAt||p?.createdAt||0)||0;if(!p||xt>=pt)m.set(id,{...x})});
+  s[ws]=[...m.values()];finoraSavePendingTxV79(s);
+}
+function finoraDetectAndRememberChangedTxV79(beforeRows,afterRows,workspaceId=currentWorkspaceId){
+  const ws=String(workspaceId||'');if(!ws)return;
+  const before=new Map((Array.isArray(beforeRows)?beforeRows:[]).filter(x=>String(x?.workspaceId||'')===ws).map(x=>[String(x.id||''),x]));
+  const changed=(Array.isArray(afterRows)?afterRows:[]).filter(x=>String(x?.workspaceId||'')===ws).filter(x=>!before.has(String(x.id||''))||!finoraTxSameV79(before.get(String(x.id||'')),x));
+  if(changed.length)finoraRememberPendingTxV79(changed,ws);
+}
+function finoraClearConfirmedPendingTxV79(remoteRows,workspaceId=currentWorkspaceId){
+  const ws=String(workspaceId||''),s=finoraLoadPendingTxV79(),pending=Array.isArray(s[ws])?s[ws]:[];if(!pending.length)return {remaining:0,confirmed:0};
+  const rm=new Map((Array.isArray(remoteRows)?remoteRows:[]).map(x=>[String(x.id||''),x]));const remaining=[];let confirmed=0;
+  pending.forEach(local=>{const remote=rm.get(String(local.id||''));if(!remote){remaining.push(local);return}const lt=Date.parse(local.updatedAt||local.createdAt||0)||0,rt=Date.parse(remote.updatedAt||remote.createdAt||0)||0;if(rt>lt||(rt===lt&&finoraTxSameV79(remote,local)))confirmed++;else remaining.push(local)});
+  if(remaining.length)s[ws]=remaining;else delete s[ws];finoraSavePendingTxV79(s);return {remaining:remaining.length,confirmed};
+}
+function finoraOverlayPendingTxV79(rows,workspaceId=currentWorkspaceId){const p=finoraPendingTxForWorkspaceV79(workspaceId);return p.length?mergeTransactions(Array.isArray(rows)?rows:[],p,[]):(Array.isArray(rows)?rows:[])}
+
 function finoraCanonicalTransactions(rows){
   const map=new Map();
   const noId=[];
@@ -7621,10 +7648,10 @@ $('dataLancamento').value=today(); $('filtroMes').value=currentMonth();
 
 function sameWorkspace(x){return !!currentWorkspaceId && x.workspaceId===currentWorkspaceId}
 function save(){
-  if(currentWorkspaceId){
-    data.forEach(x=>{if(sameWorkspace(x) && !x.workspaceId)x.workspaceId=currentWorkspaceId});
-  }
+  let finoraBeforeSaveV79=[];try{finoraBeforeSaveV79=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){finoraBeforeSaveV79=[]}
+  if(currentWorkspaceId){data.forEach(x=>{if(sameWorkspace(x)&&!x.workspaceId)x.workspaceId=currentWorkspaceId});}
   data=finoraCanonicalTransactions(data);
+  finoraDetectAndRememberChangedTxV79(finoraBeforeSaveV79,data,currentWorkspaceId);
   localStorage.setItem(KEY,JSON.stringify(data));
   if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
   scheduleCloudPush();
@@ -7978,10 +8005,7 @@ function addMonths(dateStr, n=1){
 function normalizeVariableReminders(){
   let changed=false;
   data.forEach(x=>{
-    if(x.materializedOccurrence && !x.valorPendente){
-      if(x.generatedReminder){x.generatedReminder=false;changed=true}
-      return;
-    }
+    if(x.materializedOccurrence && !x.valorPendente){if(x.generatedReminder){x.generatedReminder=false;changed=true}return;}
     // Any generated monthly reminder marked as variable must not retain the prior month's amount.
     if(x.generatedReminder && x.valorRecorrente==='variavel'){
       if(x.valor!==0 || !x.valorPendente){
@@ -10010,11 +10034,6 @@ $('entryForm').addEventListener('submit',async e=>{
     recRule:recRuleVal,
     valorRecorrente:$('valorRecorrente').value,
     valorPendente:false,
-    generatedReminder:false,
-    materializedOccurrence:!!(old?.valorPendente||old?.generatedReminder||old?.materializedOccurrence),
-    materializedAt:(old?.valorPendente||old?.generatedReminder)
-      ? new Date().toISOString()
-      : (old?.materializedAt||null),
     valorReferencia:(old?.valorPendente||old?.generatedReminder)?parseBRLInput($('valor').value):(old?.valorReferencia??null),
     beneficiario:$('beneficiario').value.trim(),
     codigoBoleto:$('codigoBoleto')?.value.trim()||'',
@@ -11087,7 +11106,7 @@ async function pushCloudState(showToast=false){
   finoraCloudPushPending=false;
   finoraCloudBusy=true;
   try{
-    let payload=cloudStatePayload();
+    let payload=cloudStatePayload(); payload.transactions=finoraOverlayPendingTxV79(payload.transactions||[],currentWorkspaceId);
 
     const {data:remoteRow,error:readError}=await client
       .from('finora_workspace_state')
@@ -11132,24 +11151,14 @@ async function pushCloudState(showToast=false){
       state:payload,
       updated_at:new Date().toISOString()
     };
-    const {error}=await client
-      .from('finora_workspace_state')
-      .upsert(row,{onConflict:'workspace_id'});
+    const {error}=await client.from('finora_workspace_state').upsert(row,{onConflict:'workspace_id'});
     if(error)throw error;
-
-    // A partir daqui já existe uma fonte de verdade remota.
-    finoraFinishBootstrap();
-    markFinoraWorkspaceHydrated();
-
-    // Só limpa o indicador de alterações se nenhum novo salvamento ocorreu
-    // enquanto a requisição estava em trânsito.
-    if(finoraCloudMutationRevision===pushRevision){
-      finoraCloudDirty=false;
-      finoraCloudPushPending=false;
-    }else{
-      finoraCloudDirty=true;
-      finoraCloudPushPending=true;
-    }
+    const {data:confirmRow,error:confirmError}=await client.from('finora_workspace_state').select('state,updated_at').eq('workspace_id',currentWorkspaceId).maybeSingle();
+    if(confirmError)throw confirmError;
+    const confirmedRemoteTx=Array.isArray(confirmRow?.state?.transactions)?confirmRow.state.transactions:[];
+    const confirmation=finoraClearConfirmedPendingTxV79(confirmedRemoteTx,currentWorkspaceId);
+    finoraFinishBootstrap();markFinoraWorkspaceHydrated();
+    if(finoraCloudMutationRevision===pushRevision && confirmation.remaining===0){finoraCloudDirty=false;finoraCloudPushPending=false}else{finoraCloudDirty=true;finoraCloudPushPending=true}
 
     // Atualiza o navegador com o mesmo estado consolidado que foi salvo.
     data=finoraCanonicalTransactions(
@@ -11196,12 +11205,8 @@ function scheduleCloudPush(){
 }
 async function pullCloudState(showToast=false){
   if(!cloudConfigured())return false;
-
-  // Nunca baixa estado remoto por cima de um lançamento local ainda não enviado.
-  if(finoraCloudDirty || finoraCloudPushPending){
-    scheduleCloudPush();
-    return false;
-  }
+  if(finoraPendingTxForWorkspaceV79(currentWorkspaceId).length){finoraCloudDirty=true;finoraCloudPushPending=true;scheduleCloudPush();return false;}
+  if(finoraCloudDirty || finoraCloudPushPending){scheduleCloudPush();return false;}
 
   if(finoraCloudBusy)return false;
   const client=getCloudClient();if(!client)return false;
@@ -11262,9 +11267,17 @@ async function pullCloudState(showToast=false){
     const mergedTombstones=firstHydration
       ? remoteTombstones
       : mergeTombstones(remoteTombstones,localTombstones);
-    const mergedTx=firstHydration
+    let mergedTx=firstHydration
       ? remoteTx
       : mergeTransactions(localTx,remoteTx,mergedTombstones);
+
+    const remoteByIdV79=new Map(remoteTx.map(x=>[String(x.id||''),x]));
+    const localNewerV79=localTx.filter(x=>{const r=remoteByIdV79.get(String(x.id||''));return !!r&&txTime(x)>txTime(r)});
+    if(localNewerV79.length){
+      mergedTx=mergeTransactions(mergedTx,localNewerV79,mergedTombstones);
+      finoraRememberPendingTxV79(localNewerV79,currentWorkspaceId);
+      finoraCloudDirty=true;finoraCloudPushPending=true;
+    }
 
     data=finoraCanonicalTransactions(
       data.filter(x=>!sameWorkspace(x)).concat(
@@ -11318,6 +11331,7 @@ async function pullCloudState(showToast=false){
     render();
     renderFamilyAccess();
     updateCloudUI('connected');
+    if(finoraPendingTxForWorkspaceV79(currentWorkspaceId).length)scheduleCloudPush();
     if(showToast)toast('Dados consolidados com a nuvem.');
     return true;
   }catch(e){
@@ -20707,84 +20721,22 @@ window.finoraR76Health=function(){
 </script>
 
 
-<style id="finora-r78-dark-final">
-body.finora-v84-dark{background:#08150f!important;color:#f5faf7!important}
-body.finora-v84-dark .shell,body.finora-v84-dark main,body.finora-v84-dark #simpleHome{background:#08150f!important}
-body.finora-v84-dark .finora-v84-periodbar,
-body.finora-v84-dark .month-tabs{background:#10231b!important;border-color:#2f4b3f!important;box-shadow:none!important}
-body.finora-v84-dark .finora-v84-periodbar select,
-body.finora-v84-dark .month-tab{background:#152a21!important;color:#eaf3ee!important;border-color:#315044!important}
-body.finora-v84-dark .month-tab:hover{background:#1d352a!important;color:#fff!important}
-body.finora-v84-dark .month-tab.active{background:#078650!important;color:#fff!important;border-color:#078650!important}
-
-body.finora-v84-dark :is(
-.simple-kpi,.simple-column,.simple-topline,.simple-table-head,.simple-group-head,.simple-total,
-.finora-home-category-card,.finora-v84-quick,.finora-v84-panel,.finora-v84-panel-head,
-.finora-category-strip,.finora-figure,.finora-cards-panel,.finora-card-item,.finora-monthly-sheet,
-.finora-family-panel,.panel,.panel-head,.toolbar,.footer-tools,.alert-toolbar,.alert-month-block,
-.alert-summary-card,.report-section,.report-shell,.profile-modal,.profile-modal-head,.profile-summary
-){background:#10231b!important;color:#f5faf7!important;border-color:#2f4b3f!important;box-shadow:none!important}
-
-body.finora-v84-dark .finora-v84-quick-tabs,
-body.finora-v84-dark .finora-v84-quick-tabs button,
-body.finora-v84-dark .finora-v88-chart-period,
-body.finora-v84-dark .finora-v88-chart-more,
-body.finora-v84-dark .finora-r2-chart-menu,
-body.finora-v84-dark .finora-privacy-toggle,
-body.finora-v84-dark .simple-action:not(.primary),
-body.finora-v84-dark .btn-soft,
-body.finora-v84-dark .iconbtn{
-  background:#152a21!important;color:#f5faf7!important;border-color:#38574a!important
-}
-body.finora-v84-dark .finora-v84-quick-tabs button:first-child{color:#7ee0ad!important}
-body.finora-v84-dark .finora-v84-quick-tabs button:last-child{color:#ff9191!important}
-body.finora-v84-dark .finora-v84-quick-tabs button.active{background:#1d352a!important}
-
-body.finora-v84-dark .shell :is(input,select,textarea),
-body.finora-v84-dark .popup-only-panel :is(input,select,textarea),
-body.finora-v84-dark .profile-modal :is(input,select,textarea){
-  background:#152a21!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border-color:#49675a!important
-}
-body.finora-v84-dark th{background:#152a21!important;color:#e7f1ec!important;border-color:#315044!important}
-body.finora-v84-dark td{background:#10231b!important;color:#f5faf7!important;border-color:#294238!important}
-body.finora-v84-dark tr:hover td{background:#172e24!important}
-
-body.finora-v84-dark .popup-only-panel.section-modal-active,
-body.finora-v84-dark .section-modal-active .panel-head{
-  background:#10231b!important;color:#f5faf7!important;border-color:#2f4b3f!important
-}
-
-/* menu lateral independente do tema */
-body.finora-v84-dark .finora-sidebar{background:linear-gradient(180deg,#00382d 0%,#00503d 100%)!important}
-
-/* login sempre claro */
-body.finora-v84-dark #authScreen .auth-card,
-body.finora-v84-dark #authScreen .auth-panel,
-body.finora-v84-dark #authScreen .auth-inner,
-body.finora-v84-dark #authScreen #loginPane,
-body.finora-v84-dark #authScreen #registerPane{background:#fff!important;color:#173f32!important}
-body.finora-v84-dark #authScreen :is(input,select,textarea){
-  background:#fff!important;color:#172c24!important;-webkit-text-fill-color:#172c24!important;border-color:#a7bbb1!important
-}
-</style>
-
-<script id="finora-r78-health">
+<script id="finora-r79-sync-health">
 (function(){
-  window.finoraR78Health=function(id){
-    let row=null;
-    try{row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id))||null}catch(e){}
-    return {
-      release:'1.0.10-R7.8',
-      transaction:row?{
-        id:row.id,descricao:row.descricao,valor:row.valor,
-        valorPendente:!!row.valorPendente,
-        generatedReminder:!!row.generatedReminder,
-        materializedOccurrence:!!row.materializedOccurrence,
-        updatedAt:row.updatedAt
-      }:null,
-      dark:document.body.classList.contains('finora-v84-dark')
-    };
+window.finoraR79SyncHealth=function(id){
+  let row=null;
+  try{row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id))||null}catch(e){}
+  const pending=finoraPendingTxForWorkspaceV79(currentWorkspaceId);
+  return {
+    release:'1.0.10-R7.9',
+    workspaceId:String(currentWorkspaceId||''),
+    cloudDirty:typeof finoraCloudDirty!=='undefined'?finoraCloudDirty:null,
+    cloudPushPending:typeof finoraCloudPushPending!=='undefined'?finoraCloudPushPending:null,
+    pendingCount:pending.length,
+    pendingIds:pending.map(x=>x.id),
+    transaction:row?finoraTxComparableV79(row):null
   };
+};
 })();
 </script>
 
