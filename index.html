@@ -6311,66 +6311,66 @@ body.finora-v84-dark .finora-r6-reader-pick,body.finora-v84-dark .finora-r6-read
 .finora-r7-use{float:right;display:inline-flex!important;align-items:center;gap:4px;margin:0!important;color:#37604d!important;font:700 8px Verdana,sans-serif!important;text-transform:none!important;letter-spacing:0!important}.finora-r7-use input{width:14px;height:14px;accent-color:#0f6847}.finora-r7-profile-saving{opacity:.72;pointer-events:none}#userChip .finora-session-avatar.finora-has-photo{background-color:#004638!important;background-position:center!important;background-size:cover!important;background-repeat:no-repeat!important}body.finora-v84-dark .finora-r7-use{color:#dbe8e1!important}
 </style>
 
-<style id="finora-v110-r8-style">
-/* ===== FINORA 1.0.10 — Homologação R8 ===== */
+<style id="finora-v110-r71-avatar-style">
+/* FINORA 1.0.10 R7.1 — avatar estritamente por usuário */
+#profileAvatar.finora-user-photo,
+#userAvatarInitials.finora-user-photo{
+  color:transparent!important;
+  text-shadow:none!important;
+  background-position:center!important;
+  background-size:cover!important;
+  background-repeat:no-repeat!important;
+}
+</style>
 
-.finora-r8-installment-combos{
+
+<style id="finora-v110-r72-style">
+/* FINORA 1.0.10 R7.2 — Nova despesa completa + parcelamento X / Y */
+
+/* Na jornada Nova despesa, os campos cadastrais devem estar presentes
+   desde a abertura, independentemente de boleto ou parcelamento. */
+#simpleLaunchPanel.launch-expense-mode #installmentFlagField,
+#simpleLaunchPanel.launch-expense-mode #installmentsField,
+#simpleLaunchPanel.launch-expense-mode #beneficiaryField,
+#simpleLaunchPanel.launch-expense-mode #launchCardField,
+#simpleLaunchPanel.launch-expense-mode #paymentMethodField,
+#simpleLaunchPanel.launch-expense-mode #attachmentField,
+#simpleLaunchPanel.launch-expense-mode #reminderHelpField{
+  display:block!important;
+}
+
+/* O leitor de boleto é um atalho opcional. Ele não esconde o formulário manual. */
+#simpleLaunchPanel.launch-expense-mode #entryForm{
+  display:grid!important;
+}
+
+.finora-r72-installment-row{
   display:grid;
-  grid-template-columns:minmax(90px,1fr) 28px minmax(90px,1fr);
-  align-items:center;
+  grid-template-columns:minmax(120px,1fr) 26px minmax(120px,1fr);
   gap:8px;
+  align-items:center;
 }
-.finora-r8-installment-combos select{
-  min-height:42px;
+.finora-r72-installment-row select{
   width:100%;
+  min-height:42px;
 }
-.finora-r8-installment-sep{
+.finora-r72-installment-separator{
   text-align:center;
-  font-size:18px;
+  font-size:20px;
   font-weight:700;
-  color:#315d49;
+  color:#315f4b;
 }
-
-/* O leitor de boleto é uma ferramenta opcional, nunca substitui o formulário. */
-#boletoReaderEntry{
-  display:block;
+#installmentsField.finora-r72-disabled .finora-r72-installment-row{
+  opacity:.55;
 }
-#entryForm .finora-r8-manual-hint{
-  margin:-2px 0 8px;
-  padding:7px 10px;
-  border-radius:9px;
-  background:#f5f9f7;
-  color:#61736a;
-  font:8px/1.4 Verdana,sans-serif;
+#installmentsField.finora-r72-disabled .file-note{
+  opacity:.75;
 }
-body.finora-v84-dark #entryForm .finora-r8-manual-hint{
-  background:#173026;
-  color:#d4e1da;
-}
-
-/* Feedback persistente de salvamento do perfil */
-.finora-r8-profile-status{
-  margin-top:8px;
-  border-radius:10px;
-  padding:9px 11px;
-  font:9px/1.35 Verdana,sans-serif;
-  display:none;
-}
-.finora-r8-profile-status.show{display:block}
-.finora-r8-profile-status.ok{
-  background:#eaf6ee;
-  border:1px solid #c8e5d1;
-  color:#17633f;
-}
-.finora-r8-profile-status.error{
-  background:#fff0ee;
-  border:1px solid #efcbc6;
-  color:#a13c33;
-}
+body.finora-v84-dark .finora-r72-installment-separator{color:#fff}
 
 @media(max-width:560px){
-  .finora-r8-installment-combos{
-    grid-template-columns:1fr 22px 1fr;
+  .finora-r72-installment-row{
+    grid-template-columns:1fr 20px 1fr;
   }
 }
 </style>
@@ -7101,15 +7101,19 @@ body.finora-v84-dark #entryForm .finora-r8-manual-hint{
       </select>
       <div class="file-note">Marque Sim quando o lançamento tiver uma sequência definida de parcelas.</div>
     </div>
-    <div class="field" id="installmentsField" style="display:none">
-      <label>Parcelamento</label>
-      <div class="finora-r8-installment-combos">
-        <select id="parcelaAtual" aria-label="Parcela atual"></select>
-        <span class="finora-r8-installment-sep">/</span>
-        <select id="parcelaTotal" aria-label="Total de parcelas"></select>
+    <div class="field" id="installmentsField">
+      <label>Parcelamento — parcela atual / total</label>
+      <div class="finora-r72-installment-row">
+        <select id="parcelaAtual" aria-label="Parcela atual">
+          <option value=""></option>
+        </select>
+        <span class="finora-r72-installment-separator">/</span>
+        <select id="parcelaTotal" aria-label="Total de parcelas">
+          <option value=""></option>
+        </select>
       </div>
       <input id="parcelas" type="hidden" value="">
-      <div class="file-note" id="installmentHelp">Selecione a parcela atual e o total. Ex.: 1 / 12. Os meses seguintes avançam automaticamente até a última parcela.</div>
+      <div class="file-note" id="installmentHelp">Selecione a parcela atual e o total. Ex.: 1 / 12. O FINORA avança automaticamente nos meses seguintes até a última parcela.</div>
     </div>
     
     <div class="field" id="launchCardField">
@@ -11347,6 +11351,10 @@ async function finoraRecoverWorkspaceDataIfEmpty(){
 
 async function openFinora(user){
   currentUser=user;
+  // R7.1: limpa qualquer avatar herdado da sessão anterior antes de abrir este usuário.
+  if(typeof window.finoraAvatarUserResetR71==='function'){
+    window.finoraAvatarUserResetR71(user);
+  }
   account='family';
   currentWorkspaceId=user.workspaceId;
   finoraCloudHydratedWorkspaces.delete(String(currentWorkspaceId));
@@ -11388,6 +11396,10 @@ async function openFinora(user){
   render();
   renderFamilyAccess();
   updateCloudUI();
+  // R7.1: só agora busca a foto correspondente ao auth.uid() da sessão ativa.
+  if(typeof window.finoraAvatarUserSyncR71==='function'){
+    setTimeout(()=>window.finoraAvatarUserSyncR71(),0);
+  }
 }
 function updateWorkspaceMode(){
   const mode=$('regWorkspaceMode')?.value||'create';
@@ -11698,6 +11710,10 @@ $('doLogin').addEventListener('click',async()=>{
 });
 
 $('logoutBtn').addEventListener('click',async()=>{
+  // R7.1: nenhum avatar da conta anterior pode sobreviver ao logout.
+  if(typeof window.finoraAvatarUserClearR71==='function'){
+    window.finoraAvatarUserClearR71();
+  }
   try{await getAuthClient()?.auth.signOut()}catch(e){}
   localStorage.removeItem(FINORA_SESSION_KEY);
   currentUser=null;currentWorkspaceId='';currentWorkspaceName='Meu ambiente';
@@ -11756,6 +11772,13 @@ function clearProfileMessages(){
 function openProfileModal(){
   if(!currentUser)return;
   clearProfileMessages();
+  // R7.1: evita exibir por alguns milissegundos a foto do usuário anterior.
+  if(typeof window.finoraAvatarUserResetR71==='function'){
+    window.finoraAvatarUserResetR71(currentUser);
+  }
+  if(typeof window.finoraAvatarUserSyncR71==='function'){
+    setTimeout(()=>window.finoraAvatarUserSyncR71(),0);
+  }
   const ws=workspaceById(currentUser.workspaceId);
   $('profileName').value=currentUser.name||'';
   $('profileEmail').value=currentUser.email||'';
@@ -12616,8 +12639,6 @@ setTimeout(renderHomeCategoryDonut,0);
     const el=document.getElementById('loggedName');
     const avatar=document.getElementById('userAvatarInitials');
     if(!el||!avatar)return;
-    // R8: se há foto aplicada, não sobrepor com iniciais.
-    if(avatar.classList.contains('finora-has-photo') || avatar.style.backgroundImage)return;
     const parts=String(el.textContent||'Usuário').trim().split(/\s+/).filter(Boolean);
     const initials=(parts.length>1?parts[0][0]+parts[parts.length-1][0]:parts[0]?.slice(0,2)||'U').toUpperCase();
     avatar.textContent=initials;
@@ -19199,11 +19220,11 @@ window.finoraBoletoReaderHealthR6=function(){return {release:'1.0.10-R6',barcode
 <script id="finora-v110-r7">
 (function(){
 'use strict';let photoDraft=null,photoRemove=false;const $7=id=>document.getElementById(id);
-function applyAvatar(photo){[$7('profileAvatar'),$7('userAvatarInitials')].filter(Boolean).forEach(el=>{if(photo){el.style.setProperty('background-image',`url("${photo}")`,'important');el.style.setProperty('background-position','center','important');el.style.setProperty('background-size','cover','important');el.classList.add('finora-has-photo');el.textContent=''}else{el.style.removeProperty('background-image');el.classList.remove('finora-has-photo');const n=(currentUser?.name||$7('loggedName')?.textContent||'U').trim();el.textContent=(n.charAt(0)||'U').toUpperCase()}})}window.finoraApplyAvatarR7=applyAvatar;
+function applyAvatar(photo){[$7('profileAvatar'),$7('userAvatarInitials')].filter(Boolean).forEach(el=>{if(photo){el.style.setProperty('background-image',`url("${photo}")`,'important');el.style.setProperty('background-position','center','important');el.style.setProperty('background-size','cover','important');el.classList.add('finora-has-photo');el.textContent=''}else{el.style.removeProperty('background-image');el.classList.remove('finora-has-photo');const n=(window.currentUser?.name||$7('loggedName')?.textContent||'U').trim();el.textContent=(n.charAt(0)||'U').toUpperCase()}})}window.finoraApplyAvatarR7=applyAvatar;
 async function loadAvatar(){try{const c=getAuthClient();if(!c)return'';const {data,error}=await c.auth.getUser();if(error)throw error;const p=data?.user?.user_metadata?.finora_avatar||'';window.finoraProfileAvatarData=p;applyAvatar(p);return p}catch(e){console.warn('FINORA R7 avatar',e);return''}}
 function resizePhoto(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(new Error('Não foi possível ler a imagem.'));r.onload=()=>{const i=new Image();i.onerror=()=>reject(new Error('Formato de imagem inválido.'));i.onload=()=>{const s=128,c=document.createElement('canvas');c.width=s;c.height=s;const x=c.getContext('2d'),k=Math.max(s/i.width,s/i.height),w=i.width*k,h=i.height*k;x.drawImage(i,(s-w)/2,(s-h)/2,w,h);resolve(c.toDataURL('image/jpeg',.68))};i.src=r.result};r.readAsDataURL(file)})}
 function replacePhoto(){const oi=$7('profilePhotoInput');if(oi&&!oi.dataset.r7){const n=oi.cloneNode(true);n.dataset.r7='1';oi.replaceWith(n);n.addEventListener('change',async()=>{const f=n.files?.[0];if(!f)return;if(f.size>8*1024*1024){profileErr('A foto deve ter no máximo 8 MB.');n.value='';return}try{photoDraft=await resizePhoto(f);photoRemove=false;applyAvatar(photoDraft);profileOk('Foto preparada. Clique em Salvar alterações para confirmar.')}catch(e){profileErr(e.message||'Não foi possível preparar a foto.')}})}const or=$7('removeProfilePhotoBtn');if(or&&!or.dataset.r7){const b=or.cloneNode(true);b.dataset.r7='1';or.replaceWith(b);b.addEventListener('click',()=>{photoDraft=null;photoRemove=true;applyAvatar('');profileOk('Foto marcada para remoção. Clique em Salvar alterações para confirmar.')})}}
-async function saveProfile(btn){if(!currentUser||btn.dataset.busy==='1')return;clearProfileMessages();const name=$7('profileName').value.trim(),email=$7('profileEmail').value.trim().toLowerCase(),cpfLogin=normalizeCPF($7('profileCpfLogin')?.value||''),cp=$7('profileCurrentPassword').value,np=$7('profileNewPassword').value,np2=$7('profileNewPassword2').value;if(!name)return profileErr('Informe seu nome.');if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return profileErr('Informe um e-mail válido.');if(cpfLogin&&!validCPF(cpfLogin))return profileErr('Informe um CPF válido para atualizar o login.');const wp=!!(np||np2),wc=!!cpfLogin,wf=photoDraft!==null||photoRemove,c=getAuthClient();if(!c)return profileErr('Autenticação online indisponível.');btn.dataset.busy='1';btn.disabled=true;btn.classList.add('finora-r7-profile-saving');const txt=btn.textContent;btn.textContent='Salvando...';try{const oldEmail=String(currentUser.email||'').toLowerCase();if(wp||wc){if(!cp)throw new Error('Informe sua senha atual para confirmar a alteração.');const ck=await c.auth.signInWithPassword({email:oldEmail,password:cp});if(ck.error)throw new Error('A senha atual está incorreta.')}if(wp){if(np.length<6)throw new Error('A nova senha precisa ter pelo menos 6 caracteres.');if(np!==np2)throw new Error('A confirmação da nova senha não confere.');const {error}=await c.auth.updateUser({password:np});if(error)throw error}const patch={};if(email!==oldEmail)patch.email=email;if(wf)patch.data={finora_avatar:photoRemove?'':photoDraft};if(Object.keys(patch).length){const {error}=await c.auth.updateUser(patch);if(error)throw error}const {data:s}=await c.auth.getSession(),uid=s?.session?.user?.id||currentUser.id,profile=await upsertOwnFinoraProfile({user_id:uid,name,email,cpf_hash:wc?await finoraHash(cpfLogin):(currentUser.cpfHash||''),cpf_masked:wc?maskCPF(cpfLogin):(currentUser.cpfMasked||''),workspace_id:currentUser.workspaceId,role:currentUser.role}),updated=await cacheAuthProfile(profile);currentUser=updated;window.currentUser=updated;localStorage.setItem(FINORA_SESSION_KEY,updated.id);$7('loggedName').textContent=updated.name||'Usuário';$7('profileSummaryName').textContent=updated.name||'Usuário';$7('profileCpf').value=updated.cpfMasked||'CPF cadastrado';$7('profileCpfLogin').value='';$7('profileCurrentPassword').value='';$7('profileNewPassword').value='';$7('profileNewPassword2').value='';if(wf){window.finoraProfileAvatarData=photoRemove?'':photoDraft;photoDraft=null;photoRemove=false}await loadAvatar();try{renderFamilyAccess()}catch(e){}try{fillPeople()}catch(e){}try{render()}catch(e){}profileOk('Perfil atualizado com sucesso.');toast('Perfil e foto atualizados com sucesso.')}catch(e){console.error('FINORA R7 perfil',e);profileErr(e?.message||'Não foi possível atualizar seu perfil.')}finally{btn.disabled=false;btn.classList.remove('finora-r7-profile-saving');delete btn.dataset.busy;btn.textContent=txt}}
+async function saveProfile(btn){if(!window.currentUser||btn.dataset.busy==='1')return;clearProfileMessages();const name=$7('profileName').value.trim(),email=$7('profileEmail').value.trim().toLowerCase(),cpfLogin=normalizeCPF($7('profileCpfLogin')?.value||''),cp=$7('profileCurrentPassword').value,np=$7('profileNewPassword').value,np2=$7('profileNewPassword2').value;if(!name)return profileErr('Informe seu nome.');if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return profileErr('Informe um e-mail válido.');if(cpfLogin&&!validCPF(cpfLogin))return profileErr('Informe um CPF válido para atualizar o login.');const wp=!!(np||np2),wc=!!cpfLogin,wf=photoDraft!==null||photoRemove,c=getAuthClient();if(!c)return profileErr('Autenticação online indisponível.');btn.dataset.busy='1';btn.disabled=true;btn.classList.add('finora-r7-profile-saving');const txt=btn.textContent;btn.textContent='Salvando...';try{const oldEmail=String(currentUser.email||'').toLowerCase();if(wp||wc){if(!cp)throw new Error('Informe sua senha atual para confirmar a alteração.');const ck=await c.auth.signInWithPassword({email:oldEmail,password:cp});if(ck.error)throw new Error('A senha atual está incorreta.')}if(wp){if(np.length<6)throw new Error('A nova senha precisa ter pelo menos 6 caracteres.');if(np!==np2)throw new Error('A confirmação da nova senha não confere.');const {error}=await c.auth.updateUser({password:np});if(error)throw error}const patch={};if(email!==oldEmail)patch.email=email;if(wf)patch.data={finora_avatar:photoRemove?'':photoDraft};if(Object.keys(patch).length){const {error}=await c.auth.updateUser(patch);if(error)throw error}const {data:s}=await c.auth.getSession(),uid=s?.session?.user?.id||currentUser.id,profile=await upsertOwnFinoraProfile({user_id:uid,name,email,cpf_hash:wc?await finoraHash(cpfLogin):(currentUser.cpfHash||''),cpf_masked:wc?maskCPF(cpfLogin):(currentUser.cpfMasked||''),workspace_id:currentUser.workspaceId,role:currentUser.role}),updated=await cacheAuthProfile(profile);currentUser=updated;window.currentUser=updated;localStorage.setItem(FINORA_SESSION_KEY,updated.id);$7('loggedName').textContent=updated.name||'Usuário';$7('profileSummaryName').textContent=updated.name||'Usuário';$7('profileCpf').value=updated.cpfMasked||'CPF cadastrado';$7('profileCpfLogin').value='';$7('profileCurrentPassword').value='';$7('profileNewPassword').value='';$7('profileNewPassword2').value='';if(wf){window.finoraProfileAvatarData=photoRemove?'':photoDraft;photoDraft=null;photoRemove=false}await loadAvatar();try{renderFamilyAccess()}catch(e){}try{fillPeople()}catch(e){}try{render()}catch(e){}profileOk('Perfil atualizado com sucesso.');toast('Perfil e foto atualizados com sucesso.')}catch(e){console.error('FINORA R7 perfil',e);profileErr(e?.message||'Não foi possível atualizar seu perfil.')}finally{btn.disabled=false;btn.classList.remove('finora-r7-profile-saving');delete btn.dataset.busy;btn.textContent=txt}}
 function replaceSave(){const o=$7('saveProfileBtn');if(!o||o.dataset.r7)return;const b=o.cloneNode(true);b.dataset.r7='1';o.replaceWith(b);b.addEventListener('click',()=>saveProfile(b))}
 function install(){replacePhoto();replaceSave();loadAvatar();const oo=window.openProfileModal;if(typeof oo==='function'&&!oo.__r7){const w=function(){const r=oo.apply(this,arguments);replacePhoto();replaceSave();loadAvatar();return r};w.__r7=true;window.openProfileModal=w}$7('profileBtn')?.addEventListener('click',()=>setTimeout(loadAvatar,0))}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
@@ -19211,9 +19232,368 @@ window.finoraV110R7Health=async function(){let authAvatar=false;try{const {data}
 })();
 </script>
 
+<script id="finora-v110-r71-avatar">
+(function(){
+'use strict';
 
-<script id="finora-v110-r82-rescue">
-window.FINORA_RESCUE_RELEASE='1.0.10-R8.2-RESCUE';
+const $71=id=>document.getElementById(id);
+let avatarRequestSequence=0;
+let activeAvatarUserId='';
+
+function appUser(){
+  try{return (typeof currentUser!=='undefined'&&currentUser)?currentUser:null}
+  catch(e){return null}
+}
+
+function initials(user){
+  const name=String(user?.name||$71('loggedName')?.textContent||'U').trim();
+  const parts=name.split(/\s+/).filter(Boolean);
+  return (parts.length>1
+    ? (parts[0][0]+parts[parts.length-1][0])
+    : (parts[0]?.slice(0,2)||'U')
+  ).toUpperCase();
+}
+
+function targets(){
+  return [$71('userAvatarInitials'),$71('profileAvatar')].filter(Boolean);
+}
+
+function clearVisual(user){
+  const ini=initials(user);
+  targets().forEach(el=>{
+    el.style.removeProperty('background-image');
+    el.classList.remove('finora-user-photo','finora-has-photo');
+    el.textContent=ini;
+    el.dataset.avatarUserId='';
+  });
+  window.finoraProfileAvatarData='';
+}
+
+function applyPhoto(photo,userId,user){
+  targets().forEach(el=>{
+    if(photo){
+      el.style.setProperty('background-image',`url("${photo}")`,'important');
+      el.style.setProperty('background-position','center','important');
+      el.style.setProperty('background-size','cover','important');
+      el.style.setProperty('background-repeat','no-repeat','important');
+      el.classList.add('finora-user-photo','finora-has-photo');
+      el.textContent='';
+      el.dataset.avatarUserId=String(userId||'');
+    }else{
+      el.style.removeProperty('background-image');
+      el.classList.remove('finora-user-photo','finora-has-photo');
+      el.textContent=initials(user);
+      el.dataset.avatarUserId=String(userId||'');
+    }
+  });
+  window.finoraProfileAvatarData=photo||'';
+}
+
+function clearAll(){
+  avatarRequestSequence++;
+  activeAvatarUserId='';
+  clearVisual(null);
+}
+window.finoraAvatarUserClearR71=clearAll;
+
+function resetForUser(user){
+  avatarRequestSequence++;
+  activeAvatarUserId=String(user?.id||'');
+  clearVisual(user||appUser());
+}
+window.finoraAvatarUserResetR71=resetForUser;
+
+async function syncForCurrentUser(){
+  const user=appUser();
+  if(!user?.id){
+    clearAll();
+    return;
+  }
+
+  const expectedAppUserId=String(user.id);
+  activeAvatarUserId=expectedAppUserId;
+  const seq=++avatarRequestSequence;
+
+  // Sempre começa pelas iniciais do usuário atual; nunca mantém a foto anterior.
+  clearVisual(user);
+
+  try{
+    const client=typeof getAuthClient==='function'?getAuthClient():null;
+    if(!client)return;
+
+    const {data,error}=await client.auth.getUser();
+    if(error)throw error;
+
+    const authUser=data?.user||null;
+    const authUserId=String(authUser?.id||'');
+
+    // Proteção central: foto só pode ser aplicada se auth.uid == currentUser.id.
+    if(!authUserId || authUserId!==expectedAppUserId){
+      console.warn('FINORA R7.1: avatar descartado por divergência de usuário.',{
+        appUserId:expectedAppUserId,
+        authUserId
+      });
+      if(seq===avatarRequestSequence)clearVisual(appUser());
+      return;
+    }
+
+    // Proteção contra resposta assíncrona antiga chegar depois da troca de usuário.
+    if(seq!==avatarRequestSequence || activeAvatarUserId!==expectedAppUserId)return;
+
+    const photo=authUser?.user_metadata?.finora_avatar||'';
+    applyPhoto(photo,authUserId,user);
+  }catch(e){
+    console.warn('FINORA R7.1 avatar',e);
+    if(seq===avatarRequestSequence)clearVisual(appUser());
+  }
+}
+window.finoraAvatarUserSyncR71=syncForCurrentUser;
+
+// Substitui as rotinas públicas anteriores para que qualquer chamada tardia
+// também respeite o usuário autenticado da sessão atual.
+window.finoraApplyAvatarPhotoR5=function(photo){
+  const user=appUser();
+  if(!user?.id)return clearAll();
+  // Não aceita aplicar uma foto avulsa vinda de sessão anterior.
+  // A fonte de verdade é auth.getUser().
+  syncForCurrentUser();
+};
+window.finoraApplyAvatarR7=function(photo){
+  const user=appUser();
+  if(!user?.id)return clearAll();
+  syncForCurrentUser();
+};
+
+// Ao abrir o perfil, sincroniza novamente a partir do Auth.
+document.getElementById('profileBtn')?.addEventListener('click',()=>{
+  resetForUser(appUser());
+  setTimeout(syncForCurrentUser,0);
+});
+
+// Se a aba volta ao foco, apenas ressincroniza se houver usuário ativo.
+// Sem MutationObserver e sem polling adicional.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&appUser()?.id)syncForCurrentUser();
+});
+
+// Diagnóstico simples.
+window.finoraAvatarAuditR71=async function(){
+  let authId='',hasRemotePhoto=false;
+  try{
+    const {data}=await getAuthClient().auth.getUser();
+    authId=String(data?.user?.id||'');
+    hasRemotePhoto=!!data?.user?.user_metadata?.finora_avatar;
+  }catch(e){}
+  const user=appUser();
+  return {
+    release:'1.0.10-R7.1',
+    appUserId:String(user?.id||''),
+    authUserId:authId,
+    sameUser:String(user?.id||'')===authId,
+    hasRemotePhoto,
+    topAvatarUserId:$71('userAvatarInitials')?.dataset.avatarUserId||'',
+    profileAvatarUserId:$71('profileAvatar')?.dataset.avatarUserId||''
+  };
+};
+
+})();
 </script>
+
+
+<script id="finora-v110-r72">
+(function(){
+'use strict';
+const $72=id=>document.getElementById(id);
+
+function fillInstallmentOptions(){
+  const current=$72('parcelaAtual');
+  const total=$72('parcelaTotal');
+  if(!current||!total)return;
+
+  if(current.options.length<=1){
+    for(let i=1;i<=100;i++){
+      const o=document.createElement('option');
+      o.value=String(i);o.textContent=String(i);
+      current.appendChild(o);
+    }
+  }
+  if(total.options.length<=1){
+    for(let i=1;i<=100;i++){
+      const o=document.createElement('option');
+      o.value=String(i);o.textContent=String(i);
+      total.appendChild(o);
+    }
+  }
+}
+
+function parsePair(value){
+  const m=String(value||'').trim().match(/^(\d+)\s*\/\s*(\d+)$/);
+  if(!m)return null;
+  const current=Number(m[1]),total=Number(m[2]);
+  if(current<1||total<1||current>100||total>100||current>total)return null;
+  return {current,total};
+}
+
+function syncHiddenFromCombos(){
+  const current=Number($72('parcelaAtual')?.value||0);
+  const total=Number($72('parcelaTotal')?.value||0);
+  const hidden=$72('parcelas');
+  if(!hidden)return;
+
+  if(current&&total&&current<=total){
+    hidden.value=`${current}/${total}`;
+  }else{
+    hidden.value='';
+  }
+}
+
+function syncCombosFromHidden(){
+  fillInstallmentOptions();
+  const p=parsePair($72('parcelas')?.value||'');
+  if($72('parcelaAtual'))$72('parcelaAtual').value=p?String(p.current):'';
+  if($72('parcelaTotal'))$72('parcelaTotal').value=p?String(p.total):'';
+}
+
+function syncInstallmentState(){
+  const flag=$72('parcelado');
+  const field=$72('installmentsField');
+  const current=$72('parcelaAtual');
+  const total=$72('parcelaTotal');
+  if(!flag||!field||!current||!total)return;
+
+  // O campo permanece visível sempre; apenas habilita/desabilita os combos.
+  const enabled=flag.value==='sim';
+  current.disabled=!enabled;
+  total.disabled=!enabled;
+  field.classList.toggle('finora-r72-disabled',!enabled);
+
+  if(!enabled){
+    current.value='';
+    total.value='';
+    if($72('parcelas'))$72('parcelas').value='';
+  }else{
+    // Parcelamento pressupõe sequência mensal.
+    if($72('recorrente'))$72('recorrente').value='mensal';
+  }
+}
+
+function ensureExpenseFieldsVisible(){
+  const panel=$72('simpleLaunchPanel');
+  if(!panel?.classList.contains('launch-expense-mode'))return;
+  [
+    'installmentFlagField','installmentsField','beneficiaryField',
+    'launchCardField','paymentMethodField','attachmentField','reminderHelpField'
+  ].forEach(id=>{
+    const el=$72(id);
+    if(el)el.style.removeProperty('display');
+  });
+}
+
+function install(){
+  fillInstallmentOptions();
+
+  const flag=$72('parcelado');
+  if(flag&&!flag.dataset.r72){
+    flag.dataset.r72='1';
+    flag.addEventListener('change',()=>{
+      syncInstallmentState();
+      ensureExpenseFieldsVisible();
+    });
+  }
+
+  [$72('parcelaAtual'),$72('parcelaTotal')].filter(Boolean).forEach(el=>{
+    if(el.dataset.r72)return;
+    el.dataset.r72='1';
+    el.addEventListener('change',()=>{
+      const c=Number($72('parcelaAtual')?.value||0);
+      const t=Number($72('parcelaTotal')?.value||0);
+      if(c&&t&&c>t){
+        el.value='';
+        if(typeof toast==='function')toast('A parcela atual não pode ser maior que o total de parcelas.');
+      }
+      syncHiddenFromCombos();
+    });
+  });
+
+  // Validação antes do submit legado. O hidden "parcelas" mantém compatibilidade.
+  const form=$72('entryForm');
+  if(form&&!form.dataset.r72){
+    form.dataset.r72='1';
+    form.addEventListener('submit',e=>{
+      if($72('parcelado')?.value==='sim'){
+        syncHiddenFromCombos();
+        const p=parsePair($72('parcelas')?.value||'');
+        if(!p){
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          if(typeof toast==='function')toast('Selecione a parcela atual e o total do parcelamento.');
+          $72('parcelaAtual')?.focus();
+          return;
+        }
+      }
+    },true);
+  }
+
+  syncCombosFromHidden();
+  syncInstallmentState();
+  ensureExpenseFieldsVisible();
+}
+
+// Wrapper da edição: carrega N/T nos dois combos.
+const previousEditRow=window.editRow;
+if(typeof previousEditRow==='function'&&!previousEditRow.__finoraR72){
+  const wrapped=function(id){
+    const result=previousEditRow.apply(this,arguments);
+    setTimeout(()=>{
+      fillInstallmentOptions();
+      syncCombosFromHidden();
+      syncInstallmentState();
+      ensureExpenseFieldsVisible();
+    },0);
+    return result;
+  };
+  wrapped.__finoraR72=true;
+  window.editRow=wrapped;
+}
+
+// Leitor de boleto continua opcional; se detectar parcela N/T,
+// converte o hidden existente nos dois combos.
+$72('applyBoletoReader')?.addEventListener('click',()=>{
+  setTimeout(()=>{
+    syncCombosFromHidden();
+    syncInstallmentState();
+    ensureExpenseFieldsVisible();
+  },0);
+});
+
+// Ao abrir a jornada de despesa, reforça o layout completo sem observer global.
+document.addEventListener('click',e=>{
+  const trigger=e.target?.closest?.('[data-open-expense],#btnNewExpense,#newExpenseBtn,[data-launch-mode="expense"]');
+  if(trigger)setTimeout(()=>{
+    fillInstallmentOptions();
+    syncCombosFromHidden();
+    syncInstallmentState();
+    ensureExpenseFieldsVisible();
+  },0);
+});
+
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});
+else install();
+
+window.finoraR72InstallmentHealth=function(){
+  return {
+    release:'1.0.10-R7.2',
+    questionVisible:!!$72('installmentFlagField'),
+    fieldVisible:!!$72('installmentsField'),
+    currentOptions:$72('parcelaAtual')?.options.length||0,
+    totalOptions:$72('parcelaTotal')?.options.length||0,
+    hiddenValue:$72('parcelas')?.value||'',
+    expenseMode:$72('simpleLaunchPanel')?.classList.contains('launch-expense-mode')||false
+  };
+};
+
+})();
+</script>
+
 </body>
 </html>
