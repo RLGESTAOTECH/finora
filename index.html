@@ -6307,6 +6307,9 @@ body.finora-v84-dark .finora-r6-reader-pick,body.finora-v84-dark .finora-r6-read
 @media(max-width:560px){.finora-r6-reader-grid{grid-template-columns:1fr}.finora-r6-reader-card{padding:15px}.finora-r6-boleto-button{grid-template-columns:38px 1fr 18px;padding:10px}}
 </style>
 
+<style id="finora-v110-r7-style">
+.finora-r7-use{float:right;display:inline-flex!important;align-items:center;gap:4px;margin:0!important;color:#37604d!important;font:700 8px Verdana,sans-serif!important;text-transform:none!important;letter-spacing:0!important}.finora-r7-use input{width:14px;height:14px;accent-color:#0f6847}.finora-r7-profile-saving{opacity:.72;pointer-events:none}#userChip .finora-session-avatar.finora-has-photo{background-color:#004638!important;background-position:center!important;background-size:cover!important;background-repeat:no-repeat!important}body.finora-v84-dark .finora-r7-use{color:#dbe8e1!important}
+</style>
 </head>
 <body>
 
@@ -18968,16 +18971,16 @@ window.FINORA_RELEASE='1.0.10';
     <div class="finora-r6-reader-result" id="boletoReaderResult" style="display:none">
       <div class="finora-r6-reader-result-head"><strong>Informações identificadas</strong><span id="boletoReaderConfidence"></span></div>
       <div class="finora-r6-reader-grid">
-        <div><span>Vencimento</span><strong id="boletoResultDue">—</strong></div>
-        <div><span>Valor</span><strong id="boletoResultValue">—</strong></div>
-        <div><span>Beneficiário</span><strong id="boletoResultBeneficiary">—</strong></div>
-        <div><span>Parcela</span><strong id="boletoResultInstallment">—</strong></div>
+        <div><label class="finora-r7-use"><input type="checkbox" id="useBoletoDue" checked> usar</label><span>Vencimento</span><strong id="boletoResultDue">—</strong></div>
+        <div><label class="finora-r7-use"><input type="checkbox" id="useBoletoValue" checked> usar</label><span>Valor</span><strong id="boletoResultValue">—</strong></div>
+        <div><label class="finora-r7-use"><input type="checkbox" id="useBoletoBeneficiary" checked> usar</label><span>Beneficiário</span><strong id="boletoResultBeneficiary">—</strong></div>
+        <div><label class="finora-r7-use"><input type="checkbox" id="useBoletoInstallment" checked> usar</label><span>Parcela</span><strong id="boletoResultInstallment">—</strong></div>
       </div>
-      <div class="finora-r6-reader-code"><span>Código / linha digitável</span><code id="boletoResultCode">—</code></div>
+      <div class="finora-r6-reader-code"><label class="finora-r7-use"><input type="checkbox" id="useBoletoCode" checked> usar</label><span>Código / linha digitável</span><code id="boletoResultCode">—</code></div>
       <div class="finora-r6-reader-warning" id="boletoReaderWarning">Confira os dados antes de salvar. A leitura automática pode não reconhecer todos os campos.</div>
       <div class="finora-r6-reader-result-actions">
-        <button type="button" class="btn btn-soft" id="discardBoletoReader">Cancelar</button>
-        <button type="button" class="btn btn-primary" id="applyBoletoReader">Aplicar ao lançamento</button>
+        <button type="button" class="btn btn-soft" id="discardBoletoReader">Descartar leitura</button>
+        <button type="button" class="btn btn-primary" id="applyBoletoReader">Usar dados selecionados</button>
       </div>
     </div>
   </div>
@@ -18996,32 +18999,54 @@ function validISO(v){if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;return !Numb
 function addDaysISO(base,days){const d=new Date(base+'T12:00:00');d.setDate(d.getDate()+Number(days||0));return d.toISOString().slice(0,10)}
 function line47ToBarcode44(line){const d=digits(line);return d.length===47?d.slice(0,4)+d.slice(32,33)+d.slice(33,47)+d.slice(4,9)+d.slice(10,20)+d.slice(21,31):''}
 function parseBankBarcode(code){
- let d=digits(code);if(d.length===47)d=line47ToBarcode44(d);if(d.length!==44||d.startsWith('8'))return {};
- const factor=d.slice(5,9),valueDigits=d.slice(9,19),value=Number(valueDigits)/100;let due='';
+ let raw=digits(code);
+ if(raw.length===48&&raw.startsWith('8')){
+   const barcode=raw.slice(0,11)+raw.slice(12,23)+raw.slice(24,35)+raw.slice(36,47);
+   const ref=barcode.charAt(2);let value=null;
+   if(ref==='6'||ref==='7'){const cents=Number(barcode.slice(4,15));if(Number.isFinite(cents)&&cents>0)value=cents/100}
+   return {code:barcode,originalCode:raw,value,due:'',kind:'collection'};
+ }
+ let d=raw;if(d.length===47)d=line47ToBarcode44(d);if(d.length!==44||d.startsWith('8'))return {};
+ const factor=d.slice(5,9),value=Number(d.slice(9,19))/100;let due='';
  if(factor!=='0000'){const f=Number(factor);if(f>=1000)due=addDaysISO('2025-02-22',f-1000)}
- return {code:d,originalCode:digits(code),value:Number.isFinite(value)&&value>0?value:null,due:validISO(due)?due:''};
+ return {code:d,originalCode:raw,value:Number.isFinite(value)&&value>0?value:null,due:validISO(due)?due:'',kind:'bank'};
 }
 function candidateCodeFromText(text){
- const chunks=String(text||'').match(/(?:\d[\s.\-]*){44,55}/g)||[];
- return chunks.map(x=>digits(x)).filter(x=>[44,47,48].includes(x.length)).sort((a,b)=>((a.length===47?1:a.length===44?2:3)-(b.length===47?1:b.length===44?2:3)))[0]||'';
+ const s=String(text||''),found=[];
+ s.split(/\r?\n/).forEach((line,index)=>{
+   const d=digits(line);if(![44,47,48].includes(d.length))return;
+   let score=d.length===48&&d.startsWith('8')?140:d.length===47?125:d.length===44&&d.startsWith('8')?115:80;
+   const ctx=((s.split(/\r?\n/)[Math.max(0,index-1)]||'')+' '+line).toLowerCase();
+   if(/chave\s+de\s+acesso|nf3e|nota\s+fiscal/.test(ctx))score-=120;
+   found.push({code:d,score,index});
+ });
+ found.sort((a,b)=>b.score-a.score||b.index-a.index);
+ return found[0]?.score>0?found[0].code:'';
+}
+function billingSummaryFromText(text){
+ const s=String(text||'').replace(/\u00a0/g,' ').replace(/[ \t]+/g,' ');
+ const mon='(?:JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)';
+ let m=s.match(new RegExp(`${mon}\\/\\d{4}\\s+(\\d{2}\\/\\d{2}\\/\\d{4})\\s+([\\d.]+,\\d{2})`,'i'));
+ if(m)return {due:isoFromBR(m[1]),value:parseBRMoney(m[2])};
+ m=s.match(new RegExp(`(\\d{2}\\/\\d{2}\\/\\d{4})\\s+([\\d.]+,\\d{2})\\s+[\\d.\\-]{6,}\\s+${mon}\\/\\d{4}`,'i'));
+ return m?{due:isoFromBR(m[1]),value:parseBRMoney(m[2])}:{due:'',value:null};
 }
 function firstLabeledDate(text){
- for(const p of [/(?:data\s+de\s+)?vencimento\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i,/venc\.\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i,/(\d{2}\/\d{2}\/\d{4})/]){
-  const m=String(text||'').match(p);if(m)return isoFromBR(m[1]);
- }return '';
+ const s=billingSummaryFromText(text);if(s.due)return s.due;
+ for(const p of [/(?:data\s+de\s+)?vencimento\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i,/venc\.\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i]){const m=String(text||'').match(p);if(m)return isoFromBR(m[1])}
+ return '';
 }
 function parseBRMoney(raw){let s=String(raw||'').replace(/[R$\s]/g,'');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const n=Number(s);return Number.isFinite(n)?n:null}
 function firstLabeledValue(text){
- for(const p of [/valor\s+(?:do\s+)?documento\s*[:\-]?\s*R?\$?\s*([\d.]+,\d{2})/i,/valor\s+(?:cobrado|a\s+pagar|total)\s*[:\-]?\s*R?\$?\s*([\d.]+,\d{2})/i,/total\s+a\s+pagar\s*[:\-]?\s*R?\$?\s*([\d.]+,\d{2})/i]){
-  const m=String(text||'').match(p);if(m){const n=parseBRMoney(m[1]);if(n!==null&&n>0)return n}
- }return null;
+ const s=billingSummaryFromText(text);if(s.value!==null&&s.value!==undefined&&s.value>0)return s.value;
+ for(const p of [/total\s+a\s+pagar\s*[:\-]?\s*R?\$?\s*([\d.]+,\d{2})/i,/valor\s+(?:do\s+)?documento\s*[:\-]?\s*R?\$?\s*([\d.]+,\d{2})/i,/valor\s+(?:cobrado|a\s+pagar|total)\s*[:\-]?\s*R?\$?\s*([\d.]+,\d{2})/i]){const m=String(text||'').match(p);if(m){const n=parseBRMoney(m[1]);if(n!==null&&n>0)return n}}
+ return null;
 }
 function extractBeneficiary(lines,text){
- for(let i=0;i<(lines||[]).length;i++){
-  const line=String(lines[i]||'').trim();let m=line.match(/(?:benefici[aá]rio|cedente|favorecido)\s*[:\-]\s*(.+)$/i);
-  if(m&&m[1].trim().length>2)return m[1].trim().slice(0,100);
-  if(/^(?:benefici[aá]rio|cedente|favorecido)\s*[:\-]?$/i.test(line)&&lines[i+1])return String(lines[i+1]).trim().slice(0,100);
- }const m=String(text||'').match(/(?:benefici[aá]rio|cedente|favorecido)\s*[:\-]\s*([A-ZÀ-Ú0-9][A-ZÀ-Ú0-9 .&\-]{2,80})/i);return m?m[1].trim().slice(0,100):'';
+ const list=(Array.isArray(lines)?lines:[]).map(x=>String(x||'').trim()).filter(Boolean);
+ for(let i=0;i<list.length;i++){const line=list[i];let m=line.match(/(?:benefici[aá]rio|cedente|favorecido)\s*[:\-]\s*(.+)$/i);if(m&&m[1].trim().length>2)return m[1].trim().slice(0,100);if(/^(?:benefici[aá]rio|cedente|favorecido)\s*[:\-]?$/i.test(line)&&list[i+1])return list[i+1].slice(0,100)}
+ for(const line of list.slice(0,18)){if(line.length<4||line.length>120)continue;if(/^(RUA|AV\.?|AVENIDA|CEP|CNPJ|CPF|EMISS|CLASSIF|MODALIDADE|TENS[AÃ]O|TIPO\s+DE|NOTA\s+FISCAL)/i.test(line))continue;if(/\b(S\.?A\.?|LTDA|CIA|DISTRIB|ENERGIA|ELETRIC|SANEAMENTO|TELECOM|BANCO|PREFEITURA|COMPANHIA)\b/i.test(line))return line.slice(0,100)}
+ const m=String(text||'').match(/(?:benefici[aá]rio|cedente|favorecido)\s*[:\-]\s*([A-ZÀ-Ú0-9][A-ZÀ-Ú0-9 .&\-]{2,80})/i);return m?m[1].trim().slice(0,100):'';
 }
 function extractInstallment(text){
  for(const p of [/parcela\s*(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})/i,/parc(?:ela)?\.?\s*(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})/i,/(\d{1,3})\s*\/\s*(\d{1,3})\s*(?:parcela|parcelas)/i]){
@@ -19055,7 +19080,11 @@ async function analyzePdf(file,onProgress){
 }
 function analyzeManualCode(raw){const code=digits(raw);if(![44,47,48].includes(code.length))throw new Error('A linha digitável/código deve ter 44, 47 ou 48 dígitos.');const p=parseBankBarcode(code);return {source:'código informado manualmente',code,due:p.due||'',value:p.value,beneficiary:'',installment:'',file:null}}
 function extractionScore(r){let n=0;for(const ok of [r.due,r.value!==null&&r.value!==undefined,r.beneficiary,r.installment,r.code])if(ok)n++;return {n,total:5}}
-function renderResult(r){const s=extractionScore(r);$6('boletoResultDue').textContent=r.due?brFromISO(r.due):'Não identificado';$6('boletoResultValue').textContent=r.value!==null&&r.value!==undefined?moneyText(r.value):'Não identificado';$6('boletoResultBeneficiary').textContent=r.beneficiary||'Não identificado';$6('boletoResultInstallment').textContent=r.installment||'Não identificado';$6('boletoResultCode').textContent=r.code||'Não identificado';$6('boletoReaderConfidence').textContent=`${s.n} de 5 campos identificados`;$6('boletoReaderWarning').textContent=s.n===5?'Todos os campos principais foram identificados. Confira antes de salvar.':'Leitura parcial: campos não identificados permanecerão para preenchimento manual.';$6('boletoReaderResult').style.display='block'}
+function renderResult(r){
+ const s=extractionScore(r);$6('boletoResultDue').textContent=r.due?brFromISO(r.due):'Não identificado';$6('boletoResultValue').textContent=r.value!==null&&r.value!==undefined?moneyText(r.value):'Não identificado';$6('boletoResultBeneficiary').textContent=r.beneficiary||'Não identificado';$6('boletoResultInstallment').textContent=r.installment||'Não identificado';$6('boletoResultCode').textContent=r.code||'Não identificado';
+ const ok={useBoletoDue:!!r.due,useBoletoValue:r.value!==null&&r.value!==undefined,useBoletoBeneficiary:!!r.beneficiary,useBoletoInstallment:!!r.installment,useBoletoCode:!!r.code};Object.entries(ok).forEach(([id,a])=>{const el=$6(id);if(el){el.checked=a;el.disabled=!a}});
+ $6('boletoReaderConfidence').textContent=`${s.n} de 5 campos identificados`;$6('boletoReaderWarning').textContent=s.n===5?'Todos os campos principais foram identificados. Selecione o que deseja utilizar e confira antes de salvar.':'Leitura parcial: use somente os campos confiáveis ou clique em “Descartar leitura” para não aproveitar nenhuma informação.';$6('boletoReaderResult').style.display='block';
+}
 function setProgress(show,text='Analisando...'){$6('boletoReaderProgress').style.display=show?'flex':'none';$6('boletoReaderProgressText').textContent=text;$6('analyzeBoletoReader').disabled=show}
 function openReader(){selectedBoletoFile=null;extractedBoleto=null;$6('boletoReaderFile').value='';$6('boletoReaderFileName').textContent='Nenhum arquivo selecionado.';$6('boletoReaderManualCode').value='';$6('boletoReaderResult').style.display='none';setProgress(false);$6('finoraBoletoReader').classList.add('open');$6('finoraBoletoReader').setAttribute('aria-hidden','false')}
 function closeReader(){$6('finoraBoletoReader').classList.remove('open');$6('finoraBoletoReader').setAttribute('aria-hidden','true')}
@@ -19073,11 +19102,11 @@ async function analyze(){
 function attachSourceFile(file){if(!file)return;const input=$6('arquivo');if(!input)return;try{const dt=new DataTransfer();dt.items.add(file);input.files=dt.files;if($6('fileInfo'))$6('fileInfo').textContent=`Arquivo selecionado pelo leitor: ${file.name}`}catch(e){}}
 function applyExtraction(){
  const r=extractedBoleto;if(!r)return;if($6('tipo'))$6('tipo').value='saida';try{if(typeof applyLaunchMode==='function')applyLaunchMode('saida',{keepForm:true})}catch(e){}
- if(r.due&&$6('vencimento'))$6('vencimento').value=r.due;
- if(r.value!==null&&r.value!==undefined&&$6('valor')){try{$6('valor').value=typeof formatBRLInput==='function'?formatBRLInput(r.value):moneyText(r.value)}catch(e){$6('valor').value=moneyText(r.value)}}
- if(r.beneficiary&&$6('beneficiario')){$6('beneficiario').value=r.beneficiary;if(!$6('descricao').value.trim())$6('descricao').value=`BOLETO ${r.beneficiary}`.slice(0,120)}
- if(r.code&&$6('codigoBoleto'))$6('codigoBoleto').value=r.code;
- if(r.installment){if($6('parcelado'))$6('parcelado').value='sim';if($6('parcelas'))$6('parcelas').value=r.installment;if($6('installmentsField'))$6('installmentsField').style.display='block';if($6('recorrente'))$6('recorrente').value='mensal'}
+ if($6('useBoletoDue')?.checked&&r.due&&$6('vencimento'))$6('vencimento').value=r.due;
+ if($6('useBoletoValue')?.checked&&r.value!==null&&r.value!==undefined&&$6('valor')){try{$6('valor').value=typeof formatBRLInput==='function'?formatBRLInput(r.value):moneyText(r.value)}catch(e){$6('valor').value=moneyText(r.value)}}
+ if($6('useBoletoBeneficiary')?.checked&&r.beneficiary&&$6('beneficiario')){$6('beneficiario').value=r.beneficiary;if(!$6('descricao').value.trim())$6('descricao').value=`BOLETO ${r.beneficiary}`.slice(0,120)}
+ if($6('useBoletoCode')?.checked&&r.code&&$6('codigoBoleto'))$6('codigoBoleto').value=r.code;
+ if($6('useBoletoInstallment')?.checked&&r.installment){if($6('parcelado'))$6('parcelado').value='sim';if($6('parcelas'))$6('parcelas').value=r.installment;if($6('installmentsField'))$6('installmentsField').style.display='block';if($6('recorrente'))$6('recorrente').value='mensal'}
  const forma=$6('forma');if(forma&&[...forma.options].some(o=>o.value==='Boleto'||o.textContent==='Boleto')){forma.value='Boleto';try{updatePaymentAccountField()}catch(e){}}
  if($6('dataLancamento')&&!$6('dataLancamento').value&&typeof today==='function')$6('dataLancamento').value=today();
  attachSourceFile(r.file);
@@ -19095,5 +19124,19 @@ window.finoraBoletoReaderHealthR6=function(){return {release:'1.0.10-R6',barcode
 })();
 </script>
 
+<script id="finora-v110-r7">
+(function(){
+'use strict';let photoDraft=null,photoRemove=false;const $7=id=>document.getElementById(id);
+function applyAvatar(photo){[$7('profileAvatar'),$7('userAvatarInitials')].filter(Boolean).forEach(el=>{if(photo){el.style.setProperty('background-image',`url("${photo}")`,'important');el.style.setProperty('background-position','center','important');el.style.setProperty('background-size','cover','important');el.classList.add('finora-has-photo');el.textContent=''}else{el.style.removeProperty('background-image');el.classList.remove('finora-has-photo');const n=(window.currentUser?.name||$7('loggedName')?.textContent||'U').trim();el.textContent=(n.charAt(0)||'U').toUpperCase()}})}window.finoraApplyAvatarR7=applyAvatar;
+async function loadAvatar(){try{const c=getAuthClient();if(!c)return'';const {data,error}=await c.auth.getUser();if(error)throw error;const p=data?.user?.user_metadata?.finora_avatar||'';window.finoraProfileAvatarData=p;applyAvatar(p);return p}catch(e){console.warn('FINORA R7 avatar',e);return''}}
+function resizePhoto(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(new Error('Não foi possível ler a imagem.'));r.onload=()=>{const i=new Image();i.onerror=()=>reject(new Error('Formato de imagem inválido.'));i.onload=()=>{const s=128,c=document.createElement('canvas');c.width=s;c.height=s;const x=c.getContext('2d'),k=Math.max(s/i.width,s/i.height),w=i.width*k,h=i.height*k;x.drawImage(i,(s-w)/2,(s-h)/2,w,h);resolve(c.toDataURL('image/jpeg',.68))};i.src=r.result};r.readAsDataURL(file)})}
+function replacePhoto(){const oi=$7('profilePhotoInput');if(oi&&!oi.dataset.r7){const n=oi.cloneNode(true);n.dataset.r7='1';oi.replaceWith(n);n.addEventListener('change',async()=>{const f=n.files?.[0];if(!f)return;if(f.size>8*1024*1024){profileErr('A foto deve ter no máximo 8 MB.');n.value='';return}try{photoDraft=await resizePhoto(f);photoRemove=false;applyAvatar(photoDraft);profileOk('Foto preparada. Clique em Salvar alterações para confirmar.')}catch(e){profileErr(e.message||'Não foi possível preparar a foto.')}})}const or=$7('removeProfilePhotoBtn');if(or&&!or.dataset.r7){const b=or.cloneNode(true);b.dataset.r7='1';or.replaceWith(b);b.addEventListener('click',()=>{photoDraft=null;photoRemove=true;applyAvatar('');profileOk('Foto marcada para remoção. Clique em Salvar alterações para confirmar.')})}}
+async function saveProfile(btn){if(!window.currentUser||btn.dataset.busy==='1')return;clearProfileMessages();const name=$7('profileName').value.trim(),email=$7('profileEmail').value.trim().toLowerCase(),cpfLogin=normalizeCPF($7('profileCpfLogin')?.value||''),cp=$7('profileCurrentPassword').value,np=$7('profileNewPassword').value,np2=$7('profileNewPassword2').value;if(!name)return profileErr('Informe seu nome.');if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return profileErr('Informe um e-mail válido.');if(cpfLogin&&!validCPF(cpfLogin))return profileErr('Informe um CPF válido para atualizar o login.');const wp=!!(np||np2),wc=!!cpfLogin,wf=photoDraft!==null||photoRemove,c=getAuthClient();if(!c)return profileErr('Autenticação online indisponível.');btn.dataset.busy='1';btn.disabled=true;btn.classList.add('finora-r7-profile-saving');const txt=btn.textContent;btn.textContent='Salvando...';try{const oldEmail=String(currentUser.email||'').toLowerCase();if(wp||wc){if(!cp)throw new Error('Informe sua senha atual para confirmar a alteração.');const ck=await c.auth.signInWithPassword({email:oldEmail,password:cp});if(ck.error)throw new Error('A senha atual está incorreta.')}if(wp){if(np.length<6)throw new Error('A nova senha precisa ter pelo menos 6 caracteres.');if(np!==np2)throw new Error('A confirmação da nova senha não confere.');const {error}=await c.auth.updateUser({password:np});if(error)throw error}const patch={};if(email!==oldEmail)patch.email=email;if(wf)patch.data={finora_avatar:photoRemove?'':photoDraft};if(Object.keys(patch).length){const {error}=await c.auth.updateUser(patch);if(error)throw error}const {data:s}=await c.auth.getSession(),uid=s?.session?.user?.id||currentUser.id,profile=await upsertOwnFinoraProfile({user_id:uid,name,email,cpf_hash:wc?await finoraHash(cpfLogin):(currentUser.cpfHash||''),cpf_masked:wc?maskCPF(cpfLogin):(currentUser.cpfMasked||''),workspace_id:currentUser.workspaceId,role:currentUser.role}),updated=await cacheAuthProfile(profile);currentUser=updated;window.currentUser=updated;localStorage.setItem(FINORA_SESSION_KEY,updated.id);$7('loggedName').textContent=updated.name||'Usuário';$7('profileSummaryName').textContent=updated.name||'Usuário';$7('profileCpf').value=updated.cpfMasked||'CPF cadastrado';$7('profileCpfLogin').value='';$7('profileCurrentPassword').value='';$7('profileNewPassword').value='';$7('profileNewPassword2').value='';if(wf){window.finoraProfileAvatarData=photoRemove?'':photoDraft;photoDraft=null;photoRemove=false}await loadAvatar();try{renderFamilyAccess()}catch(e){}try{fillPeople()}catch(e){}try{render()}catch(e){}profileOk('Perfil atualizado com sucesso.');toast('Perfil e foto atualizados com sucesso.')}catch(e){console.error('FINORA R7 perfil',e);profileErr(e?.message||'Não foi possível atualizar seu perfil.')}finally{btn.disabled=false;btn.classList.remove('finora-r7-profile-saving');delete btn.dataset.busy;btn.textContent=txt}}
+function replaceSave(){const o=$7('saveProfileBtn');if(!o||o.dataset.r7)return;const b=o.cloneNode(true);b.dataset.r7='1';o.replaceWith(b);b.addEventListener('click',()=>saveProfile(b))}
+function install(){replacePhoto();replaceSave();loadAvatar();const oo=window.openProfileModal;if(typeof oo==='function'&&!oo.__r7){const w=function(){const r=oo.apply(this,arguments);replacePhoto();replaceSave();loadAvatar();return r};w.__r7=true;window.openProfileModal=w}$7('profileBtn')?.addEventListener('click',()=>setTimeout(loadAvatar,0))}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+window.finoraV110R7Health=async function(){let authAvatar=false;try{const {data}=await getAuthClient().auth.getUser();authAvatar=!!data?.user?.user_metadata?.finora_avatar}catch(e){}return{release:'1.0.10-R7',authAvatar,topAvatarHasPhoto:$7('userAvatarInitials')?.classList.contains('finora-has-photo')||false,boletoReader:true,selectiveControls:['useBoletoDue','useBoletoValue','useBoletoBeneficiary','useBoletoInstallment','useBoletoCode'].every(id=>!!$7(id))}};
+})();
+</script>
 </body>
 </html>
