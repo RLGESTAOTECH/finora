@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.25-login-feedback-avatar-fix">
+<meta name="finora-release" content="R7.26-zero-cost-performance">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -7609,6 +7609,43 @@ body.dark .finora-r721-share-icon{
 }
 </style>
 
+
+<style id="finora-r726-sync-style">
+#finoraSyncIndicatorR726{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  z-index:9998;
+  display:none;
+  align-items:center;
+  gap:8px;
+  padding:9px 12px;
+  border-radius:999px;
+  background:rgba(255,255,255,.96);
+  color:#315548;
+  border:1px solid #d9e7df;
+  box-shadow:0 8px 28px rgba(12,53,39,.12);
+  font:600 11px/1 Arial,sans-serif;
+  pointer-events:none;
+}
+#finoraSyncIndicatorR726.show{display:flex}
+#finoraSyncIndicatorR726.error{color:#9f2d24;border-color:#f0c6c1;background:#fff7f6}
+#finoraSyncIndicatorR726 .dot{
+  width:7px;height:7px;border-radius:50%;background:#0f8a5f;
+}
+#finoraSyncIndicatorR726.syncing .dot{
+  animation:finoraR726Pulse 1s infinite ease-in-out;
+}
+@keyframes finoraR726Pulse{0%,100%{opacity:.25}50%{opacity:1}}
+html.dark #finoraSyncIndicatorR726,
+body.dark #finoraSyncIndicatorR726{
+  background:#043327;color:#fff;border-color:rgba(255,255,255,.15)
+}
+@media(max-width:700px){
+  #finoraSyncIndicatorR726{right:10px;bottom:10px}
+}
+</style>
+
 </head>
 <body>
 
@@ -11674,16 +11711,55 @@ updateTypeLabels();
 
 
 let finoraCloudPollTimer=null;
+
+const FINORA_R726_SYNC_COOLDOWN_MS=120000;
+const FINORA_R726_POLL_MS=300000;
+let finoraR726LastAutoSyncAt=0;
+
+function finoraSyncIndicatorR726(state='idle',message=''){
+  const el=document.getElementById('finoraSyncIndicatorR726');
+  if(!el)return;
+  const txt=el.querySelector('.txt');
+  el.classList.remove('syncing','error','show');
+  if(state==='idle'){
+    el.style.display='none';
+    return;
+  }
+  el.classList.add('show');
+  if(state==='syncing')el.classList.add('syncing');
+  if(state==='error')el.classList.add('error');
+  if(txt)txt.textContent=message || (state==='syncing'?'Sincronizando...':state==='error'?'Sincronização pendente':'Sincronizado');
+  if(state==='ok'){
+    clearTimeout(el._hideTimer);
+    el._hideTimer=setTimeout(()=>{el.classList.remove('show');el.style.display='none'},1800);
+  }else{
+    el.style.display='flex';
+  }
+}
+
+function finoraR726CanAutoSync(force=false){
+  if(force)return true;
+  const now=Date.now();
+  if(now-finoraR726LastAutoSyncAt<FINORA_R726_SYNC_COOLDOWN_MS)return false;
+  finoraR726LastAutoSyncAt=now;
+  return true;
+}
+
 function startCloudPolling(){
   clearInterval(finoraCloudPollTimer);
   if(!cloudConfigured())return;
+
+  // R7.26: fallback raro. Realtime/focus cuidam da maior parte da atualização.
   finoraCloudPollTimer=setInterval(()=>{
-    if(document.visibilityState==='visible'&&!finoraCloudBusy)pullCloudState(false);
-  },20000);
+    if(
+      document.visibilityState==='visible' &&
+      !finoraCloudBusy &&
+      finoraR726CanAutoSync(false)
+    ){
+      finoraAutoPull();
+    }
+  },FINORA_R726_POLL_MS);
 }
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible'&&cloudConfigured())pullCloudState(false);
-});
 
 const FINORA_CLOUD_CONFIG_KEY='finora_cloud_config_v1';
 const FINORA_CLOUD_SYNC_KEY='finora_cloud_last_sync_v1';
@@ -11708,7 +11784,7 @@ function finoraReleaseCloudBusy(){
   finoraCloudBusy=false;
   if(finoraCloudPushPending || finoraCloudDirty){
     clearTimeout(finoraCloudPushTimer);
-    finoraCloudPushTimer=setTimeout(()=>pushCloudState(false),180);
+    finoraCloudPushTimer=setTimeout(()=>pushCloudState(false),1200);
   }
 }
 // FINORA 1.0.4: impede que cache local antigo seja enviado antes de o
@@ -12590,6 +12666,7 @@ async function pushCloudState(showToast=false){
   const pushRevision=finoraCloudMutationRevision;
   finoraCloudPushPending=false;
   finoraCloudBusy=true;
+  finoraSyncIndicatorR726('syncing','Salvando na nuvem...');
   try{
     let payload=cloudStatePayload(); payload.transactions=finoraOverlayPendingTxV79(payload.transactions||[],currentWorkspaceId);
 
@@ -12638,9 +12715,10 @@ async function pushCloudState(showToast=false){
     };
     const {error}=await client.from('finora_workspace_state').upsert(row,{onConflict:'workspace_id'});
     if(error)throw error;
-    const {data:confirmRow,error:confirmError}=await client.from('finora_workspace_state').select('state,updated_at').eq('workspace_id',currentWorkspaceId).maybeSingle();
-    if(confirmError)throw confirmError;
-    const confirmedRemoteTx=Array.isArray(confirmRow?.state?.transactions)?confirmRow.state.transactions:[];
+
+    // R7.26: upsert bem-sucedido já confirma persistência.
+    // Evita baixar o JSON inteiro uma segunda vez só para confirmar o que acabou de gravar.
+    const confirmedRemoteTx=Array.isArray(payload.transactions)?payload.transactions:[];
     const confirmation=finoraClearConfirmedPendingTxV79(confirmedRemoteTx,currentWorkspaceId);
     finoraFinishBootstrap();markFinoraWorkspaceHydrated();
     if(finoraCloudMutationRevision===pushRevision && confirmation.remaining===0){finoraCloudDirty=false;finoraCloudPushPending=false}else{finoraCloudDirty=true;finoraCloudPushPending=true}
@@ -12669,14 +12747,16 @@ async function pushCloudState(showToast=false){
     localStorage.setItem(FINORA_CLOUD_SYNC_KEY,stamp);
     render();
     updateCloudUI('connected');
+    finoraSyncIndicatorR726('ok','Salvo e sincronizado');
     if(showToast)toast('Dados enviados e consolidados na nuvem.');
     return true;
   }catch(e){
     console.error('FINORA cloud push',e);
     finoraCloudDirty=true;
     finoraCloudPushPending=true;
+    finoraSyncIndicatorR726('error','Salvo localmente — sincronização pendente');
     updateCloudUI('error');
-    if(showToast)toast('Falha ao enviar dados para a nuvem.');
+    if(showToast)toast('Dados salvos localmente. A sincronização será tentada depois.');
     return false;
   }finally{
     finoraReleaseCloudBusy();
@@ -12686,7 +12766,7 @@ function scheduleCloudPush(){
   if(!cloudConfigured() || !finoraWorkspaceHydrated())return;
   finoraCloudPushPending=true;
   clearTimeout(finoraCloudPushTimer);
-  finoraCloudPushTimer=setTimeout(()=>pushCloudState(false),450);
+  finoraCloudPushTimer=setTimeout(()=>pushCloudState(false),1800);
 }
 async function pullCloudState(showToast=false){
   if(!cloudConfigured())return false;
@@ -12704,6 +12784,7 @@ async function pullCloudState(showToast=false){
   if(finoraCloudBusy)return false;
   const client=getCloudClient();if(!client)return false;
   finoraCloudBusy=true;
+  finoraSyncIndicatorR726('syncing','Sincronizando dados...');
   try{
     const {data:row,error}=await client
       .from('finora_workspace_state')
@@ -12843,6 +12924,7 @@ async function pullCloudState(showToast=false){
     return true;
   }catch(e){
     console.error('FINORA cloud pull',e);
+    finoraSyncIndicatorR726('error','Nuvem lenta — trabalhando com dados locais');
     updateCloudUI('error');
     if(showToast)toast('Falha ao baixar dados da nuvem.');
     return false;
@@ -12904,9 +12986,15 @@ function startFinoraRealtimeSync(){
   }catch(e){ console.warn('FINORA realtime indisponível; usando atualização por foco.',e); }
 }
 
-window.addEventListener('focus',()=>{ if(currentUser) finoraAutoPull(); });
+window.addEventListener('focus',()=>{
+  if(currentUser && finoraR726CanAutoSync(false))finoraAutoPull();
+});
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible' && currentUser) finoraAutoPull();
+  if(
+    document.visibilityState==='visible' &&
+    currentUser &&
+    finoraR726CanAutoSync(false)
+  )finoraAutoPull();
 });
 
 
@@ -13240,57 +13328,103 @@ async function finoraRecoverWorkspaceDataIfEmpty(){
   }
 }
 
+async function finoraBackgroundHydrateR726(user){
+  if(!cloudConfigured())return false;
+
+  try{
+    finoraSyncIndicatorR726('syncing','Atualizando dados...');
+
+    const pulled=await pullCloudState(false);
+
+    // Só executa rotinas recorrentes depois de a fonte remota ter tido chance
+    // de hidratar o workspace. Evita gerar trabalho em cima de cache antigo.
+    normalizeVariableReminders();
+    ensureRecurringNextMonths();
+    normalizeVariableReminders();
+
+    // Não executa recuperação legada automática em caso de timeout.
+    // Essa rotina fazia leituras amplas do state e pressionava o Supabase.
+    if(pulled){
+      render();
+      renderFamilyAccess();
+    }
+
+    // Nome já vem dentro do state no pull; evita outra leitura completa.
+    if(user?.role==='member' && finoraWorkspaceHydrated()){
+      reconcileAcceptedFamilyInvites();
+      if(finoraPendingTxForWorkspaceV79(currentWorkspaceId).length){
+        await pushCloudState(false);
+      }
+    }
+
+    startFinoraRealtimeSync();
+    startCloudPolling();
+    finoraSyncIndicatorR726('ok','Sincronizado');
+    return pulled;
+  }catch(e){
+    console.warn('FINORA R7.26 background sync',e);
+    startCloudPolling();
+    finoraSyncIndicatorR726('error','Nuvem lenta — usando dados locais');
+    return false;
+  }
+}
+
 async function openFinora(user){
   currentUser=user;
-  // R7.1: limpa qualquer avatar herdado da sessão anterior antes de abrir este usuário.
+
   if(typeof window.finoraAvatarUserResetR71==='function'){
     window.finoraAvatarUserResetR71(user);
   }
+
   account='family';
   currentWorkspaceId=user.workspaceId;
   finoraCloudHydratedWorkspaces.delete(String(currentWorkspaceId));
-  await refreshOnlineWorkspaces();
+
+  // Mantém a lista de workspaces online, mas não bloqueia a abertura visual.
+  try{
+    await Promise.race([
+      refreshOnlineWorkspaces(),
+      new Promise(resolve=>setTimeout(resolve,2500))
+    ]);
+  }catch(e){
+    console.warn('FINORA R7.26 workspace list',e);
+  }
+
   const savedActive=localStorage.getItem('finora_active_workspace_v52');
   const available=adminAvailableWorkspaces();
   if(savedActive&&available.some(w=>w.id===savedActive))currentWorkspaceId=savedActive;
+
   const ws=available.find(w=>w.id===currentWorkspaceId)||workspaceById(currentWorkspaceId);
   currentWorkspaceName=ws?.name||'Meu ambiente';
   currentUser={...user,workspaceId:currentWorkspaceId};
   migrateWorkspaceData();
 
-  const sw=document.querySelector('.account-switch');if(sw)sw.classList.add('locked');
+  const sw=document.querySelector('.account-switch');
+  if(sw)sw.classList.add('locked');
+
   $('authScreen').style.display='none';
   $('userChip').style.display='flex';
   $('loggedName').textContent=user.name||'Usuário';
   $('loggedAccount').textContent=currentWorkspaceName;
   $('loggedFamily').textContent=`${user.role==='admin'?'Administrador':'Integrante'} · CPF ${user.cpfMasked||''}`;
-  // R4: a fonte remota é hidratada antes de qualquer rotina que possa
-  // gerar/alterar recorrências locais. Isso evita divergência Web x Mobile.
+
   resetForm();
-  if(cloudConfigured()){
-    await pullCloudState(false);
-    await finoraRecoverWorkspaceDataIfEmpty();
-    await ensureOnlineWorkspaceName();
-  }
-  normalizeVariableReminders();
-  ensureRecurringNextMonths();
-  normalizeVariableReminders();
-  if(cloudConfigured()){
-    // Um integrante que acabou de aceitar o convite publica imediatamente
-    // seu vínculo e o status utilizado, depois de receber o estado atual.
-    if(user.role==='member'){
-      reconcileAcceptedFamilyInvites();
-      await pushCloudState(false);
-    }
-    startCloudPolling();
-  }
+
+  // R7.26: abre primeiro. A nuvem não bloqueia mais o dashboard.
   render();
   renderFamilyAccess();
   updateCloudUI();
-  // R7.1: só agora busca a foto correspondente ao auth.uid() da sessão ativa.
+
   if(typeof window.finoraAvatarUserSyncR71==='function'){
     setTimeout(()=>window.finoraAvatarUserSyncR71(),0);
   }
+
+  // Sincronização pesada somente depois que a interface já está utilizável.
+  if(cloudConfigured()){
+    setTimeout(()=>finoraBackgroundHydrateR726(user),50);
+  }
+
+  return true;
 }
 function updateWorkspaceMode(){
   const mode=$('regWorkspaceMode')?.value||'create';
@@ -23600,6 +23734,12 @@ window.finoraR721Health=function(id){
 };
 })();
 </script>
+
+
+<div id="finoraSyncIndicatorR726" aria-live="polite">
+  <span class="dot"></span>
+  <span class="txt">Sincronizando...</span>
+</div>
 
 </body>
 </html>
