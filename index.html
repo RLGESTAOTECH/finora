@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.17">
+<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.18">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -8681,7 +8681,100 @@ function cardInvoiceAlerts(){
   return result;
 }
 
+
+function finoraIsCardLikeR718(x){
+  if(!x)return false;
+  return !!(
+    x.cardId ||
+    x.virtualCardAlert ||
+    /fatura|cart[aã]o/i.test(String(x.descricao||'')) ||
+    /cart[aã]o/i.test(String(x.categoria||''))
+  );
+}
+
+function finoraNormalizePendingZeroR718(){
+  if(!Array.isArray(data))return false;
+
+  const changed=[];
+  const now=new Date().toISOString();
+
+  data.forEach(x=>{
+    if(!x || x.tipo!=='saida')return;
+
+    const st=(typeof effectiveStatus==='function')
+      ? effectiveStatus(x)
+      : (x.status||'pendente');
+
+    // Regra FINORA:
+    // fatura/cartão pendente com zero significa valor ainda não definido.
+    if(
+      st!=='pago' &&
+      finoraIsCardLikeR718(x) &&
+      Number(x.valor||0)===0 &&
+      !x.valorPendente
+    ){
+      x.valor=0;
+      x.valorPendente=true;
+      x.generatedReminder=false;
+      delete x.dataPagamento;
+      x.updatedAt=now;
+      changed.push(x);
+    }
+  });
+
+  if(!changed.length)return false;
+
+  try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}
+
+  try{
+    if(typeof finoraRememberPendingTxV79==='function'){
+      finoraRememberPendingTxV79(changed,currentWorkspaceId);
+    }
+  }catch(e){}
+
+  try{
+    if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
+    if(typeof scheduleCloudPush==='function')scheduleCloudPush();
+  }catch(e){}
+
+  return true;
+}
+
+function finoraAlertAmountR718(x){
+  const pending=!!(
+    x?.valorPendente ||
+    (
+      x?.tipo==='saida' &&
+      finoraIsCardLikeR718(x) &&
+      (typeof effectiveStatus==='function'?effectiveStatus(x):x?.status)!=='pago' &&
+      Number(x?.valor||0)===0
+    )
+  );
+  return pending?'Valor a definir':money(x?.valor);
+}
+
+function finoraResolveCardForAlertR718(x){
+  try{
+    const cards=typeof accountCards==='function'?accountCards():[];
+    if(x?.cardId){
+      const direct=cards.find(c=>String(c.id)===String(x.cardId));
+      if(direct)return direct;
+    }
+
+    const label=String(x?.descricao||'').toLowerCase();
+    return cards.find(c=>{
+      const name=String(c.name||'').toLowerCase();
+      const issuer=String(c.issuer||'').toLowerCase();
+      return (name&&label.includes(name)) ||
+             (issuer&&/fatura/i.test(label)&&label.includes(issuer));
+    })||null;
+  }catch(e){
+    return null;
+  }
+}
+
 function renderAlerts(){
+  finoraNormalizePendingZeroR718();
   const savedMonth=$('alertMonthFilter')?.value||'';
   const savedCategory=$('alertCategoryFilter')?.value||'';
   const typeFilter=$('alertTypeFilter')?.value||'';
@@ -8751,10 +8844,28 @@ function renderAlerts(){
         ${items.map(x=>{
           const isIncome=x.tipo==='entrada', late=x._days<0;
           const when=late?`${Math.abs(x._days)} dia${Math.abs(x._days)===1?'':'s'} atrasado`:x._days===0?'Hoje':x._days===1?'Amanhã':`em ${x._days} dias`;
-          const amount=x.valorPendente?'Valor a definir':money(x.valor);
+          const amount=finoraAlertAmountR718(x);
+          const alertPendingStatus=(
+            (typeof effectiveStatus==='function'?effectiveStatus(x):(x.status||'pendente'))!=='pago'
+          );
+          const showPayAction=!isIncome && alertPendingStatus;
+          const realId=(!x.virtualCardAlert && x.id)?String(x.id):'';
+          const resolvedCard=finoraResolveCardForAlertR718(x);
+          const payAction=showPayAction
+            ? (
+                realId
+                  ? `<button type="button" class="finora-v109-alert-paid" onclick="finoraR718RegisterTransactionPaid('${esc(realId)}')">Registrar paga</button>`
+                  : (resolvedCard
+                      ? `<button type="button" class="finora-v109-alert-paid" onclick="finoraV109MarkInvoicePaid('${esc(String(resolvedCard.id))}','${esc(String(x._date||''))}')">Registrar paga</button>`
+                      : '')
+              )
+            : '';
           return `<div class="alert-item ${isIncome?'income':'expense'} ${late?'late':''}">
             <div><div class="meta">${isIncome?'Recebimento':'Gasto'} · ${when} · ${dateBR(x._date)}</div><strong>${esc(x.descricao)}</strong> · ${esc(x.pessoa)}</div>
-            <div class="amount">${amount}</div>
+            <div class="finora-v109-alert-actions">
+              <div class="amount">${amount}</div>
+              ${payAction}
+            </div>
           </div>`;
         }).join('')}
       </div>`;
@@ -21906,6 +22017,232 @@ window.finoraR717Health=function(id){
     paidMarker:marker
   };
 };
+})();
+</script>
+
+
+<script id="finora-r718-generic-payment">
+(function(){
+'use strict';
+
+let txId=null;
+
+function parseMoneyR718(v){
+  try{
+    if(typeof parseBRLInput==='function')return Number(parseBRLInput(v)||0);
+  }catch(e){}
+  let s=String(v||'').replace(/[R$\s]/g,'');
+  if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');
+  const n=Number(s);
+  return Number.isFinite(n)?n:NaN;
+}
+
+function dialogR718(){
+  let root=document.getElementById('finoraR718PaymentDialog');
+  if(root)return root;
+
+  root=document.createElement('div');
+  root.id='finoraR718PaymentDialog';
+  root.className='finora-v110-alert-dialog';
+  root.innerHTML=
+    '<div class="finora-v110-alert-card" role="dialog" aria-modal="true">'+
+      '<h3 id="finoraR718PayTitle">Registrar pagamento</h3>'+
+      '<p>Informe o valor efetivamente pago. A alteração será refletida imediatamente nos lançamentos e alertas.</p>'+
+      '<div class="field">'+
+        '<label>Valor pago</label>'+
+        '<input id="finoraR718PayValue" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00">'+
+      '</div>'+
+      '<div class="finora-v110-alert-actions">'+
+        '<button type="button" class="btn btn-soft" id="finoraR718PayCancel">Cancelar</button>'+
+        '<button type="button" class="btn btn-primary" id="finoraR718PayConfirm">Confirmar pagamento</button>'+
+      '</div>'+
+    '</div>';
+
+  document.body.appendChild(root);
+
+  const close=()=>{
+    root.classList.remove('open');
+    txId=null;
+  };
+
+  document.getElementById('finoraR718PayCancel').onclick=close;
+  root.addEventListener('click',e=>{if(e.target===root)close()});
+
+  document.getElementById('finoraR718PayConfirm').onclick=async()=>{
+    const id=txId;
+    if(!id)return;
+
+    const input=document.getElementById('finoraR718PayValue');
+    const raw=String(input?.value||'').trim();
+
+    if(!raw){
+      if(typeof toast==='function')toast('Informe o valor pago.');
+      return;
+    }
+
+    const value=parseMoneyR718(raw);
+    if(!Number.isFinite(value) || value<0){
+      if(typeof toast==='function')toast('Informe um valor válido.');
+      return;
+    }
+
+    const row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id));
+    if(!row){
+      if(typeof toast==='function')toast('Lançamento não encontrado.');
+      return;
+    }
+
+    const before={...row};
+    const now=new Date().toISOString();
+
+    row.valor=value;
+    row.valorPendente=false;
+    row.generatedReminder=false;
+    row.materializedOccurrence=true;
+    row.materializedAt=row.materializedAt||now;
+    row.status='pago';
+    row.dataPagamento=(typeof today==='function'?today():now.slice(0,10));
+    row.updatedAt=now;
+
+    // Se for fatura/cartão, cria o marcador compartilhado de pago.
+    try{
+      if(
+        (row.cardId || /fatura|cart[aã]o/i.test(String(row.descricao||''))) &&
+        typeof loadFinoraFeatureState==='function' &&
+        typeof saveFinoraFeatureState==='function'
+      ){
+        const card=typeof finoraResolveCardForAlertR718==='function'
+          ? finoraResolveCardForAlertR718(row)
+          : null;
+        const cardId=String(row.cardId||card?.id||'');
+        const month=String(
+          (typeof recordMonth==='function'?recordMonth(row):'') ||
+          row.vencimento ||
+          row.dataLancamento ||
+          ''
+        ).slice(0,7);
+
+        if(cardId && month){
+          const state=loadFinoraFeatureState()||{};
+          state.paidCardInvoices={...(state.paidCardInvoices||{})};
+          state.paidCardInvoices[`${cardId}|${month}`]={
+            paid:true,
+            noCharge:value===0,
+            paidAt:now,
+            cardId,
+            month,
+            valor:value
+          };
+          state.updatedAt=now;
+          saveFinoraFeatureState(state);
+          row.cardId=row.cardId||cardId;
+        }
+      }
+    }catch(e){
+      console.warn('FINORA R7.18 paid marker',e);
+    }
+
+    try{
+      localStorage.setItem(KEY,JSON.stringify(data));
+      if(typeof finoraRememberPendingTxV79==='function'){
+        finoraRememberPendingTxV79([row],currentWorkspaceId);
+      }
+    }catch(e){}
+
+    root.classList.remove('open');
+    txId=null;
+
+    try{if(typeof render==='function')render()}catch(e){}
+    try{if(typeof renderAlerts==='function')renderAlerts()}catch(e){}
+    try{if(typeof renderV84Dashboard==='function')renderV84Dashboard()}catch(e){}
+    try{if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut()}catch(e){}
+
+    try{
+      if(typeof save==='function')save();
+      if(typeof scheduleCloudPush==='function')scheduleCloudPush();
+    }catch(e){}
+
+    try{
+      if(typeof finoraAuditLog==='function'){
+        finoraAuditLog(
+          'ALTEROU STATUS',
+          'LANCAMENTO',
+          row.id,
+          'Lançamento registrado como pago pelos Alertas',
+          before,
+          row
+        );
+      }
+    }catch(e){}
+
+    if(typeof toast==='function'){
+      toast(value===0
+        ? 'Pagamento zerado registrado com sucesso.'
+        : 'Pagamento registrado com sucesso.');
+    }
+  };
+
+  return root;
+}
+
+window.finoraR718RegisterTransactionPaid=function(id){
+  const row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id));
+
+  if(!row){
+    if(typeof toast==='function')toast('Lançamento não encontrado.');
+    return;
+  }
+
+  txId=String(id);
+
+  const root=dialogR718();
+  document.getElementById('finoraR718PayTitle').textContent=
+    `Registrar ${row.descricao||'lançamento'} como pago`;
+
+  const field=document.getElementById('finoraR718PayValue');
+
+  // Se já há valor conhecido, sugere o valor atual. Se é "a definir", deixa em branco.
+  field.value=row.valorPendente
+    ? ''
+    : Number(row.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  root.classList.add('open');
+  requestAnimationFrame(()=>field?.focus());
+};
+
+window.finoraR718Health=function(id){
+  let row=null;
+  try{
+    row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id))||null;
+  }catch(e){}
+
+  return {
+    release:'1.0.10-R7.18',
+    transaction:row?{
+      id:row.id,
+      descricao:row.descricao,
+      valor:row.valor,
+      valorPendente:!!row.valorPendente,
+      status:row.status,
+      cardId:row.cardId||null,
+      dataPagamento:row.dataPagamento||null,
+      updatedAt:row.updatedAt
+    }:null
+  };
+};
+})();
+</script>
+
+
+<script id="finora-r718-render-normalizer">
+(function(){
+  const oldRenderR718=window.render;
+  if(typeof oldRenderR718==='function'){
+    window.render=function(){
+      try{finoraNormalizePendingZeroR718()}catch(e){}
+      return oldRenderR718.apply(this,arguments);
+    };
+  }
 })();
 </script>
 
