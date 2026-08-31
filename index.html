@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.21-transaction-share">
+<meta name="finora-release" content="R7.21.1-share-overlay-fix">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -7588,6 +7588,24 @@ body.dark .finora-r721-share-icon{
   .finora-r721-card-value{font-size:15px}
   .finora-r721-actions{grid-template-columns:1fr}
   .finora-r721-action.primary{grid-column:auto}
+}
+</style>
+
+
+<style id="finora-r721-share-zindex-fix">
+/* R7.21.1 — compartilhamento sempre acima de todos os overlays/modais */
+#finoraR721ShareBackdrop.finora-r721-backdrop{
+  position:fixed !important;
+  inset:0 !important;
+  z-index:2147483000 !important;
+  isolation:isolate;
+}
+#finoraR721ShareBackdrop .finora-r721-modal{
+  position:relative;
+  z-index:1;
+}
+#finoraR721Toast.finora-r721-toast{
+  z-index:2147483640 !important;
 }
 </style>
 
@@ -23188,6 +23206,11 @@ function audit(action,x,extra={}){
 }
 
 window.finoraOpenTransactionShareR721=function(id){
+  const shareRoot=$721('finoraR721ShareBackdrop');
+  const shareToast=$721('finoraR721Toast');
+  if(shareRoot && shareRoot.parentElement!==document.body)document.body.appendChild(shareRoot);
+  if(shareToast && shareToast.parentElement!==document.body)document.body.appendChild(shareToast);
+
   const x=rowById(id);
   if(!x){toast721('Lançamento não encontrado.');return}
 
