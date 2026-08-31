@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.15">
+<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.17">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -10578,14 +10578,70 @@ $('entryForm').addEventListener('submit',async e=>{
     createdAt:old?.createdAt||new Date().toISOString(),
     updatedAt:new Date().toISOString()
   };
+  // R7.17: respeita explicitamente a decisão do usuário.
+  // Se um lançamento antes pago for salvo como pendente, desfaz TODOS os sinais de pagamento.
+  const wasPaid=!!(
+    old &&
+    (
+      old.status==='pago' ||
+      old.dataPagamento ||
+      (typeof finoraEffectiveStatusR716==='function' && finoraEffectiveStatusR716(old)==='pago')
+    )
+  );
+
+  const nowPending=row.status!=='pago';
+
+  if(nowPending){
+    delete row.dataPagamento;
+
+    // Fatura/cartão zerado e pendente volta ao fluxo de "Valor a definir".
+    const cardLike=!!(
+      row.cardId ||
+      /fatura|cart[aã]o/i.test(String(row.descricao||'')) ||
+      /cart[aã]o/i.test(String(row.categoria||''))
+    );
+
+    if(cardLike && Number(row.valor||0)===0){
+      row.valorPendente=true;
+    }
+
+    // Não recria reminder técnico; apenas deixa a obrigação pendente.
+    row.generatedReminder=false;
+
+    if(wasPaid){
+      finoraClearPaidMarkerR717(row);
+    }
+  }else{
+    // Coerência inversa: pago nunca permanece como "valor a definir".
+    row.valorPendente=false;
+    row.generatedReminder=false;
+    row.materializedOccurrence=true;
+    row.materializedAt=row.materializedAt||new Date().toISOString();
+    row.dataPagamento=row.dataPagamento || old?.dataPagamento ||
+      (typeof today==='function'?today():new Date().toISOString().slice(0,10));
+  }
+
   const idx=data.findIndex(x=>x.id===id); if(idx>=0)data[idx]=row;else data.push(row);
-  try{save()}catch(err){toast('Arquivo muito grande para o navegador. Remova o anexo.');return}
+  try{
+    save();
+  }catch(err){
+    console.error('FINORA R7.16 save lançamento',err);
+    toast(
+      err?.message
+        ? `Não foi possível salvar o lançamento: ${err.message}`
+        : 'Não foi possível salvar o lançamento. Revise os dados e tente novamente.'
+    );
+    return;
+  }
   // R3: confirmação visual local acontece no mesmo ciclo do primeiro clique
   // e todas as visões derivadas são atualizadas a partir do mesmo objeto canônico.
   data=typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(data):data;
   localStorage.setItem(KEY,JSON.stringify(data));
   render();
+  try{if(typeof renderAlerts==='function')renderAlerts()}catch(e){}
   try{if(typeof finoraRefreshAllR2==='function')finoraRefreshAllR2()}catch(e){}
+  try{if(typeof renderV84Dashboard==='function')renderV84Dashboard()}catch(e){}
+  try{if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut()}catch(e){}
   if(typeof finoraAuditLog==='function'){
     finoraAuditLog(idx>=0?'ATUALIZOU':'INCLUIU','LANCAMENTO',row.id,
       idx>=0?'Lançamento atualizado':'Lançamento incluído',old||null,row);
@@ -10594,10 +10650,163 @@ $('entryForm').addEventListener('submit',async e=>{
   const savedMode=row.tipo==='entrada'?'entrada':'saida';
   resetForm();
   applyLaunchMode(savedMode,{keepForm:true});
-  toast(idx>=0?(row.tipo==='entrada'?'Entrada atualizada.':'Despesa / saída atualizada.'):(row.tipo==='entrada'?'Entrada salva.':'Despesa / saída salva.'));
+  toast('Lançamento salvo com sucesso.');
 });
+
+
+function finoraClearPaidMarkerR717(row){
+  if(!row)return false;
+
+  try{
+    const cardId=String(row.cardId||'');
+    const month=String(
+      (typeof recordMonth==='function' ? recordMonth(row) : '') ||
+      row.vencimento ||
+      row.dataLancamento ||
+      ''
+    ).slice(0,7);
+
+    if(!cardId || !month || typeof loadFinoraFeatureState!=='function'){
+      return false;
+    }
+
+    const state=loadFinoraFeatureState()||{};
+    const markers={...(state.paidCardInvoices||{})};
+    const key=`${cardId}|${month}`;
+
+    if(!markers[key])return false;
+
+    const beforeMarker={...markers[key]};
+    delete markers[key];
+
+    const next={
+      ...state,
+      paidCardInvoices:markers,
+      updatedAt:new Date().toISOString()
+    };
+
+    if(typeof saveFinoraFeatureState==='function'){
+      // Não usa skipCloud: a reversão precisa chegar a todos os acessos.
+      saveFinoraFeatureState(next);
+    }
+
+    try{
+      if(typeof finoraAuditLog==='function'){
+        finoraAuditLog(
+          'REVERTEU STATUS',
+          'FATURA_CARTAO',
+          row.id || key,
+          'Fatura reaberta: status alterado de pago para pendente',
+          {
+            status:'pago',
+            paidMarker:beforeMarker,
+            cardId,
+            month
+          },
+          {
+            status:'pendente',
+            paidMarker:null,
+            cardId,
+            month
+          }
+        );
+      }
+    }catch(e){}
+
+    return true;
+  }catch(e){
+    console.warn('FINORA R7.17 limpar marcador pago',e);
+    return false;
+  }
+}
+
+function finoraEffectiveStatusR716(x){
+  if(!x)return 'pendente';
+
+  if(x.status==='pago' || x.dataPagamento)return 'pago';
+
+  try{
+    const cardId=String(x.cardId||'');
+    const month=String(
+      (typeof recordMonth==='function' ? recordMonth(x) : '') ||
+      x.vencimento ||
+      x.dataLancamento ||
+      ''
+    ).slice(0,7);
+
+    if(cardId && month && typeof loadFinoraFeatureState==='function'){
+      const state=loadFinoraFeatureState()||{};
+      const marker=state?.paidCardInvoices?.[`${cardId}|${month}`];
+      if(marker?.paid)return 'pago';
+    }
+  }catch(e){}
+
+  return x.status||'pendente';
+}
+
+function finoraReconcilePaidStatusR716(x){
+  if(!x)return x;
+
+  const effective=finoraEffectiveStatusR716(x);
+  if(effective!=='pago')return x;
+
+  if(x.status==='pago' && !x.valorPendente && !x.generatedReminder)return x;
+
+  const now=new Date().toISOString();
+
+  x.status='pago';
+  x.valorPendente=false;
+  x.generatedReminder=false;
+  x.materializedOccurrence=true;
+  x.materializedAt=x.materializedAt||now;
+
+  try{
+    const cardId=String(x.cardId||'');
+    const month=String(
+      (typeof recordMonth==='function' ? recordMonth(x) : '') ||
+      x.vencimento ||
+      x.dataLancamento ||
+      ''
+    ).slice(0,7);
+
+    const state=typeof loadFinoraFeatureState==='function'
+      ? (loadFinoraFeatureState()||{})
+      : {};
+    const marker=cardId&&month
+      ? state?.paidCardInvoices?.[`${cardId}|${month}`]
+      : null;
+
+    if(marker?.paidAt && !x.dataPagamento){
+      x.dataPagamento=String(marker.paidAt).slice(0,10);
+    }
+    if(marker && Number.isFinite(Number(marker.valor))){
+      x.valor=Number(marker.valor);
+    }
+  }catch(e){}
+
+  x.updatedAt=now;
+
+  // Persistência local imediata e fila de sincronização já existente.
+  try{
+    localStorage.setItem(KEY,JSON.stringify(data));
+  }catch(e){}
+
+  try{
+    if(typeof finoraRememberPendingTxV79==='function'){
+      finoraRememberPendingTxV79([x],currentWorkspaceId);
+    }
+  }catch(e){}
+
+  try{
+    if(typeof scheduleCloudPush==='function')scheduleCloudPush();
+  }catch(e){}
+
+  return x;
+}
+
 function editRow(id){
-  const x=data.find(r=>String(r.id)===String(id));if(!x)return;
+  let x=data.find(r=>String(r.id)===String(id));if(!x)return;
+  x=finoraReconcilePaidStatusR716(x);
   openSectionModal('simpleLaunchPanel');
   applyLaunchMode(x.tipo==='entrada'?'entrada':'saida',{keepForm:true});
   $('editId').value=x.id;
@@ -10609,7 +10818,11 @@ function editRow(id){
   setCategoryValue(x.categoria||'');
   $('essentialType').value=x.essentialType||inferEssentialType(x);
 
-  const isVariableReminder=!!(x.valorPendente || x.generatedReminder || Number(x.valor||0)===0 && x.valorRecorrente==='variavel');
+  const effectiveStatusR716=finoraEffectiveStatusR716(x);
+  const isVariableReminder=!!(
+    effectiveStatusR716!=='pago' &&
+    (x.valorPendente || x.generatedReminder || (Number(x.valor||0)===0 && x.valorRecorrente==='variavel'))
+  );
   $('valor').value=isVariableReminder?'':formatBRLInput(x.valor);
 
   // R3: ao editar um compromisso recorrente/valor a definir,
@@ -10627,7 +10840,7 @@ function editRow(id){
   const installmentsField=$('installmentsField');
   if(installmentsField)installmentsField.style.display=isInstallment?'block':'none';
   fillLaunchCards(x.cardId||'');
-  $('status').value=x.status||'pendente';
+  $('status').value=finoraEffectiveStatusR716(x);
   // R5: ocorrências mensais geradas permanecem identificadas como recorrentes.
   $('recorrente').value=(x.recorrente==='mensal'||x.generatedReminder)?'mensal':'nao';
   $('valorRecorrente').value=x.valorRecorrente||'mesmo';
@@ -21622,6 +21835,75 @@ window.finoraR715Health=function(){
     paymentDialogOpen:!!document.getElementById('finoraR714PaymentDialog')?.classList.contains('open'),
     authStoragePresent:authKey,
     finoraSession:localStorage.getItem(typeof FINORA_SESSION_KEY!=='undefined'?FINORA_SESSION_KEY:'finora_session')||null
+  };
+};
+})();
+</script>
+
+
+<script id="finora-r716-health">
+(function(){
+window.finoraR716Health=function(id){
+  let row=null;
+  try{
+    row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id))||null;
+  }catch(e){}
+  return {
+    release:'1.0.10-R7.16',
+    transaction:row?{
+      id:row.id,
+      descricao:row.descricao,
+      valor:row.valor,
+      status:row.status,
+      effectiveStatus:typeof finoraEffectiveStatusR716==='function'
+        ? finoraEffectiveStatusR716(row)
+        : row.status,
+      dataPagamento:row.dataPagamento||null,
+      valorPendente:!!row.valorPendente,
+      generatedReminder:!!row.generatedReminder,
+      updatedAt:row.updatedAt
+    }:null,
+    formStatus:document.getElementById('status')?.value||null
+  };
+};
+})();
+</script>
+
+
+<script id="finora-r717-health">
+(function(){
+window.finoraR717Health=function(id){
+  let row=null, marker=null, markerKey=null;
+  try{
+    row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id))||null;
+    if(row){
+      const cardId=String(row.cardId||'');
+      const month=String(
+        (typeof recordMonth==='function'?recordMonth(row):'') ||
+        row.vencimento ||
+        row.dataLancamento ||
+        ''
+      ).slice(0,7);
+      markerKey=cardId&&month?`${cardId}|${month}`:null;
+      if(markerKey && typeof loadFinoraFeatureState==='function'){
+        marker=(loadFinoraFeatureState()?.paidCardInvoices||{})[markerKey]||null;
+      }
+    }
+  }catch(e){}
+  return {
+    release:'1.0.10-R7.17',
+    transaction:row?{
+      id:row.id,
+      descricao:row.descricao,
+      valor:row.valor,
+      status:row.status,
+      dataPagamento:row.dataPagamento||null,
+      valorPendente:!!row.valorPendente,
+      generatedReminder:!!row.generatedReminder,
+      updatedAt:row.updatedAt
+    }:null,
+    paidMarkerKey:markerKey,
+    paidMarker:marker
   };
 };
 })();
