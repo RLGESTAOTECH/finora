@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.23-auditoria-workspace-fix">
+<meta name="finora-release" content="R7.24-login-economico">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -11880,13 +11880,102 @@ async function authProfileByUserId(userId){
   return data||null;
 }
 
+
+const FINORA_CPF_EMAIL_CACHE_R724='finora_cpf_email_cache_r724';
+
+function finoraLoadCpfEmailCacheR724(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(FINORA_CPF_EMAIL_CACHE_R724)||'{}');
+    return raw && typeof raw==='object' ? raw : {};
+  }catch(e){
+    return {};
+  }
+}
+
+function finoraSaveCpfEmailCacheR724(cpfHash,email){
+  const hash=String(cpfHash||'').trim();
+  const normalizedEmail=String(email||'').trim().toLowerCase();
+  if(!hash || !normalizedEmail || !normalizedEmail.includes('@'))return;
+  try{
+    const cache=finoraLoadCpfEmailCacheR724();
+    cache[hash]={
+      email:normalizedEmail,
+      updatedAt:new Date().toISOString()
+    };
+
+    // Mantém o cache pequeno.
+    const entries=Object.entries(cache)
+      .sort((a,b)=>String(b[1]?.updatedAt||'').localeCompare(String(a[1]?.updatedAt||'')))
+      .slice(0,20);
+
+    localStorage.setItem(
+      FINORA_CPF_EMAIL_CACHE_R724,
+      JSON.stringify(Object.fromEntries(entries))
+    );
+  }catch(e){}
+}
+
+function finoraCachedEmailByCpfHashR724(cpfHash){
+  const hash=String(cpfHash||'').trim();
+  if(!hash)return '';
+
+  // 1. Cache leve específico da resolução CPF -> e-mail.
+  try{
+    const hit=finoraLoadCpfEmailCacheR724()[hash];
+    if(hit?.email)return String(hit.email).trim().toLowerCase();
+  }catch(e){}
+
+  // 2. Perfis que já autenticaram neste dispositivo.
+  try{
+    const local=(typeof loadFinoraUsers==='function'?loadFinoraUsers():[]).find(u=>
+      String(u.cpf_hash||u.cpfHash||'').trim()===hash
+    );
+    if(local?.email){
+      const email=String(local.email).trim().toLowerCase();
+      finoraSaveCpfEmailCacheR724(hash,email);
+      return email;
+    }
+  }catch(e){}
+
+  return '';
+}
+
 async function authEmailFromCpf(cpf){
   const client=getAuthClient();
   if(!client)return '';
-  const hash=await finoraHash(normalizeCPF(cpf));
-  const {data,error}=await client.rpc('finora_login_email_by_cpf',{p_cpf_hash:hash});
-  if(error)throw error;
-  return typeof data==='string'?data:(Array.isArray(data)&&data[0]?.email)||'';
+
+  const normalized=normalizeCPF(cpf);
+  const hash=await finoraHash(normalized);
+
+  // R7.24: não toca no banco se este dispositivo já conhece o vínculo.
+  const cached=finoraCachedEmailByCpfHashR724(hash);
+  if(cached)return cached;
+
+  // CPF ainda desconhecido: uma única resolução remota.
+  try{
+    const {data,error}=await client.rpc('finora_login_email_by_cpf',{p_cpf_hash:hash});
+    if(error)throw error;
+
+    const email=typeof data==='string'
+      ? data.trim().toLowerCase()
+      : (Array.isArray(data)&&data[0]?.email)
+        ? String(data[0].email).trim().toLowerCase()
+        : data?.email
+          ? String(data.email).trim().toLowerCase()
+          : '';
+
+    if(email)finoraSaveCpfEmailCacheR724(hash,email);
+    return email;
+  }catch(err){
+    console.warn('FINORA R7.24 CPF lookup indisponível',err);
+    const friendly=new Error(
+      'O acesso por CPF está temporariamente indisponível. Se possível, entre com seu e-mail e a mesma senha.'
+    );
+    friendly.name='FinoraCpfLookupUnavailable';
+    friendly.finoraNoRetry=true;
+    friendly.cause=err;
+    throw friendly;
+  }
 }
 
 function localUserFromAuthProfile(profile){
@@ -12020,42 +12109,32 @@ async function finoraResolveEmailByCpf(cpf){
   if(!normalized)return null;
 
   const cpfHash=await finoraHash(normalized);
+
+  // R7.24: primeiro dispositivo/cache, depois rede.
+  const cached=finoraCachedEmailByCpfHashR724(cpfHash);
+  if(cached)return cached;
+
   const client=getAuthClient();
   if(!client)return null;
 
-  // 1) Caminho principal: RPC por hash.
   try{
     const {data,error}=await client.rpc('finora_login_email_by_cpf',{p_cpf_hash:cpfHash});
-    if(!error && data){
-      if(typeof data==='string')return data.trim().toLowerCase();
-      if(Array.isArray(data) && data[0]?.email)return String(data[0].email).trim().toLowerCase();
-      if(data?.email)return String(data.email).trim().toLowerCase();
-    }
+    if(error)throw error;
+
+    const email=typeof data==='string'
+      ? data.trim().toLowerCase()
+      : (Array.isArray(data)&&data[0]?.email)
+        ? String(data[0].email).trim().toLowerCase()
+        : data?.email
+          ? String(data.email).trim().toLowerCase()
+          : '';
+
+    if(email)finoraSaveCpfEmailCacheR724(cpfHash,email);
+    return email||null;
   }catch(e){
-    console.debug('FINORA CPF RPC fallback',e);
+    console.warn('FINORA R7.24 CPF resolver remoto indisponível',e);
+    return null;
   }
-
-  // 2) Fallback de compatibilidade: consulta direta pelo hash, caso a policy permita.
-  try{
-    const {data,error}=await client
-      .from('finora_profiles')
-      .select('email')
-      .eq('cpf_hash',cpfHash)
-      .limit(1)
-      .maybeSingle();
-    if(!error && data?.email)return String(data.email).trim().toLowerCase();
-  }catch(e){}
-
-  // 3) Fallback local para contas já usadas neste navegador.
-  try{
-    const local=(loadFinoraUsers?.()||[]).find(u=>
-      String(u.cpf_hash||u.cpfHash||'')===cpfHash ||
-      normalizeCPF(u.cpf||u.cpf_masked||'')===normalized
-    );
-    if(local?.email)return String(local.email).trim().toLowerCase();
-  }catch(e){}
-
-  return null;
 }
 
 async function __finoraLoginWithSupabaseCore(identifier,password){
@@ -12076,6 +12155,12 @@ async function __finoraLoginWithSupabaseCore(identifier,password){
   if(error)throw error;
   const profile=await authProfileByUserId(data.user?.id);
   if(!profile)throw new Error('Perfil FINORA não encontrado para este acesso.');
+
+  // R7.24: depois de qualquer login válido, memoriza somente hash -> e-mail.
+  if(profile.cpf_hash && profile.email){
+    finoraSaveCpfEmailCacheR724(profile.cpf_hash,profile.email);
+  }
+
   return await cacheAuthProfile(profile);
 }
 
@@ -12083,40 +12168,52 @@ async function __finoraLoginWithSupabaseCore(identifier,password){
 let __finoraLoginPromise = null;
 
 function __finoraTransientAuthError(err) {
+  if(err?.finoraNoRetry)return false;
+
   const text = String(err?.message || err || '');
-  const hit = text.match(/\b(502|503|504)\b/);
+  const hit = text.match(/\b(500|502|503|504)\b/);
   const status = Number(err?.status || err?.statusCode || err?.response?.status || (hit && hit[1]) || 0);
   const msg = text.toLowerCase();
-  return [502, 503, 504].includes(status) ||
-    /failed to fetch|networkerror|network request failed|load failed|timeout|timed out|gateway/.test(msg);
+  const timeoutLike=/failed to fetch|networkerror|network request failed|load failed|timeout|timed out|gateway|57014/.test(msg);
+
+  return [502,503,504].includes(status) || (status===500 && timeoutLike) || timeoutLike;
 }
 function __finoraAuthDelay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 async function loginWithSupabase(...args) {
   if (__finoraLoginPromise) return __finoraLoginPromise;
+
   __finoraLoginPromise = (async () => {
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    const maxAttempts=2;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         return await __finoraLoginWithSupabaseCore(...args);
       } catch (err) {
         const transient = __finoraTransientAuthError(err);
         if (!transient) throw err;
-        if (attempt === 3) {
-          console.warn('FINORA R7.20: autenticação indisponível após retries.', err);
-          const friendly = new Error('Não foi possível conectar ao serviço de autenticação agora. Sua conta não foi alterada. Aguarde alguns segundos e tente novamente.');
-          friendly.name = 'FinoraTemporaryAuthError';
-          friendly.status = Number(err?.status || err?.statusCode || 503);
-          friendly.cause = err;
+
+        if (attempt === maxAttempts) {
+          console.warn('FINORA R7.24: autenticação indisponível após tentativa controlada.', err);
+          const friendly = new Error(
+            'Não foi possível conectar ao serviço de autenticação agora. Sua conta não foi alterada. Aguarde um momento e tente novamente.'
+          );
+          friendly.name='FinoraTemporaryAuthError';
+          friendly.status=Number(err?.status||err?.statusCode||503);
+          friendly.cause=err;
           throw friendly;
         }
-        console.warn(`FINORA R7.20: falha transitória; retry ${attempt + 1}/3.`, err);
-        await __finoraAuthDelay(700 * attempt);
+
+        // Uma única nova tentativa, mais espaçada, para não pressionar o Supabase.
+        console.warn(`FINORA R7.24: falha transitória; nova tentativa ${attempt + 1}/${maxAttempts}.`,err);
+        await __finoraAuthDelay(1800);
       }
     }
   })();
-  try { return await __finoraLoginPromise; }
-  finally { __finoraLoginPromise = null; }
+
+  try{return await __finoraLoginPromise}
+  finally{__finoraLoginPromise=null}
 }
 
 
