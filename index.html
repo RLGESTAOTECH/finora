@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.24-login-economico">
+<meta name="finora-release" content="R7.25-login-feedback-avatar-fix">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -13546,59 +13546,109 @@ $('doRegister').addEventListener('click',async()=>{
 $('doLogin').addEventListener('click',async()=>{
   clearAuthErr();
 
+  const btn=$('doLogin');
+  if(btn?.dataset.busy==='1')return;
+
   const identifier=$('loginIdentifier').value.trim();
   const password=$('loginPass').value;
+
   if(!identifier||!password)return authErr('Informe seu e-mail ou CPF e a senha.');
   if(!publicSupabaseReady())return authErr('A configuração online da FINORA não está disponível.');
 
-  const users=loadFinoraUsers();
-  let legacyUser=null;
-
-  if(identifier.includes('@')){
-    const email=identifier.toLowerCase();
-    legacyUser=users.find(u=>String(u.email||'').toLowerCase()===email)||null;
-  }else{
-    const cpf=normalizeCPF(identifier);
-    if(cpf.length!==11)return authErr('Informe um CPF válido ou utilize seu e-mail.');
-    const cpfHash=await finoraHash(cpf);
-    legacyUser=users.find(u=>u.cpfHash===cpfHash)||null;
+  if(btn){
+    btn.dataset.busy='1';
+    btn.dataset.originalText=btn.textContent||'Entrar';
+    btn.disabled=true;
+    btn.textContent='Entrando...';
+    btn.setAttribute('aria-busy','true');
   }
+
+  const finishLoginUi=()=>{
+    if(!btn)return;
+    btn.dataset.busy='0';
+    btn.disabled=false;
+    btn.textContent=btn.dataset.originalText||'Entrar';
+    btn.setAttribute('aria-busy','false');
+  };
 
   try{
-    // Normal platform login: always Supabase.
-    const cloudUser=await loginWithSupabase(identifier,password);
-    localStorage.setItem(FINORA_SESSION_KEY,cloudUser.id);
-    await openFinora(cloudUser);
-    return;
+    const users=loadFinoraUsers();
+    let legacyUser=null;
 
-  }catch(cloudError){
-    console.warn('FINORA cloud login',cloudError);
-
-    // One-time migration for accounts created in pre-v47 browsers.
-    // The local browser is used only to prove the old credentials.
-    if(legacyUser?.hash && legacyUser.hash===await finoraHash(password)){
-      try{
-        const migrated=await migrateLocalLoginToSupabase(legacyUser,password);
-        if(!migrated)throw new Error('A migração não retornou um perfil online.');
-        localStorage.setItem(FINORA_SESSION_KEY,migrated.id);
-        await openFinora(migrated);
-        toast('Conta migrada. Agora este acesso funciona em qualquer dispositivo.');
-        return;
-      }catch(migrationError){
-        console.error('FINORA legacy migration',migrationError);
-        return authErr('Não foi possível concluir a migração online: '+(migrationError?.message||'erro desconhecido'));
+    if(identifier.includes('@')){
+      const email=identifier.toLowerCase();
+      legacyUser=users.find(u=>String(u.email||'').toLowerCase()===email)||null;
+    }else{
+      const cpf=normalizeCPF(identifier);
+      if(cpf.length!==11){
+        finishLoginUi();
+        return authErr('Informe um CPF válido ou utilize seu e-mail.');
       }
+      const cpfHash=await finoraHash(cpf);
+      legacyUser=users.find(u=>u.cpfHash===cpfHash || u.cpf_hash===cpfHash)||null;
     }
 
-    // Do not open a local-only session anymore.
-    const msg=String(cloudError?.message||'');
-    if(/invalid login credentials|email not confirmed/i.test(msg))
-      return authErr('E-mail/CPF ou senha incorretos.');
-    if(/Perfil FINORA não encontrado/i.test(msg))
-      return authErr('Sua conta existe, mas o perfil FINORA ainda não foi vinculado. Acesse uma vez pelo navegador antigo para migrar.');
-    authErr(msg||'Não foi possível entrar na FINORA.');
+    try{
+      // R7.24 permanece: e-mail direto / CPF cache-first.
+      const cloudUser=await loginWithSupabase(identifier,password);
+      localStorage.setItem(FINORA_SESSION_KEY,cloudUser.id);
+
+      // O botão fica bloqueado até a interface principal abrir.
+      btn && (btn.textContent='Carregando...');
+      await openFinora(cloudUser);
+      finishLoginUi();
+      return;
+
+    }catch(cloudError){
+      console.warn('FINORA cloud login',cloudError);
+
+      // Migração única de contas antigas.
+      if(legacyUser?.hash && legacyUser.hash===await finoraHash(password)){
+        try{
+          btn && (btn.textContent='Migrando conta...');
+          const migrated=await migrateLocalLoginToSupabase(legacyUser,password);
+          if(!migrated)throw new Error('A migração não retornou um perfil online.');
+          localStorage.setItem(FINORA_SESSION_KEY,migrated.id);
+          await openFinora(migrated);
+          finishLoginUi();
+          toast('Conta migrada. Agora este acesso funciona em qualquer dispositivo.');
+          return;
+        }catch(migrationError){
+          console.error('FINORA legacy migration',migrationError);
+          finishLoginUi();
+          return authErr('Não foi possível concluir a migração online: '+(migrationError?.message||'erro desconhecido'));
+        }
+      }
+
+      const msg=String(cloudError?.message||'');
+
+      finishLoginUi();
+
+      if(/invalid login credentials|email not confirmed/i.test(msg))
+        return authErr('E-mail/CPF ou senha incorretos.');
+
+      if(/Perfil FINORA não encontrado/i.test(msg))
+        return authErr('Sua conta existe, mas o perfil FINORA ainda não foi vinculado. Acesse uma vez pelo navegador antigo para migrar.');
+
+      if(/acesso por cpf está temporariamente indisponível/i.test(msg))
+        return authErr('O acesso por CPF está temporariamente indisponível. Use seu e-mail e a mesma senha para entrar agora.');
+
+      return authErr(msg||'Não foi possível entrar na FINORA.');
+    }
+  }catch(e){
+    console.error('FINORA R7.25 login handler',e);
+    finishLoginUi();
+    return authErr(e?.message||'Não foi possível concluir o acesso.');
   }
 });
+
+$('loginPass')?.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    $('doLogin')?.click();
+  }
+});
+
 
 $('logoutBtn').addEventListener('click',async()=>{
   // R7.1: nenhum avatar da conta anterior pode sobreviver ao logout.
@@ -21153,7 +21203,34 @@ window.finoraBoletoReaderHealthR6=function(){return {release:'1.0.10-R6',barcode
 (function(){
 'use strict';let photoDraft=null,photoRemove=false;const $7=id=>document.getElementById(id);
 function applyAvatar(photo){[$7('profileAvatar'),$7('userAvatarInitials')].filter(Boolean).forEach(el=>{if(photo){el.style.setProperty('background-image',`url("${photo}")`,'important');el.style.setProperty('background-position','center','important');el.style.setProperty('background-size','cover','important');el.classList.add('finora-has-photo');el.textContent=''}else{el.style.removeProperty('background-image');el.classList.remove('finora-has-photo');const n=(window.currentUser?.name||$7('loggedName')?.textContent||'U').trim();el.textContent=(n.charAt(0)||'U').toUpperCase()}})}window.finoraApplyAvatarR7=applyAvatar;
-async function loadAvatar(){try{const c=getAuthClient();if(!c)return'';const {data,error}=await c.auth.getUser();if(error)throw error;const p=data?.user?.user_metadata?.finora_avatar||'';window.finoraProfileAvatarData=p;applyAvatar(p);return p}catch(e){console.warn('FINORA R7 avatar',e);return''}}
+async function loadAvatar(){
+  try{
+    const c=getAuthClient();
+    if(!c)return '';
+
+    const {data:sessionData,error:sessionError}=await c.auth.getSession();
+    if(sessionError)return '';
+
+    // R7.25: na tela de login não há sessão ainda. Isso é normal.
+    if(!sessionData?.session?.user?.id)return '';
+
+    const {data,error}=await c.auth.getUser();
+    if(error)return '';
+
+    const p=data?.user?.user_metadata?.finora_avatar||'';
+    window.finoraProfileAvatarData=p;
+    applyAvatar(p);
+    return p;
+  }catch(e){
+    if(
+      String(e?.name||'')==='AuthSessionMissingError' ||
+      /auth session missing/i.test(String(e?.message||''))
+    )return '';
+
+    console.warn('FINORA R7.25 avatar',e);
+    return '';
+  }
+}
 function resizePhoto(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(new Error('Não foi possível ler a imagem.'));r.onload=()=>{const i=new Image();i.onerror=()=>reject(new Error('Formato de imagem inválido.'));i.onload=()=>{const s=128,c=document.createElement('canvas');c.width=s;c.height=s;const x=c.getContext('2d'),k=Math.max(s/i.width,s/i.height),w=i.width*k,h=i.height*k;x.drawImage(i,(s-w)/2,(s-h)/2,w,h);resolve(c.toDataURL('image/jpeg',.68))};i.src=r.result};r.readAsDataURL(file)})}
 function replacePhoto(){const oi=$7('profilePhotoInput');if(oi&&!oi.dataset.r7){const n=oi.cloneNode(true);n.dataset.r7='1';oi.replaceWith(n);n.addEventListener('change',async()=>{const f=n.files?.[0];if(!f)return;if(f.size>8*1024*1024){profileErr('A foto deve ter no máximo 8 MB.');n.value='';return}try{photoDraft=await resizePhoto(f);photoRemove=false;applyAvatar(photoDraft);profileOk('Foto preparada. Clique em Salvar alterações para confirmar.')}catch(e){profileErr(e.message||'Não foi possível preparar a foto.')}})}const or=$7('removeProfilePhotoBtn');if(or&&!or.dataset.r7){const b=or.cloneNode(true);b.dataset.r7='1';or.replaceWith(b);b.addEventListener('click',()=>{photoDraft=null;photoRemove=true;applyAvatar('');profileOk('Foto marcada para remoção. Clique em Salvar alterações para confirmar.')})}}
 async function saveProfile(btn){if(!window.currentUser||btn.dataset.busy==='1')return;clearProfileMessages();const name=$7('profileName').value.trim(),email=$7('profileEmail').value.trim().toLowerCase(),cpfLogin=normalizeCPF($7('profileCpfLogin')?.value||''),cp=$7('profileCurrentPassword').value,np=$7('profileNewPassword').value,np2=$7('profileNewPassword2').value;if(!name)return profileErr('Informe seu nome.');if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return profileErr('Informe um e-mail válido.');if(cpfLogin&&!validCPF(cpfLogin))return profileErr('Informe um CPF válido para atualizar o login.');const wp=!!(np||np2),wc=!!cpfLogin,wf=photoDraft!==null||photoRemove,c=getAuthClient();if(!c)return profileErr('Autenticação online indisponível.');btn.dataset.busy='1';btn.disabled=true;btn.classList.add('finora-r7-profile-saving');const txt=btn.textContent;btn.textContent='Salvando...';try{const oldEmail=String(currentUser.email||'').toLowerCase();if(wp||wc){if(!cp)throw new Error('Informe sua senha atual para confirmar a alteração.');const ck=await c.auth.signInWithPassword({email:oldEmail,password:cp});if(ck.error)throw new Error('A senha atual está incorreta.')}if(wp){if(np.length<6)throw new Error('A nova senha precisa ter pelo menos 6 caracteres.');if(np!==np2)throw new Error('A confirmação da nova senha não confere.');const {error}=await c.auth.updateUser({password:np});if(error)throw error}const patch={};if(email!==oldEmail)patch.email=email;if(wf)patch.data={finora_avatar:photoRemove?'':photoDraft};if(Object.keys(patch).length){const {error}=await c.auth.updateUser(patch);if(error)throw error}const {data:s}=await c.auth.getSession(),uid=s?.session?.user?.id||currentUser.id,profile=await upsertOwnFinoraProfile({user_id:uid,name,email,cpf_hash:wc?await finoraHash(cpfLogin):(currentUser.cpfHash||''),cpf_masked:wc?maskCPF(cpfLogin):(currentUser.cpfMasked||''),workspace_id:currentUser.workspaceId,role:currentUser.role}),updated=await cacheAuthProfile(profile);currentUser=updated;window.currentUser=updated;localStorage.setItem(FINORA_SESSION_KEY,updated.id);$7('loggedName').textContent=updated.name||'Usuário';$7('profileSummaryName').textContent=updated.name||'Usuário';$7('profileCpf').value=updated.cpfMasked||'CPF cadastrado';$7('profileCpfLogin').value='';$7('profileCurrentPassword').value='';$7('profileNewPassword').value='';$7('profileNewPassword2').value='';if(wf){window.finoraProfileAvatarData=photoRemove?'':photoDraft;photoDraft=null;photoRemove=false}await loadAvatar();try{renderFamilyAccess()}catch(e){}try{fillPeople()}catch(e){}try{render()}catch(e){}profileOk('Perfil atualizado com sucesso.');toast('Perfil e foto atualizados com sucesso.')}catch(e){console.error('FINORA R7 perfil',e);profileErr(e?.message||'Não foi possível atualizar seu perfil.')}finally{btn.disabled=false;btn.classList.remove('finora-r7-profile-saving');delete btn.dataset.busy;btn.textContent=txt}}
