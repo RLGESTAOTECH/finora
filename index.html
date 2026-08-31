@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.18">
+<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.19">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -8171,13 +8171,30 @@ $('dataLancamento').value=today(); $('filtroMes').value=currentMonth();
 
 function sameWorkspace(x){return !!currentWorkspaceId && x.workspaceId===currentWorkspaceId}
 function save(){
-  let finoraBeforeSaveV79=[];try{finoraBeforeSaveV79=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){finoraBeforeSaveV79=[]}
-  if(currentWorkspaceId){data.forEach(x=>{if(sameWorkspace(x)&&!x.workspaceId)x.workspaceId=currentWorkspaceId});}
+  let finoraBeforeSaveV79=[];
+  try{finoraBeforeSaveV79=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){finoraBeforeSaveV79=[]}
+  if(currentWorkspaceId){
+    data.forEach(x=>{if(sameWorkspace(x)&&!x.workspaceId)x.workspaceId=currentWorkspaceId});
+  }
   data=finoraCanonicalTransactions(data);
   finoraDetectAndRememberChangedTxV79(finoraBeforeSaveV79,data,currentWorkspaceId);
-  localStorage.setItem(KEY,JSON.stringify(data));
+
+  try{
+    localStorage.setItem(KEY,JSON.stringify(data));
+  }catch(e){
+    console.error('FINORA R7.19 storage',e);
+    throw new Error('O navegador não permitiu gravar os dados localmente.');
+  }
+
   if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
-  scheduleCloudPush();
+  try{scheduleCloudPush()}catch(e){}
+
+  // Não depende só de timers do navegador.
+  try{
+    if(cloudConfigured()&&finoraWorkspaceHydrated()){
+      Promise.resolve().then(()=>pushCloudState(false)).catch(()=>{});
+    }
+  }catch(e){}
 }
 function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),1800)}
 function people(){
@@ -11409,7 +11426,51 @@ function finoraFinishBootstrap(){
 }
 
 
+
 let finoraAuthClient=null;
+
+const finoraAuthMemoryR719=new Map();
+
+function finoraStorageAvailableR719(storage){
+  try{
+    const key='__finora_storage_test__'+Date.now()+Math.random();
+    storage.setItem(key,'1');
+    storage.removeItem(key);
+    return true;
+  }catch(e){return false}
+}
+
+const finoraAuthStorageR719={
+  getItem(key){
+    try{if(window.localStorage&&finoraStorageAvailableR719(localStorage))return localStorage.getItem(key)}catch(e){}
+    try{if(window.sessionStorage&&finoraStorageAvailableR719(sessionStorage))return sessionStorage.getItem(key)}catch(e){}
+    return finoraAuthMemoryR719.has(key)?finoraAuthMemoryR719.get(key):null;
+  },
+  setItem(key,value){
+    const v=String(value);
+    try{if(window.localStorage&&finoraStorageAvailableR719(localStorage)){localStorage.setItem(key,v);return}}catch(e){}
+    try{if(window.sessionStorage&&finoraStorageAvailableR719(sessionStorage)){sessionStorage.setItem(key,v);return}}catch(e){}
+    finoraAuthMemoryR719.set(key,v);
+  },
+  removeItem(key){
+    try{localStorage?.removeItem(key)}catch(e){}
+    try{sessionStorage?.removeItem(key)}catch(e){}
+    finoraAuthMemoryR719.delete(key);
+  }
+};
+
+function finoraUUIDR719(){
+  try{if(globalThis.crypto?.randomUUID)return globalThis.crypto.randomUUID()}catch(e){}
+  try{
+    const bytes=new Uint8Array(16);
+    globalThis.crypto?.getRandomValues?.(bytes);
+    bytes[6]=(bytes[6]&0x0f)|0x40; bytes[8]=(bytes[8]&0x3f)|0x80;
+    const h=[...bytes].map(b=>b.toString(16).padStart(2,'0'));
+    return `${h.slice(0,4).join('')}-${h.slice(4,6).join('')}-${h.slice(6,8).join('')}-${h.slice(8,10).join('')}-${h.slice(10).join('')}`;
+  }catch(e){}
+  return `finora-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 
 function publicSupabaseConfig(){
   const pub=window.FINORA_PUBLIC_CONFIG||{};
@@ -11435,7 +11496,8 @@ function getAuthClient(){
       persistSession:true,
       autoRefreshToken:true,
       detectSessionInUrl:true,
-      storageKey:'finora-auth-v46'
+      storageKey:'finora-auth-v46',
+      storage:finoraAuthStorageR719
     }
   });
   return finoraAuthClient;
@@ -12123,8 +12185,16 @@ function scheduleCloudPush(){
 }
 async function pullCloudState(showToast=false){
   if(!cloudConfigured())return false;
-  if(finoraPendingTxForWorkspaceV79(currentWorkspaceId).length){finoraCloudDirty=true;finoraCloudPushPending=true;scheduleCloudPush();return false;}
-  if(finoraCloudDirty || finoraCloudPushPending){scheduleCloudPush();return false;}
+
+  const pendingBeforeHydrationR719=finoraPendingTxForWorkspaceV79(currentWorkspaceId);
+
+  if(pendingBeforeHydrationR719.length && finoraWorkspaceHydrated()){
+    finoraCloudDirty=true;finoraCloudPushPending=true;scheduleCloudPush();return false;
+  }
+
+  if((finoraCloudDirty || finoraCloudPushPending) && finoraWorkspaceHydrated()){
+    scheduleCloudPush();return false;
+  }
 
   if(finoraCloudBusy)return false;
   const client=getCloudClient();if(!client)return false;
@@ -12145,6 +12215,8 @@ async function pullCloudState(showToast=false){
       if(showToast)toast('Ambiente conectado. O primeiro lançamento será sincronizado automaticamente.');
       return false;
     }
+
+    const firstHydrationR719=!finoraWorkspaceHydrated();
 
     // Há estado remoto: ele volta a ser a fonte de verdade.
     markFinoraWorkspaceHydrated();
@@ -12174,7 +12246,7 @@ async function pullCloudState(showToast=false){
     const remoteInvites=Array.isArray(state.invites)?state.invites:[];
     const remoteTombstones=Array.isArray(state.transactionTombstones)?state.transactionTombstones:[];
 
-    const firstHydration=!finoraWorkspaceHydrated();
+    const firstHydration=firstHydrationR719;
 
     const localTx=data.filter(x=>sameWorkspace(x));
     const localTombstones=loadDeletedTransactions().filter(t=>t.workspaceId===currentWorkspaceId);
@@ -12188,6 +12260,13 @@ async function pullCloudState(showToast=false){
     let mergedTx=firstHydration
       ? remoteTx
       : mergeTransactions(localTx,remoteTx,mergedTombstones);
+
+    const pendingR719=finoraPendingTxForWorkspaceV79(currentWorkspaceId);
+    if(pendingR719.length){
+      mergedTx=finoraOverlayPendingTxV79(mergedTx,currentWorkspaceId);
+      finoraCloudDirty=true;
+      finoraCloudPushPending=true;
+    }
 
     const remoteByIdV79=new Map(remoteTx.map(x=>[String(x.id||''),x]));
     const localNewerV79=localTx.filter(x=>{const r=remoteByIdV79.get(String(x.id||''));return !!r&&txTime(x)>txTime(r)});
@@ -12249,7 +12328,12 @@ async function pullCloudState(showToast=false){
     render();
     renderFamilyAccess();
     updateCloudUI('connected');
-    if(finoraPendingTxForWorkspaceV79(currentWorkspaceId).length)scheduleCloudPush();
+    if(finoraPendingTxForWorkspaceV79(currentWorkspaceId).length){
+      finoraCloudDirty=true;
+      finoraCloudPushPending=true;
+      scheduleCloudPush();
+      setTimeout(()=>{try{pushCloudState(false)}catch(e){}},0);
+    }
     if(showToast)toast('Dados consolidados com a nuvem.');
     return true;
   }catch(e){
@@ -22243,6 +22327,84 @@ window.finoraR718Health=function(id){
       return oldRenderR718.apply(this,arguments);
     };
   }
+})();
+</script>
+
+
+<script id="finora-r719-browser-compat">
+(function(){
+'use strict';
+let reconciling=false,lastRun=0;
+
+async function reconcile(reason){
+  const now=Date.now();
+  if(reconciling||now-lastRun<350)return;
+  lastRun=now;
+
+  if(typeof cloudConfigured!=='function'||!cloudConfigured()||!currentWorkspaceId)return;
+
+  reconciling=true;
+  try{
+    try{
+      const client=typeof getAuthClient==='function'?getAuthClient():null;
+      if(client){
+        const {data,error}=await client.auth.getSession();
+        if(error)throw error;
+        if(!data?.session?.user?.id){
+          try{await client.auth.refreshSession()}catch(e){}
+        }
+      }
+    }catch(e){
+      console.warn('FINORA R7.19 auth reconcile',reason,e);
+    }
+
+    const pending=typeof finoraPendingTxForWorkspaceV79==='function'
+      ? finoraPendingTxForWorkspaceV79(currentWorkspaceId):[];
+
+    if(pending.length){
+      if(typeof finoraWorkspaceHydrated==='function'&&!finoraWorkspaceHydrated()){
+        try{await pullCloudState(false)}catch(e){}
+      }
+      try{await pushCloudState(false)}catch(e){}
+    }else{
+      try{await pullCloudState(false)}catch(e){}
+    }
+  }finally{
+    reconciling=false;
+  }
+}
+
+window.addEventListener('online',()=>reconcile('online'));
+window.addEventListener('pageshow',e=>reconcile(e.persisted?'pageshow-bfcache':'pageshow'));
+window.addEventListener('focus',()=>reconcile('focus'));
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')reconcile('visible');
+});
+
+window.addEventListener('storage',e=>{
+  if(!e.key)return;
+  if(e.key===KEY||e.key===FINORA_PENDING_TX_V79_KEY||e.key===FINORA_FEATURE_STATE_KEY){
+    reconcile('storage');
+  }
+});
+
+window.finoraBrowserReconcileR719=reconcile;
+window.finoraBrowserHealthR719=function(){
+  let pending=[];
+  try{pending=finoraPendingTxForWorkspaceV79(currentWorkspaceId)}catch(e){}
+  return {
+    release:'1.0.10-R7.19',
+    browser:navigator.userAgent,
+    online:navigator.onLine,
+    visibility:document.visibilityState,
+    workspaceId:currentWorkspaceId||null,
+    hydrated:typeof finoraWorkspaceHydrated==='function'?finoraWorkspaceHydrated():null,
+    pendingSync:pending.length,
+    localStorageAvailable:(()=>{try{return finoraStorageAvailableR719(localStorage)}catch(e){return false}})(),
+    sessionStorageAvailable:(()=>{try{return finoraStorageAvailableR719(sessionStorage)}catch(e){return false}})()
+  };
+};
 })();
 </script>
 
