@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.13">
+<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.14">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -21364,5 +21364,167 @@ window.finoraR711Health=function(id){
 })();
 </script>
 
+<script id="finora-r714-payment-hotfix">
+
+(function(){
+'use strict';
+const RELEASE='1.0.10-R7.14';
+let ctx=null;
+
+function money(v){
+  try{if(typeof parseBRLInput==='function')return Number(parseBRLInput(v)||0)}catch(e){}
+  let s=String(v||'').replace(/[R$\s]/g,'');
+  if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');
+  const n=Number(s); return Number.isFinite(n)?n:0;
+}
+function monthOf(x){
+  try{if(typeof recordMonth==='function')return recordMonth(x)}catch(e){}
+  return String(x?.vencimento||x?.dataLancamento||'').slice(0,7);
+}
+function sameInvoice(x,card,date){
+  if(!x||x.tipo!=='saida'||monthOf(x)!==String(date).slice(0,7))return false;
+  if(String(x.cardId||'')===String(card.id))return true;
+  const d=String(x.descricao||'').toLowerCase();
+  const n=String(card.name||'').toLowerCase();
+  const issuer=String(card.issuer||'').toLowerCase();
+  return (n&&d.includes(n))||(issuer&&d.includes('fatura')&&d.includes(issuer));
+}
+function refreshNow(){
+  try{if(typeof render==='function')render()}catch(e){}
+  try{if(typeof renderAlerts==='function')renderAlerts()}catch(e){}
+  try{if(typeof renderV84Dashboard==='function')renderV84Dashboard()}catch(e){}
+  try{if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut()}catch(e){}
+  try{if(typeof renderFinoraCards==='function')renderFinoraCards()}catch(e){}
+  try{if(document.getElementById('finoraReportsPanel')&&typeof renderFinoraReports==='function')renderFinoraReports()}catch(e){}
+}
+function ensureDialog(){
+  let root=document.getElementById('finoraR714PaymentDialog');
+  if(root)return root;
+  root=document.createElement('div');
+  root.id='finoraR714PaymentDialog';
+  root.className='finora-v110-alert-dialog';
+  root.innerHTML='<div class="finora-v110-alert-card" role="dialog" aria-modal="true">'+
+    '<h3 id="finoraR714PayTitle">Registrar pagamento</h3>'+
+    '<p>Informe o valor efetivamente pago. O registro será atualizado imediatamente em todas as telas.</p>'+
+    '<div class="field"><label>Valor pago</label><input id="finoraR714PayValue" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00"></div>'+
+    '<div class="finora-v110-alert-actions">'+
+    '<button type="button" class="btn btn-soft" id="finoraR714PayCancel">Cancelar</button>'+
+    '<button type="button" class="btn btn-primary" id="finoraR714PayConfirm">Confirmar pagamento</button>'+
+    '</div></div>';
+  document.body.appendChild(root);
+  const close=()=>{root.classList.remove('open');ctx=null};
+  document.getElementById('finoraR714PayCancel').onclick=close;
+  root.addEventListener('click',e=>{if(e.target===root)close()});
+  document.getElementById('finoraR714PayConfirm').onclick=commit;
+  return root;
+}
+async function commit(){
+  if(!ctx)return;
+  const btn=document.getElementById('finoraR714PayConfirm');
+  if(!btn||btn.dataset.busy==='1')return;
+  const value=money(document.getElementById('finoraR714PayValue')?.value||'');
+  if(!(value>0)){if(typeof toast==='function')toast('Informe o valor pago.');return}
+  btn.dataset.busy='1'; btn.disabled=true;
+  try{
+    const {card,date}=ctx, now=new Date().toISOString();
+    let rows=(Array.isArray(data)?data:[]).filter(x=>sameInvoice(x,card,date));
+    rows.sort((a,b)=>(Date.parse(b.updatedAt||b.createdAt||0)||0)-(Date.parse(a.updatedAt||a.createdAt||0)||0));
+    let row=rows[0];
+    if(row){
+      Object.assign(row,{
+        valor:value,valorPendente:false,generatedReminder:false,
+        materializedOccurrence:true,materializedAt:row.materializedAt||now,
+        status:'pago',dataPagamento:typeof today==='function'?today():now.slice(0,10),
+        cardId:card.id,cardName:card.name,forma:row.forma||'Cartão de crédito',updatedAt:now
+      });
+    }else{
+      row={
+        id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,
+        account:'family',workspaceId:currentWorkspaceId,tipo:'saida',
+        pessoa:card.owner||'Família / compartilhada',expenseOwner:card.owner||'Família / compartilhada',
+        descricao:`FATURA ${String(card.name||'CARTÃO').toUpperCase()}`,
+        beneficiario:String(card.issuer||card.name||'').toUpperCase(),
+        categoria:'Cartão de crédito',valor:value,valorPendente:false,
+        generatedReminder:false,materializedOccurrence:true,materializedAt:now,
+        dataLancamento:date,vencimento:date,status:'pago',
+        dataPagamento:typeof today==='function'?today():now.slice(0,10),
+        forma:'Cartão de crédito',cardId:card.id,cardName:card.name,
+        recorrente:'nao',valorRecorrente:'mesmo',source:'card-invoice-alert',
+        createdAt:now,updatedAt:now
+      };
+      data.push(row);
+    }
+
+    try{data=typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(data):data}catch(e){}
+    row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(row.id))||row;
+    Object.assign(row,{
+      valor:value,valorPendente:false,generatedReminder:false,
+      materializedOccurrence:true,materializedAt:row.materializedAt||now,
+      status:'pago',updatedAt:now
+    });
+
+    // Persistência durável ANTES da UI e da nuvem.
+    localStorage.setItem(typeof KEY!=='undefined'?KEY:'controleFinanceiroFamiliar_v1',JSON.stringify(data));
+    try{if(typeof finoraRememberPendingTxV79==='function')finoraRememberPendingTxV79([row],currentWorkspaceId)}catch(e){}
+
+    try{
+      if(typeof loadFinoraFeatureState==='function'&&typeof saveFinoraFeatureState==='function'){
+        const state=loadFinoraFeatureState()||{}, key=`${String(card.id)}|${String(date).slice(0,7)}`;
+        state.paidCardInvoices={...(state.paidCardInvoices||{})};
+        state.paidCardInvoices[key]={paid:true,paidAt:now,cardId:String(card.id),month:String(date).slice(0,7),valor:value};
+        state.updatedAt=now; saveFinoraFeatureState(state);
+      }
+    }catch(e){}
+
+    // Fecha primeiro e atualiza sem exigir logout/login.
+    document.getElementById('finoraR714PaymentDialog')?.classList.remove('open');
+    ctx=null;
+    refreshNow();
+
+    try{if(typeof save==='function')save()}catch(e){console.warn('FINORA R7.14 save legado',e)}
+    try{if(typeof scheduleCloudPush==='function')scheduleCloudPush()}catch(e){}
+    try{
+      if(typeof pushCloudState==='function'&&typeof cloudConfigured==='function'&&cloudConfigured()){
+        Promise.resolve().then(()=>pushCloudState(false)).then(refreshNow).catch(()=>{
+          try{if(typeof scheduleCloudPush==='function')scheduleCloudPush()}catch(e){}
+        });
+      }
+    }catch(e){}
+    if(typeof toast==='function')toast('Pagamento registrado e atualizado na tela.');
+  }catch(err){
+    console.error('FINORA R7.14 pagamento',err);
+    if(typeof toast==='function')toast('Não foi possível concluir o pagamento.');
+  }finally{
+    btn.disabled=false; delete btn.dataset.busy;
+  }
+}
+
+window.finoraV109MarkInvoicePaid=function(cardId,date){
+  const card=(typeof accountCards==='function'?accountCards():[]).find(c=>String(c.id)===String(cardId));
+  if(!card){if(typeof toast==='function')toast('Cartão não encontrado.');return}
+  ctx={card,date:String(date).slice(0,10)};
+  const root=ensureDialog();
+  document.getElementById('finoraR714PayTitle').textContent=`Registrar ${card.name} como paga`;
+  document.getElementById('finoraR714PayValue').value='';
+  root.classList.add('open');
+  requestAnimationFrame(()=>document.getElementById('finoraR714PayValue')?.focus());
+};
+
+try{
+  document.getElementById('finoraR2PaymentDialog')?.classList.remove('open');
+  document.getElementById('finoraV110AlertDialog')?.classList.remove('open');
+}catch(e){}
+
+window.finoraR714PaymentHealth=function(id){
+  let row=null,pending=[];
+  try{row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id))||null}catch(e){}
+  try{pending=typeof finoraPendingTxForWorkspaceV79==='function'?finoraPendingTxForWorkspaceV79(currentWorkspaceId):[]}catch(e){}
+  return {release:RELEASE,dialogOpen:!!document.getElementById('finoraR714PaymentDialog')?.classList.contains('open'),
+    pendingSyncCount:pending.length,transaction:row?{id:row.id,descricao:row.descricao,valor:row.valor,
+    valorPendente:!!row.valorPendente,status:row.status,materializedOccurrence:!!row.materializedOccurrence,updatedAt:row.updatedAt}:null};
+};
+})();
+
+</script>
 </body>
 </html>
