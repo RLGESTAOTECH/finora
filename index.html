@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.14">
+<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.15">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -11327,24 +11327,88 @@ async function loginWithSupabase(identifier,password){
 }
 
 async function restoreSupabaseSession(){
-  try{
-    const client=getAuthClient();
-    if(!client)return false;
-    const {data}=await client.auth.getSession();
-    const uid=data?.session?.user?.id;
-    if(!uid)return false;
-    const profile=await authProfileByUserId(uid);
-    if(!profile)return false;
-    const user=await cacheAuthProfile(profile);
-    localStorage.setItem(FINORA_SESSION_KEY,user.id);
-    await openFinora(user);
-    return true;
-  }catch(e){
-    console.warn('FINORA auth restore',e);
+  const client=getAuthClient();
+  if(!client)return false;
+
+  let session=null;
+  let lastError=null;
+
+  // R7.15: três tentativas antes de considerar a sessão ausente.
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      const {data,error}=await client.auth.getSession();
+      if(error)throw error;
+      session=data?.session||null;
+
+      if(session?.user?.id)break;
+
+      if(attempt===1){
+        try{
+          const refreshed=await client.auth.refreshSession();
+          session=refreshed?.data?.session||null;
+          if(session?.user?.id)break;
+        }catch(e){
+          lastError=e;
+        }
+      }
+    }catch(e){
+      lastError=e;
+    }
+
+    await new Promise(resolve=>setTimeout(resolve,150*(attempt+1)));
+  }
+
+  const uid=session?.user?.id;
+  if(!uid){
+    if(lastError)console.warn('FINORA R7.15 auth restore',lastError);
     return false;
   }
-}
 
+  let profile=null;
+
+  // Se Auth está válido, falha temporária na tabela de perfis não derruba a UI.
+  for(let attempt=0;attempt<3 && !profile;attempt++){
+    try{
+      profile=await authProfileByUserId(uid);
+    }catch(e){
+      lastError=e;
+      await new Promise(resolve=>setTimeout(resolve,180*(attempt+1)));
+    }
+  }
+
+  let user=null;
+
+  if(profile){
+    user=await cacheAuthProfile(profile);
+  }else{
+    try{
+      const users=typeof loadFinoraUsers==='function'?loadFinoraUsers():[];
+      const cached=users.find(u=>String(u.id||'')===String(uid));
+      if(cached){
+        // O cache só é utilizado porque a sessão Supabase já foi validada acima.
+        user={...cached,cloudAuth:true};
+        console.warn('FINORA R7.15: perfil remoto indisponível; sessão Auth válida, usando cache temporário.');
+      }
+    }catch(e){}
+  }
+
+  if(!user)return false;
+
+  localStorage.setItem(FINORA_SESSION_KEY,user.id);
+  await openFinora(user);
+
+  // Recupera o perfil remoto em segundo plano quando necessário.
+  if(!profile){
+    Promise.resolve().then(async()=>{
+      try{
+        const fresh=await authProfileByUserId(uid);
+        if(fresh)await cacheAuthProfile(fresh);
+      }catch(e){}
+    });
+  }
+
+  return true;
+}
 
 function getCloudConfig(){
   let local={};
@@ -21422,8 +21486,16 @@ async function commit(){
   if(!ctx)return;
   const btn=document.getElementById('finoraR714PayConfirm');
   if(!btn||btn.dataset.busy==='1')return;
-  const value=money(document.getElementById('finoraR714PayValue')?.value||'');
-  if(!(value>0)){if(typeof toast==='function')toast('Informe o valor pago.');return}
+  const rawValue=String(document.getElementById('finoraR714PayValue')?.value||'').trim();
+  if(!rawValue){
+    if(typeof toast==='function')toast('Informe o valor pago.');
+    return;
+  }
+  const value=money(rawValue);
+  if(!Number.isFinite(value) || value<0){
+    if(typeof toast==='function')toast('Informe um valor válido.');
+    return;
+  }
   btn.dataset.busy='1'; btn.disabled=true;
   try{
     const {card,date}=ctx, now=new Date().toISOString();
@@ -21471,7 +21543,14 @@ async function commit(){
       if(typeof loadFinoraFeatureState==='function'&&typeof saveFinoraFeatureState==='function'){
         const state=loadFinoraFeatureState()||{}, key=`${String(card.id)}|${String(date).slice(0,7)}`;
         state.paidCardInvoices={...(state.paidCardInvoices||{})};
-        state.paidCardInvoices[key]={paid:true,paidAt:now,cardId:String(card.id),month:String(date).slice(0,7),valor:value};
+        state.paidCardInvoices[key]={
+          paid:true,
+          noCharge:value===0,
+          paidAt:now,
+          cardId:String(card.id),
+          month:String(date).slice(0,7),
+          valor:value
+        };
         state.updatedAt=now; saveFinoraFeatureState(state);
       }
     }catch(e){}
@@ -21490,7 +21569,11 @@ async function commit(){
         });
       }
     }catch(e){}
-    if(typeof toast==='function')toast('Pagamento registrado e atualizado na tela.');
+    if(typeof toast==='function'){
+      toast(value===0
+        ? 'Sem fatura no período. Alerta baixado e atualizado na tela.'
+        : 'Pagamento registrado e atualizado na tela.');
+    }
   }catch(err){
     console.error('FINORA R7.14 pagamento',err);
     if(typeof toast==='function')toast('Não foi possível concluir o pagamento.');
@@ -21526,5 +21609,23 @@ window.finoraR714PaymentHealth=function(id){
 })();
 
 </script>
+
+<script id="finora-r715-health">
+(function(){
+window.finoraR715Health=function(){
+  let authKey=false;
+  try{
+    authKey=Object.keys(localStorage).some(k=>String(k).includes('finora-auth-v46'));
+  }catch(e){}
+  return {
+    release:'1.0.10-R7.15',
+    paymentDialogOpen:!!document.getElementById('finoraR714PaymentDialog')?.classList.contains('open'),
+    authStoragePresent:authKey,
+    finoraSession:localStorage.getItem(typeof FINORA_SESSION_KEY!=='undefined'?FINORA_SESSION_KEY:'finora_session')||null
+  };
+};
+})();
+</script>
+
 </body>
 </html>
