@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.27-delete-local-first">
+<meta name="finora-release" content="R7.28-delete-hard-fix">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -23839,6 +23839,198 @@ window.finoraR721Health=function(id){
   <span class="dot"></span>
   <span class="txt">Sincronizando...</span>
 </div>
+
+
+<script id="finora-r728-delete-hard-fix">
+(function(){
+'use strict';
+
+if(window.__FINORA_R728_DELETE_INSTALLED__)return;
+window.__FINORA_R728_DELETE_INSTALLED__=true;
+
+function finoraR728FindTransaction(id){
+  try{
+    return (Array.isArray(data)?data:[]).find(r=>
+      String(r?.id||'')===String(id) &&
+      (typeof sameWorkspace!=='function' || sameWorkspace(r))
+    )||null;
+  }catch(e){return null}
+}
+
+function finoraR728PersistLocalDelete(x){
+  const id=String(x.id);
+
+  // 1) Tombstone primeiro: mesmo que o restante falhe, o item não pode ressuscitar.
+  try{
+    if(typeof recordTransactionDeletion==='function'){
+      recordTransactionDeletion(id);
+    }
+  }catch(e){
+    console.error('FINORA R7.28 tombstone',e);
+  }
+
+  // 2) Remove da coleção em memória.
+  data=(Array.isArray(data)?data:[]).filter(r=>String(r?.id||'')!==id);
+
+  // 3) Persiste imediatamente no storage local.
+  try{
+    localStorage.setItem(KEY,JSON.stringify(data));
+  }catch(e){
+    console.error('FINORA R7.28 localStorage',e);
+    throw new Error('O navegador não permitiu salvar a exclusão localmente.');
+  }
+
+  // 4) Mantém o estado de nuvem como pendente, mas SEM chamar a rede agora.
+  try{
+    finoraCloudDirty=true;
+    finoraCloudPushPending=true;
+  }catch(e){}
+
+  try{
+    if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
+  }catch(e){}
+
+  return true;
+}
+
+function finoraR728RemoveVisualRow(btn,id){
+  // Remove imediatamente a linha clicada para dar confirmação operacional.
+  try{
+    const tr=btn?.closest('tr');
+    if(tr)tr.remove();
+  }catch(e){}
+
+  // Se houver contador visível, atualiza de maneira não crítica.
+  try{
+    const countNode=document.querySelector('#tableWrap')?.closest('.panel')?.querySelector('[data-record-count]');
+    if(countNode){
+      const n=(Array.isArray(data)?data:[]).filter(x=>typeof sameWorkspace!=='function'||sameWorkspace(x)).length;
+      countNode.textContent=`${n} registros`;
+    }
+  }catch(e){}
+}
+
+function finoraR728Delete(id,btn){
+  const x=finoraR728FindTransaction(id);
+
+  if(!x){
+    finoraR728RemoveVisualRow(btn,id);
+    try{render()}catch(e){}
+    try{toast('Lançamento já estava excluído.')}catch(e){}
+    return false;
+  }
+
+  const desc=String(x.descricao||'este lançamento');
+  const value=typeof money==='function'?money(Number(x.valor||0)):`R$ ${Number(x.valor||0).toFixed(2)}`;
+
+  const ok=window.confirm(
+    `Excluir "${desc}" (${value})?\n\n`+
+    `O lançamento será removido imediatamente deste dispositivo. `+
+    `A sincronização com os demais dispositivos ocorrerá em segundo plano.`
+  );
+
+  if(!ok)return false;
+
+  try{
+    finoraR728PersistLocalDelete(x);
+    finoraR728RemoveVisualRow(btn,id);
+
+    // Render derivado é secundário. A remoção da linha já aconteceu.
+    try{
+      requestAnimationFrame(()=>{
+        try{render()}catch(err){console.warn('FINORA R7.28 render pós-exclusão',err)}
+      });
+    }catch(e){}
+
+    // Auditoria é assíncrona e nunca bloqueia a exclusão.
+    try{
+      if(typeof finoraAuditLog==='function'){
+        Promise.resolve(
+          finoraAuditLog(
+            'EXCLUIU',
+            'LANCAMENTO',
+            x.id,
+            'Lançamento excluído',
+            x,
+            null
+          )
+        ).catch(()=>{});
+      }
+    }catch(e){}
+
+    // Não faz cloud push imediato: o Supabase está degradado.
+    // Agenda somente uma tentativa tardia e controlada.
+    try{
+      clearTimeout(window.__finoraR728DeleteSyncTimer);
+      window.__finoraR728DeleteSyncTimer=setTimeout(()=>{
+        try{
+          if(
+            typeof cloudConfigured==='function' &&
+            cloudConfigured() &&
+            typeof pushCloudState==='function'
+          ){
+            pushCloudState(false).catch(()=>{});
+          }
+        }catch(e){}
+      },60000);
+    }catch(e){}
+
+    try{toast('Lançamento excluído com sucesso.')}catch(e){}
+    return true;
+
+  }catch(e){
+    console.error('FINORA R7.28 exclusão',e);
+    try{toast(e?.message||'Não foi possível excluir o lançamento.')}catch(err){}
+    return false;
+  }
+}
+
+// Captura no document ANTES de o evento chegar aos handlers antigos do tableWrap.
+document.addEventListener('click',function(event){
+  const btn=event.target?.closest?.('button[data-row-action="delete"]');
+  if(!btn)return;
+
+  const wrap=document.getElementById('tableWrap');
+  if(wrap && !wrap.contains(btn))return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+
+  if(btn.dataset.r728Busy==='1')return;
+  btn.dataset.r728Busy='1';
+
+  try{
+    const id=btn.dataset.rowId||btn.dataset.id||'';
+    if(id)finoraR728Delete(id,btn);
+  }finally{
+    if(btn.isConnected)delete btn.dataset.r728Busy;
+  }
+},true);
+
+window.finoraDeleteTransactionR728=finoraR728Delete;
+
+window.finoraR728DeleteHealth=function(id){
+  const exists=!!finoraR728FindTransaction(id);
+  let tombstone=false;
+  try{
+    tombstone=(typeof loadDeletedTransactions==='function'
+      ? loadDeletedTransactions()
+      : []
+    ).some(t=>String(t?.id||'')===String(id));
+  }catch(e){}
+  return {
+    release:'R7.28',
+    id:String(id||''),
+    existsInLocalData:exists,
+    tombstonePresent:tombstone,
+    cloudDirty:typeof finoraCloudDirty!=='undefined'?!!finoraCloudDirty:null,
+    cloudPushPending:typeof finoraCloudPushPending!=='undefined'?!!finoraCloudPushPending:null
+  };
+};
+
+})();
+</script>
 
 </body>
 </html>
