@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.20-auth-resilience">
+<meta name="finora-release" content="R7.21-transaction-share">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -7260,6 +7260,337 @@ body.dark #authScreen :is(input,select,textarea){
 }
 </style>
 
+
+<style id="finora-r721-share-css">
+.finora-r721-desc-line{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.finora-r721-desc-line strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.finora-r721-share-icon{
+  width:30px;
+  height:30px;
+  border:1px solid #dce6e0;
+  border-radius:9px;
+  background:#fff;
+  color:#0f5a3e;
+  display:inline-grid;
+  place-items:center;
+  cursor:pointer;
+  flex:0 0 30px;
+  padding:0;
+  transition:background .16s ease,border-color .16s ease,transform .16s ease;
+}
+.finora-r721-share-icon:hover{
+  background:#edf7f1;
+  border-color:#b9d9c7;
+  transform:translateY(-1px);
+}
+.finora-r721-share-icon svg{width:15px;height:15px;stroke:currentColor}
+
+.finora-r721-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:10050;
+  background:rgba(8,33,25,.46);
+  backdrop-filter:blur(4px);
+  display:none;
+  place-items:center;
+  padding:20px;
+}
+.finora-r721-backdrop.open{display:grid}
+.finora-r721-modal{
+  width:min(980px,96vw);
+  max-height:min(88vh,900px);
+  overflow:auto;
+  background:#fff;
+  border:1px solid #dce6e0;
+  border-radius:20px;
+  box-shadow:0 26px 70px rgba(14,38,30,.22);
+  color:#173f32;
+}
+.finora-r721-head{
+  position:sticky;
+  top:0;
+  z-index:3;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+  padding:18px 20px;
+  background:rgba(255,255,255,.96);
+  border-bottom:1px solid #e5ece8;
+  backdrop-filter:blur(10px);
+}
+.finora-r721-head h2{
+  margin:0;
+  font:700 18px Georgia,serif;
+  color:#173f32;
+}
+.finora-r721-close{
+  width:38px;height:38px;border-radius:50%;
+  border:1px solid #dce6e0;background:#f5faf7;color:#0f5a3e;
+  display:grid;place-items:center;cursor:pointer;font-size:22px;line-height:1;
+}
+.finora-r721-body{
+  display:grid;
+  grid-template-columns:minmax(0,1.08fr) minmax(300px,.92fr);
+  gap:18px;
+  padding:20px;
+}
+.finora-r721-card,
+.finora-r721-side{
+  border:1px solid #dce6e0;
+  border-radius:16px;
+  background:#fff;
+}
+.finora-r721-card{overflow:hidden}
+.finora-r721-card-top{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:18px;
+  background:linear-gradient(135deg,#f5faf7,#eef5f1);
+  border-bottom:1px solid #dce6e0;
+}
+.finora-r721-card-icon{
+  width:50px;height:50px;border-radius:14px;
+  display:grid;place-items:center;
+  background:#e5f1ea;color:#0f5a3e;border:1px solid #cfe0d6;
+}
+.finora-r721-card-icon svg{width:25px;height:25px;stroke:currentColor}
+.finora-r721-card-title{min-width:0;flex:1}
+.finora-r721-card-title h3{
+  margin:0 0 4px;
+  font:700 18px Georgia,serif;
+  color:#173f32;
+  overflow-wrap:anywhere;
+}
+.finora-r721-card-title p{margin:0;color:#6a7c72;font:11px Verdana,sans-serif}
+.finora-r721-card-value{
+  text-align:right;
+  font:700 18px Georgia,serif;
+  white-space:nowrap;
+}
+.finora-r721-card-value.in{color:#15803d}
+.finora-r721-card-value.out{color:#b43d34}
+.finora-r721-details{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:0;
+}
+.finora-r721-detail{
+  padding:14px 16px;
+  border-bottom:1px solid #edf2ef;
+  min-width:0;
+}
+.finora-r721-detail:nth-child(odd){border-right:1px solid #edf2ef}
+.finora-r721-detail small{
+  display:block;
+  color:#7a8a82;
+  font:700 9px Verdana,sans-serif;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  margin-bottom:5px;
+}
+.finora-r721-detail strong,
+.finora-r721-detail span{
+  display:block;
+  color:#203d31;
+  font:600 12px Verdana,sans-serif;
+  line-height:1.45;
+  overflow-wrap:anywhere;
+}
+.finora-r721-detail.full{grid-column:1/-1;border-right:0}
+.finora-r721-share-note{
+  margin:14px 16px 16px;
+  padding:12px 13px;
+  border-radius:12px;
+  background:#f7faf8;
+  border:1px solid #e1ebe5;
+  color:#52685c;
+  font:10px Verdana,sans-serif;
+  line-height:1.55;
+}
+.finora-r721-side{padding:16px}
+.finora-r721-side h3{
+  margin:0 0 6px;
+  font:700 14px Georgia,serif;
+  color:#173f32;
+}
+.finora-r721-side .sub{
+  margin:0 0 14px;
+  color:#728179;
+  font:10px Verdana,sans-serif;
+  line-height:1.45;
+}
+.finora-r721-members{
+  display:grid;
+  gap:8px;
+  max-height:190px;
+  overflow:auto;
+  padding-right:2px;
+}
+.finora-r721-member{
+  display:grid;
+  grid-template-columns:auto 34px 1fr;
+  align-items:center;
+  gap:9px;
+  padding:9px;
+  border:1px solid #e1e9e4;
+  border-radius:11px;
+  background:#fbfdfc;
+}
+.finora-r721-member input{accent-color:#0f6b4c}
+.finora-r721-avatar{
+  width:34px;height:34px;border-radius:50%;
+  background:#e6f0ea;color:#0f5a3e;
+  display:grid;place-items:center;
+  font:700 10px Verdana,sans-serif;
+}
+.finora-r721-member b{display:block;font:700 10px Verdana,sans-serif;color:#274638}
+.finora-r721-member span{display:block;font:9px Verdana,sans-serif;color:#7b8a82;margin-top:2px}
+.finora-r721-note{
+  width:100%;
+  min-height:82px;
+  resize:vertical;
+  margin-top:12px;
+  border:1px solid #dce6e0;
+  border-radius:11px;
+  padding:10px 11px;
+  font:10px Verdana,sans-serif;
+  outline:none;
+}
+.finora-r721-note:focus{border-color:#76ad91;box-shadow:0 0 0 3px rgba(15,90,62,.08)}
+.finora-r721-actions{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin-top:12px;
+}
+.finora-r721-action{
+  min-height:40px;
+  border-radius:10px;
+  border:1px solid #d7e2dc;
+  background:#fff;
+  color:#244a3a;
+  cursor:pointer;
+  padding:8px 10px;
+  font:700 9px Verdana,sans-serif;
+}
+.finora-r721-action:hover{background:#f2f7f4}
+.finora-r721-action.primary{
+  grid-column:1/-1;
+  background:#0f6b4c;
+  color:#fff;
+  border-color:#0f6b4c;
+}
+.finora-r721-action.primary:hover{background:#0b5b40}
+.finora-r721-footnote{
+  margin-top:12px;
+  padding:10px 11px;
+  border-radius:10px;
+  background:#edf7f1;
+  border:1px solid #d4e7db;
+  color:#52695d;
+  font:9px Verdana,sans-serif;
+  line-height:1.45;
+}
+.finora-r721-toast{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  z-index:10100;
+  max-width:360px;
+  padding:12px 15px;
+  border-radius:12px;
+  background:#0f5a3e;
+  color:#fff;
+  font:700 10px Verdana,sans-serif;
+  box-shadow:0 14px 40px rgba(0,0,0,.24);
+  opacity:0;
+  transform:translateY(8px);
+  pointer-events:none;
+  transition:.2s ease;
+}
+.finora-r721-toast.show{opacity:1;transform:translateY(0)}
+
+html.dark body .finora-r721-modal,
+body.dark .finora-r721-modal,
+html.dark body .finora-r721-card,
+body.dark .finora-r721-card,
+html.dark body .finora-r721-side,
+body.dark .finora-r721-side{
+  background:#064e3b!important;
+  color:#fff!important;
+  border-color:rgba(17,94,89,.55)!important;
+}
+html.dark body .finora-r721-head,
+body.dark .finora-r721-head{
+  background:rgba(2,44,34,.96)!important;
+  border-color:rgba(17,94,89,.55)!important;
+}
+html.dark body .finora-r721-head h2,
+html.dark body .finora-r721-card-title h3,
+html.dark body .finora-r721-side h3,
+html.dark body .finora-r721-detail strong,
+html.dark body .finora-r721-detail span,
+html.dark body .finora-r721-member b,
+body.dark .finora-r721-head h2,
+body.dark .finora-r721-card-title h3,
+body.dark .finora-r721-side h3,
+body.dark .finora-r721-detail strong,
+body.dark .finora-r721-detail span,
+body.dark .finora-r721-member b{
+  color:#fff!important;
+}
+html.dark body .finora-r721-card-top,
+body.dark .finora-r721-card-top{
+  background:#043327!important;
+  border-color:rgba(17,94,89,.55)!important;
+}
+html.dark body .finora-r721-member,
+html.dark body .finora-r721-share-note,
+html.dark body .finora-r721-footnote,
+body.dark .finora-r721-member,
+body.dark .finora-r721-share-note,
+body.dark .finora-r721-footnote{
+  background:#043327!important;
+  border-color:rgba(17,94,89,.5)!important;
+  color:#e2e8f0!important;
+}
+html.dark body .finora-r721-note,
+body.dark .finora-r721-note{
+  background:#022c22!important;color:#fff!important;border-color:rgba(17,94,89,.62)!important;
+}
+html.dark body .finora-r721-action:not(.primary),
+body.dark .finora-r721-action:not(.primary){
+  background:#043327!important;color:#fff!important;border-color:rgba(17,94,89,.55)!important;
+}
+html.dark body .finora-r721-share-icon,
+body.dark .finora-r721-share-icon{
+  background:#043327!important;color:#fff!important;border-color:rgba(17,94,89,.55)!important;
+}
+
+@media(max-width:820px){
+  .finora-r721-backdrop{padding:8px}
+  .finora-r721-modal{width:100%;max-height:94vh;border-radius:16px}
+  .finora-r721-body{grid-template-columns:1fr;padding:12px;gap:12px}
+  .finora-r721-details{grid-template-columns:1fr}
+  .finora-r721-detail:nth-child(odd){border-right:0}
+  .finora-r721-card-top{align-items:flex-start}
+  .finora-r721-card-value{font-size:15px}
+  .finora-r721-actions{grid-template-columns:1fr}
+  .finora-r721-action.primary{grid-column:auto}
+}
+</style>
+
 </head>
 <body>
 
@@ -10350,7 +10681,20 @@ function render(){
   </tr></thead><tbody>${rows.map(x=>{
     const st=effectiveStatus(x);
     return `<tr>
-      <td><strong>${esc(x.descricao)}</strong>${launchMetaHtml(x)?`<br>${launchMetaHtml(x)}`:''}</td>
+      <td>
+        <div class="finora-r721-desc-line">
+          <strong>${esc(x.descricao)}</strong>
+          <button type="button" class="finora-r721-share-icon" title="Compartilhar lançamento" aria-label="Compartilhar lançamento" data-row-action="share" data-row-id="${esc(x.id)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="18" cy="5" r="2.4"></circle>
+              <circle cx="6" cy="12" r="2.4"></circle>
+              <circle cx="18" cy="19" r="2.4"></circle>
+              <path d="m8.1 10.8 7.8-4.5M8.1 13.2l7.8 4.5"></path>
+            </svg>
+          </button>
+        </div>
+        ${launchMetaHtml(x)?`<div>${launchMetaHtml(x)}</div>`:''}
+      </td>
       <td>${esc(x.tipo==='saida'?(x.expenseOwner||x.pessoa):x.pessoa)}</td>
       <td>${x.vencimento?dateBR(x.vencimento):''}</td>
       <td><span class="badge ${st}">${x.tipo==='entrada'?(st==='pago'?'Recebido':st==='atrasado'?'Recebimento atrasado':'A receber'):(st==='pago'?'Pago':st==='atrasado'?'Atrasado':'Pendente')}</span></td>
@@ -11118,6 +11462,10 @@ function installTransactionTableActions(){
     }
     if(action==='edit'){
       editRow(id);
+      return;
+    }
+    if(action==='share'){
+      if(typeof finoraOpenTransactionShareR721==='function')finoraOpenTransactionShareR721(id);
       return;
     }
     if(action==='paid'){
@@ -22445,6 +22793,581 @@ window.finoraBrowserHealthR719=function(){
     pendingSync:pending.length,
     localStorageAvailable:(()=>{try{return finoraStorageAvailableR719(localStorage)}catch(e){return false}})(),
     sessionStorageAvailable:(()=>{try{return finoraStorageAvailableR719(sessionStorage)}catch(e){return false}})()
+  };
+};
+})();
+</script>
+
+
+<div id="finoraR721ShareBackdrop" class="finora-r721-backdrop" aria-hidden="true">
+  <section class="finora-r721-modal" role="dialog" aria-modal="true" aria-labelledby="finoraR721ShareTitle">
+    <div class="finora-r721-head">
+      <h2 id="finoraR721ShareTitle">Compartilhar lançamento</h2>
+      <button type="button" class="finora-r721-close" id="finoraR721ShareClose" aria-label="Fechar">×</button>
+    </div>
+    <div class="finora-r721-body">
+      <article class="finora-r721-card" id="finoraR721PreviewCard">
+        <div class="finora-r721-card-top">
+          <div class="finora-r721-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+              <path d="M6 8h12l1 12H5L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>
+            </svg>
+          </div>
+          <div class="finora-r721-card-title">
+            <h3 id="finoraR721CardDescription">Lançamento</h3>
+            <p id="finoraR721CardMeta">FINORA</p>
+          </div>
+          <div class="finora-r721-card-value" id="finoraR721CardValue">R$ 0,00</div>
+        </div>
+        <div class="finora-r721-details" id="finoraR721Details"></div>
+        <div class="finora-r721-share-note">
+          Este cartão foi gerado pelo FINORA a partir do lançamento selecionado.
+          Você pode copiar a imagem e colar diretamente no WhatsApp, e-mail ou outra ferramenta.
+        </div>
+      </article>
+
+      <aside class="finora-r721-side">
+        <h3>Compartilhar</h3>
+        <p class="sub">Copie os detalhes, gere uma imagem ou use o compartilhamento nativo do seu dispositivo.</p>
+
+        <div id="finoraR721MembersBlock">
+          <h3 style="margin-top:2px">Destinatários do workspace <span style="font-weight:400">(opcional)</span></h3>
+          <p class="sub">Esta seleção registra a intenção de compartilhamento na Auditoria; ela não altera as permissões atuais do workspace.</p>
+          <div class="finora-r721-members" id="finoraR721Members"></div>
+        </div>
+
+        <textarea id="finoraR721ShareMessage" class="finora-r721-note" maxlength="240" placeholder="Mensagem opcional para acompanhar o lançamento..."></textarea>
+
+        <div class="finora-r721-actions">
+          <button type="button" class="finora-r721-action" id="finoraR721CopyText">Copiar detalhes</button>
+          <button type="button" class="finora-r721-action" id="finoraR721CopyImage">Copiar como imagem</button>
+          <button type="button" class="finora-r721-action" id="finoraR721CopyLink">Copiar link interno</button>
+          <button type="button" class="finora-r721-action" id="finoraR721NativeShare">Compartilhar…</button>
+          <button type="button" class="finora-r721-action primary" id="finoraR721RegisterShare">Registrar compartilhamento</button>
+        </div>
+
+        <div class="finora-r721-footnote">
+          O link interno exige login no FINORA e acesso ao mesmo workspace. Para envio externo, prefira “Copiar como imagem” ou “Compartilhar…”.
+        </div>
+      </aside>
+    </div>
+  </section>
+</div>
+<div id="finoraR721Toast" class="finora-r721-toast"></div>
+
+
+<script id="finora-r721-share-feature">
+(function(){
+'use strict';
+
+let activeId=null;
+
+const $721=id=>document.getElementById(id);
+
+function rowById(id){
+  try{
+    return (Array.isArray(data)?data:[]).find(x=>
+      String(x.id)===String(id) &&
+      (typeof sameWorkspace!=='function' || sameWorkspace(x))
+    )||null;
+  }catch(e){return null}
+}
+
+function plain(v,fallback='—'){
+  const s=String(v??'').trim();
+  return s||fallback;
+}
+
+function statusLabel(x){
+  const st=typeof effectiveStatus==='function'?effectiveStatus(x):(x.status||'pendente');
+  if(x.tipo==='entrada'){
+    return st==='pago'?'Recebido':st==='atrasado'?'Recebimento atrasado':'A receber';
+  }
+  return st==='pago'?'Pago':st==='atrasado'?'Atrasado':'Pendente';
+}
+
+function amountLabel(x){
+  if(x.valorPendente)return 'Valor a definir';
+  const sign=x.tipo==='entrada'?'+':'−';
+  return `${sign} ${typeof money==='function'?money(Number(x.valor||0)):`R$ ${Number(x.valor||0).toFixed(2)}`}`;
+}
+
+function originLabel(x){
+  if(x.tipo==='entrada')return plain(x.pessoa,'Família');
+  return plain(x.expenseOwner||x.pessoa,'Família / compartilhada');
+}
+
+function cardName(x){
+  try{
+    const c=(typeof accountCards==='function'?accountCards():[]).find(v=>String(v.id)===String(x.cardId||''));
+    return c?.name||'';
+  }catch(e){return ''}
+}
+
+function details(x){
+  const rows=[
+    ['Pessoa / origem',originLabel(x)],
+    ['Tipo',x.tipo==='entrada'?'Entrada / recebimento':'Despesa / saída'],
+    ['Categoria',plain(x.categoria)],
+    ['Status',statusLabel(x)],
+    ['Data do lançamento',x.dataLancamento&&typeof dateBR==='function'?dateBR(x.dataLancamento):plain(x.dataLancamento)],
+    ['Vencimento / data prevista',x.vencimento&&typeof dateBR==='function'?dateBR(x.vencimento):plain(x.vencimento)],
+    ['Forma de pagamento',plain(x.forma)],
+    ['Conta / origem do pagamento',plain(x.paymentAccount)],
+  ];
+
+  const cn=cardName(x);
+  if(cn)rows.push(['Cartão',cn]);
+
+  if(x.beneficiario)rows.push(['Beneficiário / favorecido',plain(x.beneficiario)]);
+  if(x.recorrente && x.recorrente!=='nao')rows.push(['Recorrência',plain(x.recorrente)]);
+  if(x.parcelaAtual || x.parcelaTotal){
+    rows.push(['Parcelamento',`${plain(x.parcelaAtual,'1')} / ${plain(x.parcelaTotal,'—')}`]);
+  }
+  if(x.observacao)rows.push(['Observações',plain(x.observacao)]);
+  rows.push(['Última atualização',x.updatedAt?new Date(x.updatedAt).toLocaleString('pt-BR'):'—']);
+  return rows;
+}
+
+function renderDetails(x){
+  const box=$721('finoraR721Details');
+  if(!box)return;
+  const arr=details(x);
+  box.innerHTML=arr.map(([k,v])=>{
+    const full=k==='Observações';
+    return `<div class="finora-r721-detail${full?' full':''}">
+      <small>${typeof esc==='function'?esc(k):k}</small>
+      <strong>${typeof esc==='function'?esc(v):v}</strong>
+    </div>`;
+  }).join('');
+}
+
+function initials(name){
+  return String(name||'?').trim().split(/\s+/).filter(Boolean).slice(0,2).map(v=>v[0]).join('').toUpperCase()||'?';
+}
+
+function memberRows(){
+  let members=[];
+  try{
+    if(typeof familyMembersDirectory==='function')members=familyMembersDirectory()||[];
+  }catch(e){}
+
+  const seen=new Set();
+  return members.filter(m=>{
+    const key=String(m.email||m.id||m.name||'').toLowerCase();
+    if(!key||seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function renderMembers(){
+  const box=$721('finoraR721Members');
+  const block=$721('finoraR721MembersBlock');
+  if(!box||!block)return;
+
+  const members=memberRows();
+  if(!members.length){
+    block.style.display='none';
+    return;
+  }
+  block.style.display='block';
+  box.innerHTML=members.map((m,i)=>{
+    const name=plain(m.name||m.nome||m.email,'Integrante');
+    const email=plain(m.email,'');
+    const key=String(m.id||m.userId||m.email||name);
+    return `<label class="finora-r721-member">
+      <input type="checkbox" data-share-member value="${typeof esc==='function'?esc(key):key}" data-name="${typeof esc==='function'?esc(name):name}" data-email="${typeof esc==='function'?esc(email):email}">
+      <span class="finora-r721-avatar">${initials(name)}</span>
+      <span><b>${typeof esc==='function'?esc(name):name}</b><span>${typeof esc==='function'?esc(email):email}</span></span>
+    </label>`;
+  }).join('');
+}
+
+function toast721(msg){
+  try{
+    if(typeof toast==='function'){toast(msg);return}
+  }catch(e){}
+  const box=$721('finoraR721Toast');
+  if(!box)return;
+  box.textContent=msg;
+  box.classList.add('show');
+  clearTimeout(box._timer);
+  box._timer=setTimeout(()=>box.classList.remove('show'),2600);
+}
+
+function shareText(x){
+  const lines=[
+    'FINORA — Detalhes do lançamento',
+    '',
+    `Descrição: ${plain(x.descricao)}`,
+    `Pessoa / origem: ${originLabel(x)}`,
+    `Tipo: ${x.tipo==='entrada'?'Entrada / recebimento':'Despesa / saída'}`,
+    `Categoria: ${plain(x.categoria)}`,
+    `Status: ${statusLabel(x)}`,
+    `Valor: ${amountLabel(x)}`,
+    `Data do lançamento: ${x.dataLancamento&&typeof dateBR==='function'?dateBR(x.dataLancamento):plain(x.dataLancamento)}`,
+    `Vencimento / data prevista: ${x.vencimento&&typeof dateBR==='function'?dateBR(x.vencimento):plain(x.vencimento)}`,
+    `Forma de pagamento: ${plain(x.forma)}`,
+  ];
+  if(x.paymentAccount)lines.push(`Conta / origem do pagamento: ${plain(x.paymentAccount)}`);
+  const cn=cardName(x); if(cn)lines.push(`Cartão: ${cn}`);
+  if(x.beneficiario)lines.push(`Beneficiário / favorecido: ${plain(x.beneficiario)}`);
+  if(x.observacao)lines.push(`Observações: ${plain(x.observacao)}`);
+  const message=String($721('finoraR721ShareMessage')?.value||'').trim();
+  if(message)lines.push('',`Mensagem: ${message}`);
+  return lines.join('\n');
+}
+
+async function copyText(text){
+  if(navigator.clipboard?.writeText){
+    await navigator.clipboard.writeText(text);
+    return true;
+  }
+  const ta=document.createElement('textarea');
+  ta.value=text;
+  ta.style.position='fixed';
+  ta.style.opacity='0';
+  document.body.appendChild(ta);
+  ta.select();
+  const ok=document.execCommand('copy');
+  ta.remove();
+  if(!ok)throw new Error('Clipboard indisponível');
+  return true;
+}
+
+function canvasBlob(canvas){
+  return new Promise((resolve,reject)=>{
+    canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Falha ao gerar imagem')),'image/png',1);
+  });
+}
+
+function wrapLines(ctx,text,maxWidth){
+  const words=String(text||'').split(/\s+/);
+  const lines=[];
+  let line='';
+  for(const word of words){
+    const test=line?`${line} ${word}`:word;
+    if(ctx.measureText(test).width>maxWidth && line){
+      lines.push(line);line=word;
+    }else line=test;
+  }
+  if(line)lines.push(line);
+  return lines;
+}
+
+function drawRounded(ctx,x,y,w,h,r,fill,stroke){
+  ctx.beginPath();
+  ctx.roundRect(x,y,w,h,r);
+  ctx.fillStyle=fill;ctx.fill();
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke()}
+}
+
+async function imageBlobFor(x){
+  const scale=2;
+  const W=900,H=1120;
+  const c=document.createElement('canvas');
+  c.width=W*scale;c.height=H*scale;
+  const ctx=c.getContext('2d');
+  ctx.scale(scale,scale);
+
+  // Background
+  ctx.fillStyle='#f4f8f5';
+  ctx.fillRect(0,0,W,H);
+
+  // Brand header
+  drawRounded(ctx,36,36,W-72,H-72,28,'#ffffff','#d9e5de');
+  ctx.fillStyle='#083f2d';
+  ctx.font='700 34px Georgia';
+  ctx.fillText('FINORA',68,96);
+  ctx.font='500 14px Verdana';
+  ctx.fillStyle='#6c7d74';
+  ctx.fillText('Comprovante visual do lançamento',68,122);
+
+  ctx.strokeStyle='#e4ece7';
+  ctx.beginPath();ctx.moveTo(68,148);ctx.lineTo(W-68,148);ctx.stroke();
+
+  // Title/value
+  ctx.fillStyle='#173f32';
+  ctx.font='700 26px Georgia';
+  const titleLines=wrapLines(ctx,plain(x.descricao),520).slice(0,2);
+  titleLines.forEach((line,i)=>ctx.fillText(line,68,194+i*31));
+
+  const value=amountLabel(x);
+  ctx.textAlign='right';
+  ctx.fillStyle=x.tipo==='entrada'?'#15803d':'#b43d34';
+  ctx.font='700 24px Georgia';
+  ctx.fillText(value,W-68,196);
+  ctx.textAlign='left';
+
+  const rows=details(x).filter(([k])=>k!=='Observações' && k!=='Última atualização');
+  let y=274;
+  const colW=350;
+  for(let i=0;i<rows.length;i+=2){
+    for(let col=0;col<2;col++){
+      const item=rows[i+col];
+      if(!item)continue;
+      const [label,val]=item;
+      const x0=68+col*390;
+      ctx.font='700 11px Verdana';
+      ctx.fillStyle='#809087';
+      ctx.fillText(String(label).toUpperCase(),x0,y);
+      ctx.font='600 15px Verdana';
+      ctx.fillStyle='#213f32';
+      const vals=wrapLines(ctx,val,colW).slice(0,2);
+      vals.forEach((line,j)=>ctx.fillText(line,x0,y+24+j*21));
+    }
+    y+=82;
+  }
+
+  if(x.observacao){
+    y+=8;
+    ctx.font='700 11px Verdana';ctx.fillStyle='#809087';
+    ctx.fillText('OBSERVAÇÕES',68,y);
+    ctx.font='500 14px Verdana';ctx.fillStyle='#3e554a';
+    const obs=wrapLines(ctx,x.observacao,W-136).slice(0,5);
+    obs.forEach((line,j)=>ctx.fillText(line,68,y+25+j*20));
+    y+=30+obs.length*20;
+  }
+
+  const msg=String($721('finoraR721ShareMessage')?.value||'').trim();
+  if(msg){
+    y+=12;
+    drawRounded(ctx,68,y,W-136,90,14,'#edf7f1','#d4e7db');
+    ctx.font='700 11px Verdana';ctx.fillStyle='#0f5a3e';
+    ctx.fillText('MENSAGEM',84,y+24);
+    ctx.font='500 14px Verdana';ctx.fillStyle='#3e554a';
+    wrapLines(ctx,msg,W-168).slice(0,3).forEach((line,j)=>ctx.fillText(line,84,y+49+j*18));
+    y+=106;
+  }
+
+  ctx.strokeStyle='#e4ece7';
+  ctx.beginPath();ctx.moveTo(68,H-108);ctx.lineTo(W-68,H-108);ctx.stroke();
+  ctx.font='500 11px Verdana';ctx.fillStyle='#819087';
+  ctx.fillText(`Gerado em ${new Date().toLocaleString('pt-BR')}`,68,H-78);
+  ctx.textAlign='right';
+  ctx.fillText(plain(currentWorkspaceName,'FINORA'),W-68,H-78);
+  ctx.textAlign='left';
+
+  return canvasBlob(c);
+}
+
+function directLink(x){
+  const u=new URL(location.href);
+  u.hash=`lancamento=${encodeURIComponent(String(x.id))}`;
+  return u.toString();
+}
+
+function selectedRecipients(){
+  return [...document.querySelectorAll('#finoraR721Members input[data-share-member]:checked')].map(el=>({
+    id:el.value,
+    name:el.dataset.name||'',
+    email:el.dataset.email||''
+  }));
+}
+
+function audit(action,x,extra={}){
+  try{
+    if(typeof finoraAuditLog==='function'){
+      finoraAuditLog(
+        action,
+        'LANCAMENTO',
+        x.id,
+        'Compartilhamento de lançamento',
+        null,
+        {
+          descricao:x.descricao,
+          recipients:selectedRecipients(),
+          message:String($721('finoraR721ShareMessage')?.value||'').trim(),
+          channel:extra.channel||'manual',
+          sharedAt:new Date().toISOString()
+        }
+      );
+    }
+  }catch(e){}
+}
+
+window.finoraOpenTransactionShareR721=function(id){
+  const x=rowById(id);
+  if(!x){toast721('Lançamento não encontrado.');return}
+
+  activeId=String(id);
+  $721('finoraR721CardDescription').textContent=plain(x.descricao);
+  $721('finoraR721CardMeta').textContent=`${x.tipo==='entrada'?'ENTRADA':'SAÍDA'} · ${statusLabel(x)}`;
+
+  const v=$721('finoraR721CardValue');
+  v.textContent=amountLabel(x);
+  v.classList.toggle('in',x.tipo==='entrada');
+  v.classList.toggle('out',x.tipo!=='entrada');
+
+  renderDetails(x);
+  renderMembers();
+  $721('finoraR721ShareMessage').value='';
+
+  const root=$721('finoraR721ShareBackdrop');
+  root.classList.add('open');
+  root.setAttribute('aria-hidden','false');
+  document.body.style.overflow='hidden';
+};
+
+function close(){
+  const root=$721('finoraR721ShareBackdrop');
+  root?.classList.remove('open');
+  root?.setAttribute('aria-hidden','true');
+  activeId=null;
+  document.body.style.overflow='';
+}
+
+$721('finoraR721ShareClose')?.addEventListener('click',close);
+$721('finoraR721ShareBackdrop')?.addEventListener('click',e=>{
+  if(e.target===$721('finoraR721ShareBackdrop'))close();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape' && $721('finoraR721ShareBackdrop')?.classList.contains('open'))close();
+});
+
+$721('finoraR721CopyText')?.addEventListener('click',async()=>{
+  const x=rowById(activeId);if(!x)return;
+  try{
+    await copyText(shareText(x));
+    audit('COMPARTILHOU',x,{channel:'clipboard-text'});
+    toast721('Detalhes copiados.');
+  }catch(e){
+    console.error(e);toast721('Não foi possível copiar os detalhes.');
+  }
+});
+
+$721('finoraR721CopyLink')?.addEventListener('click',async()=>{
+  const x=rowById(activeId);if(!x)return;
+  try{
+    await copyText(directLink(x));
+    audit('COMPARTILHOU',x,{channel:'internal-link'});
+    toast721('Link interno copiado.');
+  }catch(e){
+    console.error(e);toast721('Não foi possível copiar o link.');
+  }
+});
+
+$721('finoraR721CopyImage')?.addEventListener('click',async()=>{
+  const x=rowById(activeId);if(!x)return;
+  const btn=$721('finoraR721CopyImage');
+  const old=btn.textContent;btn.disabled=true;btn.textContent='Gerando imagem…';
+  try{
+    const blob=await imageBlobFor(x);
+    if(navigator.clipboard?.write && typeof ClipboardItem!=='undefined'){
+      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+      audit('COMPARTILHOU',x,{channel:'clipboard-image'});
+      toast721('Imagem copiada. Agora é só colar no WhatsApp ou outra ferramenta.');
+    }else{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=`finora-${String(x.descricao||'lancamento').toLowerCase().replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'')}.png`;
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+      audit('COMPARTILHOU',x,{channel:'image-download-fallback'});
+      toast721('O navegador não permite copiar imagens diretamente; o PNG foi preparado para compartilhamento.');
+    }
+  }catch(e){
+    console.error(e);
+    toast721('Não foi possível copiar a imagem neste navegador.');
+  }finally{
+    btn.disabled=false;btn.textContent=old;
+  }
+});
+
+$721('finoraR721NativeShare')?.addEventListener('click',async()=>{
+  const x=rowById(activeId);if(!x)return;
+  const btn=$721('finoraR721NativeShare');
+  const old=btn.textContent;btn.disabled=true;btn.textContent='Preparando…';
+  try{
+    const blob=await imageBlobFor(x);
+    const file=new File([blob],'finora-lancamento.png',{type:'image/png'});
+    const payload={
+      title:`FINORA — ${plain(x.descricao)}`,
+      text:shareText(x)
+    };
+
+    if(navigator.share){
+      if(navigator.canShare?.({files:[file]})){
+        payload.files=[file];
+      }else{
+        payload.url=directLink(x);
+      }
+      await navigator.share(payload);
+      audit('COMPARTILHOU',x,{channel:'web-share'});
+      toast721('Compartilhamento aberto.');
+    }else{
+      await copyText(shareText(x));
+      audit('COMPARTILHOU',x,{channel:'share-fallback-text'});
+      toast721('Compartilhamento nativo indisponível; os detalhes foram copiados.');
+    }
+  }catch(e){
+    if(e?.name!=='AbortError'){
+      console.error(e);toast721('Não foi possível abrir o compartilhamento.');
+    }
+  }finally{
+    btn.disabled=false;btn.textContent=old;
+  }
+});
+
+$721('finoraR721RegisterShare')?.addEventListener('click',()=>{
+  const x=rowById(activeId);if(!x)return;
+  const recipients=selectedRecipients();
+  const message=String($721('finoraR721ShareMessage')?.value||'').trim();
+
+  // Guarda somente histórico informativo no próprio lançamento.
+  x.shareHistory=Array.isArray(x.shareHistory)?x.shareHistory:[];
+  x.shareHistory.push({
+    at:new Date().toISOString(),
+    recipients,
+    message
+  });
+  // Limite para não inflar o registro ao longo do tempo.
+  x.shareHistory=x.shareHistory.slice(-30);
+  x.updatedAt=new Date().toISOString();
+
+  try{
+    if(typeof save==='function')save();
+  }catch(e){
+    console.error(e);
+    toast721('Não foi possível registrar o compartilhamento.');
+    return;
+  }
+
+  audit('COMPARTILHOU',x,{channel:'workspace-record'});
+  toast721(recipients.length
+    ? `Compartilhamento registrado para ${recipients.length} destinatário${recipients.length===1?'':'s'}.`
+    : 'Compartilhamento registrado na Auditoria.');
+});
+
+function tryOpenHash(){
+  const hash=String(location.hash||'');
+  const m=hash.match(/^#lancamento=(.+)$/);
+  if(!m)return;
+  const id=decodeURIComponent(m[1]);
+  const x=rowById(id);
+  if(x){
+    try{
+      if(typeof openLaunchModal==='function')openLaunchModal('list');
+    }catch(e){}
+    setTimeout(()=>window.finoraOpenTransactionShareR721(id),100);
+  }
+}
+
+window.addEventListener('hashchange',tryOpenHash);
+window.addEventListener('pageshow',()=>setTimeout(tryOpenHash,250));
+
+window.finoraR721Health=function(id){
+  const x=rowById(id);
+  return {
+    release:'1.0.10-R7.21',
+    transaction:x?{
+      id:x.id,
+      descricao:x.descricao,
+      shareHistory:Array.isArray(x.shareHistory)?x.shareHistory.length:0
+    }:null,
+    clipboardImage:!!(navigator.clipboard?.write && typeof ClipboardItem!=='undefined'),
+    webShare:typeof navigator.share==='function'
   };
 };
 })();
