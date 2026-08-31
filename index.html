@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.21.1-share-overlay-fix">
+<meta name="finora-release" content="R7.22-network-guard">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -7608,6 +7608,95 @@ body.dark .finora-r721-share-icon{
   z-index:2147483640 !important;
 }
 </style>
+
+
+<script>
+/* FINORA R7.22 — camada conservadora de estabilidade/performance
+   Objetivo: reduzir rajadas de chamadas idênticas sem alterar regras de negócio.
+   Atua somente em GET/HEAD repetidos; POST/PUT/PATCH/DELETE passam intactos. */
+(function () {
+  if (window.__FINORA_NETWORK_GUARD__) return;
+  window.__FINORA_NETWORK_GUARD__ = true;
+
+  const nativeFetch = window.fetch.bind(window);
+  const inflight = new Map();
+  const recent = new Map();
+  const GET_TTL_MS = 1200;
+  const MAX_RECENT = 80;
+
+  function methodOf(input, init) {
+    return String((init && init.method) ||
+      (input && typeof input === 'object' && input.method) || 'GET').toUpperCase();
+  }
+  function urlOf(input) {
+    try { return typeof input === 'string' ? input : input.url; }
+    catch (_) { return String(input || ''); }
+  }
+  function keyOf(input, init) {
+    const method = methodOf(input, init);
+    if (method !== 'GET' && method !== 'HEAD') return null;
+    const headers = (init && init.headers) || (input && input.headers);
+    let auth = '';
+    try {
+      if (headers instanceof Headers) auth = headers.get('authorization') || '';
+      else if (headers) auth = headers.authorization || headers.Authorization || '';
+    } catch (_) {}
+    return method + '|' + urlOf(input) + '|' + auth;
+  }
+  function cloneResponse(r) {
+    try { return r.clone(); } catch (_) { return r; }
+  }
+  function prune() {
+    if (recent.size <= MAX_RECENT) return;
+    const now = Date.now();
+    for (const [k, v] of recent) {
+      if (now - v.time > GET_TTL_MS) recent.delete(k);
+      if (recent.size <= MAX_RECENT) break;
+    }
+  }
+
+  window.fetch = function(input, init) {
+    const key = keyOf(input, init);
+    if (!key) return nativeFetch(input, init);
+
+    const cached = recent.get(key);
+    if (cached && (Date.now() - cached.time) < GET_TTL_MS) {
+      return Promise.resolve(cloneResponse(cached.response));
+    }
+
+    const pending = inflight.get(key);
+    if (pending) return pending.then(cloneResponse);
+
+    const req = nativeFetch(input, init).then(function(response) {
+      /* Cache curtíssimo apenas de respostas GET/HEAD bem-sucedidas.
+         Erros 429/5xx não são reexecutados aqui, evitando amplificação. */
+      if (response && response.ok) {
+        recent.set(key, { time: Date.now(), response: cloneResponse(response) });
+        prune();
+      }
+      return response;
+    }).finally(function() {
+      inflight.delete(key);
+    });
+
+    inflight.set(key, req);
+    return req.then(cloneResponse);
+  };
+
+  /* Pausa timers da página quando a aba está oculta.
+     Não cancela timers existentes; apenas impede trabalho repetitivo invisível
+     criado depois desta camada quando o callback é disparado via intervalos. */
+  const nativeSetInterval = window.setInterval.bind(window);
+  window.setInterval = function(fn, delay) {
+    if (typeof fn !== 'function') return nativeSetInterval(fn, delay);
+    const wrapped = function() {
+      if (document.visibilityState === 'hidden') return;
+      return fn.apply(this, arguments);
+    };
+    return nativeSetInterval(wrapped, delay);
+  };
+})();
+</script>
 
 </head>
 <body>
