@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.26-zero-cost-performance">
+<meta name="finora-release" content="R7.27-delete-local-first">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -11403,36 +11403,54 @@ async function deleteRow(id){
 
   const desc=x.descricao||'este lançamento';
   const value=money(Number(x.valor)||0);
-  if(!confirm(`Excluir "${desc}" (${value})?\n\nA exclusão será sincronizada com os outros dispositivos.`))return false;
+
+  if(!confirm(`Excluir "${desc}" (${value})?\n\nO lançamento será removido agora e sincronizado com os demais dispositivos em segundo plano.`)){
+    return false;
+  }
 
   try{
-    // Tombstone first: prevents a stale cloud poll from resurrecting the row.
+    // R7.27: exclusão local é a confirmação operacional.
+    // O Supabase não bloqueia mais a remoção da tela.
     recordTransactionDeletion(x.id);
+
     data=data.filter(r=>String(r.id)!==String(x.id));
     localStorage.setItem(KEY,JSON.stringify(data));
-    if(typeof finoraAuditLog==='function'){
-      finoraAuditLog('EXCLUIU','LANCAMENTO',x.id,'Lançamento excluído',x,null);
-    }
 
-    // Immediate visual feedback on desktop/web.
+    // Marca mutação para a fila durável já existente.
+    try{
+      if(typeof finoraRememberPendingTxV79==='function'){
+        finoraRememberPendingTxV79([],currentWorkspaceId);
+      }
+    }catch(e){}
+
+    try{
+      if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
+    }catch(e){}
+
     render();
-    toast('Excluindo e sincronizando...');
+    toast('Lançamento excluído.');
 
-    // Persist immediately instead of depending only on the debounce timer.
+    // Auditoria não pode bloquear a exclusão.
+    try{
+      if(typeof finoraAuditLog==='function'){
+        Promise.resolve(
+          finoraAuditLog('EXCLUIU','LANCAMENTO',x.id,'Lançamento excluído',x,null)
+        ).catch(()=>{});
+      }
+    }catch(e){}
+
+    // Sincroniza depois, sem manter a interface esperando e sem loop de 401.
     if(cloudConfigured()){
-      const ok=await pushCloudState(false);
-      if(!ok)throw new Error('A nuvem não confirmou a exclusão.');
+      finoraCloudDirty=true;
+      finoraCloudPushPending=true;
+      scheduleCloudPush();
     }
 
-    render();
-    toast('Lançamento excluído e sincronizado.');
     return true;
   }catch(e){
-    console.error('FINORA delete transaction',e);
-    // Keep the tombstone/local deletion: next successful sync will finish it.
+    console.error('FINORA R7.27 delete transaction',e);
     render();
-    toast('Lançamento removido deste aparelho. A sincronização será repetida automaticamente.');
-    scheduleCloudPush();
+    toast('Não foi possível concluir a exclusão neste dispositivo.');
     return false;
   }
 }
@@ -12646,8 +12664,60 @@ async function saveCloudConfiguration(){
   updateCloudUI();
   startCloudPolling();
 }
+
+let finoraR727CloudAuthBackoffUntil=0;
+
+function finoraR727ErrorStatus(err){
+  return Number(
+    err?.status ||
+    err?.statusCode ||
+    err?.response?.status ||
+    String(err?.message||'').match(/\b(401|403|429|500|502|503|504)\b/)?.[1] ||
+    0
+  );
+}
+
+async function finoraR727CloudSession(){
+  try{
+    const client=getCloudClient();
+    if(!client)return null;
+
+    const {data,error}=await client.auth.getSession();
+    if(error)return null;
+
+    let session=data?.session||null;
+    if(session?.user?.id)return session;
+
+    // Uma única tentativa de refresh. Não entra em loop.
+    try{
+      const refreshed=await client.auth.refreshSession();
+      session=refreshed?.data?.session||null;
+    }catch(e){}
+
+    return session?.user?.id ? session : null;
+  }catch(e){
+    return null;
+  }
+}
+
 async function pushCloudState(showToast=false){
   if(!cloudConfigured())return false;
+
+  // R7.27: após 401/403, não martela o Supabase.
+  if(Date.now()<finoraR727CloudAuthBackoffUntil){
+    finoraCloudDirty=true;
+    finoraCloudPushPending=true;
+    return false;
+  }
+
+  const cloudSession=await finoraR727CloudSession();
+  if(!cloudSession){
+    finoraCloudDirty=true;
+    finoraCloudPushPending=true;
+    finoraR727CloudAuthBackoffUntil=Date.now()+120000;
+    finoraSyncIndicatorR726('error','Salvo localmente — sessão da nuvem será retomada');
+    return false;
+  }
 
   // Nunca descarta um push por concorrência: coloca na fila.
   if(finoraCloudBusy){
@@ -12751,10 +12821,19 @@ async function pushCloudState(showToast=false){
     if(showToast)toast('Dados enviados e consolidados na nuvem.');
     return true;
   }catch(e){
+    const status=finoraR727ErrorStatus(e);
     console.error('FINORA cloud push',e);
+
     finoraCloudDirty=true;
     finoraCloudPushPending=true;
-    finoraSyncIndicatorR726('error','Salvo localmente — sincronização pendente');
+
+    if(status===401 || status===403){
+      finoraR727CloudAuthBackoffUntil=Date.now()+120000;
+      finoraSyncIndicatorR726('error','Salvo localmente — aguardando sessão da nuvem');
+    }else{
+      finoraSyncIndicatorR726('error','Salvo localmente — sincronização pendente');
+    }
+
     updateCloudUI('error');
     if(showToast)toast('Dados salvos localmente. A sincronização será tentada depois.');
     return false;
@@ -12764,9 +12843,18 @@ async function pushCloudState(showToast=false){
 }
 function scheduleCloudPush(){
   if(!cloudConfigured() || !finoraWorkspaceHydrated())return;
+
   finoraCloudPushPending=true;
   clearTimeout(finoraCloudPushTimer);
-  finoraCloudPushTimer=setTimeout(()=>pushCloudState(false),1800);
+
+  const wait=Math.max(
+    1800,
+    finoraR727CloudAuthBackoffUntil>Date.now()
+      ? finoraR727CloudAuthBackoffUntil-Date.now()
+      : 0
+  );
+
+  finoraCloudPushTimer=setTimeout(()=>pushCloudState(false),wait);
 }
 async function pullCloudState(showToast=false){
   if(!cloudConfigured())return false;
@@ -12840,9 +12928,9 @@ async function pullCloudState(showToast=false){
     // PRIMEIRA HIDRATAÇÃO:
     // o Supabase é a fonte de verdade. Não fazemos merge com cache local.
     // Depois de hidratado, sincronizações em tempo real continuam usando merge/tombstones.
-    const mergedTombstones=firstHydration
-      ? remoteTombstones
-      : mergeTombstones(remoteTombstones,localTombstones);
+    // R7.27: tombstones locais sempre vencem.
+    // Uma exclusão feita durante indisponibilidade da nuvem não pode ressuscitar no próximo pull.
+    const mergedTombstones=mergeTombstones(remoteTombstones,localTombstones);
     let mergedTx=firstHydration
       ? remoteTx
       : mergeTransactions(localTx,remoteTx,mergedTombstones);
@@ -12971,19 +13059,29 @@ async function finoraAutoPull(){
 
 function startFinoraRealtimeSync(){
   try{
-    if(finoraRealtimeChannel && finoraSupabase?.removeChannel){
-      finoraSupabase.removeChannel(finoraRealtimeChannel);
+    const realtimeClient=getCloudClient();
+
+    if(finoraRealtimeChannel && realtimeClient?.removeChannel){
+      realtimeClient.removeChannel(finoraRealtimeChannel);
       finoraRealtimeChannel=null;
     }
-    if(!cloudConfigured() || !finoraSupabase || !currentWorkspaceId)return;
-    finoraRealtimeChannel=finoraSupabase
+
+    if(!cloudConfigured() || !realtimeClient || !currentWorkspaceId)return;
+
+    finoraRealtimeChannel=realtimeClient
       .channel('finora-workspace-'+currentWorkspaceId)
       .on('postgres_changes',{
-        event:'*',schema:'public',table:'finora_workspace_state',
+        event:'*',
+        schema:'public',
+        table:'finora_workspace_state',
         filter:'workspace_id=eq.'+currentWorkspaceId
-      },()=>finoraAutoPull())
+      },()=>{
+        if(finoraR726CanAutoSync(false))finoraAutoPull();
+      })
       .subscribe();
-  }catch(e){ console.warn('FINORA realtime indisponível; usando atualização por foco.',e); }
+  }catch(e){
+    console.warn('FINORA R7.27 realtime indisponível; usando atualização por foco.',e);
+  }
 }
 
 window.addEventListener('focus',()=>{
@@ -13726,6 +13824,7 @@ $('doLogin').addEventListener('click',async()=>{
       // R7.24 permanece: e-mail direto / CPF cache-first.
       const cloudUser=await loginWithSupabase(identifier,password);
       localStorage.setItem(FINORA_SESSION_KEY,cloudUser.id);
+      finoraR727CloudAuthBackoffUntil=0;
 
       // O botão fica bloqueado até a interface principal abrir.
       btn && (btn.textContent='Carregando...');
