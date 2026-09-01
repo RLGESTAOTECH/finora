@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.28-delete-hard-fix">
+<meta name="finora-release" content="R7.29-delete-anti-resurrection">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -8499,7 +8499,20 @@ function finoraClearConfirmedPendingTxV79(remoteRows,workspaceId=currentWorkspac
   pending.forEach(local=>{const remote=rm.get(String(local.id||''));if(!remote){remaining.push(local);return}const lt=Date.parse(local.updatedAt||local.createdAt||0)||0,rt=Date.parse(remote.updatedAt||remote.createdAt||0)||0;if(rt>lt||(rt===lt&&finoraTxSameV79(remote,local)))confirmed++;else remaining.push(local)});
   if(remaining.length)s[ws]=remaining;else delete s[ws];finoraSavePendingTxV79(s);return {remaining:remaining.length,confirmed};
 }
-function finoraOverlayPendingTxV79(rows,workspaceId=currentWorkspaceId){const p=finoraPendingTxForWorkspaceV79(workspaceId);return p.length?mergeTransactions(Array.isArray(rows)?rows:[],p,[]):(Array.isArray(rows)?rows:[])}
+function finoraOverlayPendingTxV79(rows,workspaceId=currentWorkspaceId){
+  const deleted=finoraDeletedIdSetR729(workspaceId);
+  const p=finoraPendingTxForWorkspaceV79(workspaceId)
+    .filter(x=>!deleted.has(String(x?.id||'')));
+
+  const base=finoraFilterDeletedRowsR729(rows,workspaceId);
+
+  return p.length
+    ? finoraFilterDeletedRowsR729(
+        mergeTransactions(base,p,loadDeletedTransactions().filter(t=>String(t?.workspaceId||'')===String(workspaceId||''))),
+        workspaceId
+      )
+    : base;
+}
 
 function finoraCanonicalTransactions(rows){
   const map=new Map();
@@ -12458,6 +12471,40 @@ function normalizeTxRecord(x){
     String(x.tipo||'')+'-'+String(x.descricao||'')+'-'+String(x.dataLancamento||x.vencimento||'')+'-'+String(x.valor||0));
   return {...x,id,workspaceId:x.workspaceId||currentWorkspaceId,account:'family'};
 }
+
+function finoraDeletedIdSetR729(workspaceId=currentWorkspaceId){
+  const ws=String(workspaceId||'');
+  return new Set(
+    loadDeletedTransactions()
+      .filter(t=>String(t?.workspaceId||'')===ws && t?.id)
+      .map(t=>String(t.id))
+  );
+}
+
+function finoraFilterDeletedRowsR729(rows,workspaceId=currentWorkspaceId){
+  const deleted=finoraDeletedIdSetR729(workspaceId);
+  return (Array.isArray(rows)?rows:[]).filter(x=>!deleted.has(String(x?.id||'')));
+}
+
+function finoraRemovePendingTxR729(id,workspaceId=currentWorkspaceId){
+  try{
+    const ws=String(workspaceId||'');
+    const txId=String(id||'');
+    if(!ws || !txId)return;
+
+    const store=finoraLoadPendingTxV79();
+    const current=Array.isArray(store[ws])?store[ws]:[];
+    const next=current.filter(x=>String(x?.id||'')!==txId);
+
+    if(next.length)store[ws]=next;
+    else delete store[ws];
+
+    finoraSavePendingTxV79(store);
+  }catch(e){
+    console.warn('FINORA R7.29 pending cleanup',e);
+  }
+}
+
 function mergeTransactions(localRows,remoteRows,tombstones){
   const map=new Map();
   [...(Array.isArray(remoteRows)?remoteRows:[]),...(Array.isArray(localRows)?localRows:[])].forEach(raw=>{
@@ -12503,7 +12550,9 @@ function recordTransactionDeletion(id){
 }
 
 function cloudStatePayload(){
-  const workspaceRows=finoraCanonicalTransactions(data.filter(x=>sameWorkspace(x)));
+  const workspaceRows=finoraCanonicalTransactions(
+    finoraFilterDeletedRowsR729(data.filter(x=>sameWorkspace(x)),currentWorkspaceId)
+  );
   const cards=accountCards();
   const members=familyMembersDirectory()
     .filter(u=>u.workspaceId===currentWorkspaceId)
@@ -12799,6 +12848,14 @@ async function pushCloudState(showToast=false){
         payload.transactions.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'}))
       )
     );
+    data=finoraCanonicalTransactions(
+      data.filter(x=>!sameWorkspace(x)).concat(
+        finoraFilterDeletedRowsR729(
+          data.filter(x=>sameWorkspace(x)),
+          currentWorkspaceId
+        )
+      )
+    );
     localStorage.setItem(KEY,JSON.stringify(data));
     saveDeletedTransactions(payload.transactionTombstones||[]);
     saveFinoraCards(loadFinoraCards().filter(c=>c.workspaceId!==currentWorkspaceId).concat(payload.cards||[]));
@@ -12931,9 +12988,17 @@ async function pullCloudState(showToast=false){
     // R7.27: tombstones locais sempre vencem.
     // Uma exclusão feita durante indisponibilidade da nuvem não pode ressuscitar no próximo pull.
     const mergedTombstones=mergeTombstones(remoteTombstones,localTombstones);
-    let mergedTx=firstHydration
-      ? remoteTx
-      : mergeTransactions(localTx,remoteTx,mergedTombstones);
+    // R7.29: mesmo na primeira hidratação, exclusões locais vencem.
+    // Nunca usa remoteTx cru, pois isso ressuscitava registros já excluídos.
+    let mergedTx=mergeTransactions(
+      firstHydration ? [] : localTx,
+      remoteTx,
+      mergedTombstones
+    );
+
+    // Defesa adicional: qualquer ID com tombstone local permanece invisível
+    // até a exclusão ser consolidada na nuvem.
+    mergedTx=finoraFilterDeletedRowsR729(mergedTx,currentWorkspaceId);
 
     const pendingR719=finoraPendingTxForWorkspaceV79(currentWorkspaceId);
     if(pendingR719.length){
@@ -23869,10 +23934,14 @@ function finoraR728PersistLocalDelete(x){
     console.error('FINORA R7.28 tombstone',e);
   }
 
-  // 2) Remove da coleção em memória.
+  // 2) Remove também da fila de transações pendentes.
+  // Essa fila era uma das causas do registro reaparecer após o render/pull.
+  finoraRemovePendingTxR729(id,currentWorkspaceId);
+
+  // 3) Remove da coleção em memória.
   data=(Array.isArray(data)?data:[]).filter(r=>String(r?.id||'')!==id);
 
-  // 3) Persiste imediatamente no storage local.
+  // 4) Persiste imediatamente no storage local.
   try{
     localStorage.setItem(KEY,JSON.stringify(data));
   }catch(e){
@@ -23929,7 +23998,10 @@ function finoraR728Delete(id,btn){
     `A sincronização com os demais dispositivos ocorrerá em segundo plano.`
   );
 
-  if(!ok)return false;
+  if(!ok){
+    if(btn?.isConnected)btn.disabled=false;
+    return false;
+  }
 
   try{
     finoraR728PersistLocalDelete(x);
@@ -23998,6 +24070,9 @@ document.addEventListener('click',function(event){
   event.stopImmediatePropagation();
 
   if(btn.dataset.r728Busy==='1')return;
+
+  // Bloqueia a ação visualmente antes mesmo da confirmação.
+  btn.disabled=true;
   btn.dataset.r728Busy='1';
 
   try{
@@ -24030,6 +24105,27 @@ window.finoraR728DeleteHealth=function(id){
 };
 
 })();
+</script>
+
+
+<script id="finora-r729-delete-health">
+window.finoraR729DeleteHealth=function(id){
+  const txId=String(id||'');
+  const ws=String(currentWorkspaceId||'');
+  const tombstones=loadDeletedTransactions().filter(t=>String(t?.workspaceId||'')===ws);
+  const pending=finoraPendingTxForWorkspaceV79(ws);
+  const local=(Array.isArray(data)?data:[]).filter(x=>String(x?.workspaceId||'')===ws);
+
+  return {
+    release:'R7.29',
+    id:txId,
+    existsInLocalData:local.some(x=>String(x?.id||'')===txId),
+    tombstonePresent:tombstones.some(t=>String(t?.id||'')===txId),
+    existsInPendingQueue:pending.some(x=>String(x?.id||'')===txId),
+    cloudDirty:typeof finoraCloudDirty!=='undefined'?!!finoraCloudDirty:null,
+    cloudPushPending:typeof finoraCloudPushPending!=='undefined'?!!finoraCloudPushPending:null
+  };
+};
 </script>
 
 </body>
