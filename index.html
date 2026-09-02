@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.34-combo-performance-recovery">
+<meta name="finora-release" content="R7.35-transaction-integrity">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -11251,8 +11251,21 @@ $('forma')?.addEventListener('change',()=>{
 $('entryForm').addEventListener('submit',async e=>{
   e.preventDefault();
   if($('valor'))$('valor').value=formatBRLInput($('valor').value);
-  const id=$('editId').value||crypto.randomUUID();
-  const old=data.find(x=>x.id===id);
+  const explicitEditId=String(
+    $('editId').value ||
+    window.__finoraEditingTransactionIdR735 ||
+    ''
+  ).trim();
+
+  const id=explicitEditId || crypto.randomUUID();
+  const old=data.find(x=>String(x.id)===String(id));
+
+  // R7.35: uma edição nunca pode virar inclusão silenciosamente.
+  if(explicitEditId && !old){
+    console.error('FINORA R7.35: edição sem registro-base',explicitEditId);
+    toast('O lançamento original não foi localizado. Atualize a tela antes de editar novamente.');
+    return;
+  }
   let attachment=old?.attachment||null;
   const f=$('arquivo').files[0]; if(f) attachment=await readFile(f);
   let descVal=$('descricao').value.trim();
@@ -11374,9 +11387,10 @@ $('entryForm').addEventListener('submit',async e=>{
   }
   if(row.recorrente==='mensal') ensureRecurringNextMonths();
   const savedMode=row.tipo==='entrada'?'entrada':'saida';
+  window.__finoraEditingTransactionIdR735='';
   resetForm();
   applyLaunchMode(savedMode,{keepForm:true});
-  toast('Lançamento salvo com sucesso.');
+  toast(idx>=0?'Lançamento atualizado com sucesso.':'Lançamento salvo com sucesso.');
 });
 
 
@@ -11532,6 +11546,7 @@ function finoraReconcilePaidStatusR716(x){
 
 function editRow(id){
   let x=data.find(r=>String(r.id)===String(id));if(!x)return;
+  window.__finoraEditingTransactionIdR735=String(x.id||'');
   x=finoraReconcilePaidStatusR716(x);
   openSectionModal('simpleLaunchPanel');
   applyLaunchMode(x.tipo==='entrada'?'entrada':'saida',{keepForm:true});
@@ -11592,63 +11607,93 @@ function editRow(id){
   const _launch=$('simpleLaunchPanel');if(_launch)_launch.scrollTo({top:0,behavior:'smooth'});
 }
 async function deleteRow(id){
-  const x=data.find(r=>String(r.id)===String(id) && sameWorkspace(r));
+  const txId=String(id||'');
+  const x=(Array.isArray(data)?data:[]).find(r=>
+    String(r?.id||'')===txId &&
+    (typeof sameWorkspace!=='function'||sameWorkspace(r))
+  );
+
   if(!x){
     toast('Lançamento não encontrado ou já excluído.');
-    render();
+    try{render()}catch(e){}
     return false;
   }
 
   const desc=x.descricao||'este lançamento';
   const value=money(Number(x.valor)||0);
 
-  if(!confirm(`Excluir "${desc}" (${value})?\n\nO lançamento será removido agora e sincronizado com os demais dispositivos em segundo plano.`)){
+  if(!confirm(`Excluir "${desc}" (${value})?\n\nA exclusão será aplicada imediatamente e não poderá reaparecer pela sincronização.`)){
     return false;
   }
 
   try{
-    // R7.27: exclusão local é a confirmação operacional.
-    // O Supabase não bloqueia mais a remoção da tela.
-    recordTransactionDeletion(x.id);
+    // 1. Tombstone vem antes de qualquer remoção.
+    if(typeof recordTransactionDeletion==='function'){
+      recordTransactionDeletion(txId);
+    }
 
-    data=data.filter(r=>String(r.id)!==String(x.id));
-    localStorage.setItem(KEY,JSON.stringify(data));
-
-    // Marca mutação para a fila durável já existente.
+    // 2. Retira qualquer cópia da fila de alterações pendentes.
     try{
-      if(typeof finoraRememberPendingTxV79==='function'){
-        finoraRememberPendingTxV79([],currentWorkspaceId);
+      if(typeof finoraRemovePendingTxR729==='function'){
+        finoraRemovePendingTxR729(txId,currentWorkspaceId);
       }
     }catch(e){}
 
+    // 3. Remove TODAS as cópias locais com o mesmo ID.
+    data=(Array.isArray(data)?data:[]).filter(r=>String(r?.id||'')!==txId);
+
+    // 4. Filtro defensivo: nenhum ID tombstonado permanece no workspace atual.
     try{
-      if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
+      if(typeof finoraFilterDeletedRowsR729==='function'){
+        const other=data.filter(r=>typeof sameWorkspace==='function'&&!sameWorkspace(r));
+        const current=data.filter(r=>typeof sameWorkspace!=='function'||sameWorkspace(r));
+        data=typeof finoraCanonicalTransactions==='function'
+          ? finoraCanonicalTransactions(other.concat(
+              finoraFilterDeletedRowsR729(current,currentWorkspaceId)
+            ))
+          : other.concat(finoraFilterDeletedRowsR729(current,currentWorkspaceId));
+      }
     }catch(e){}
 
-    render();
-    toast('Lançamento excluído.');
+    localStorage.setItem(KEY,JSON.stringify(data));
 
-    // Auditoria não pode bloquear a exclusão.
+    try{if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty()}catch(e){}
+    try{
+      finoraCloudDirty=true;
+      finoraCloudPushPending=true;
+    }catch(e){}
+
+    // UI muda antes da rede.
+    render();
+    try{if(typeof renderV84Dashboard==='function')renderV84Dashboard()}catch(e){}
+    try{if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut()}catch(e){}
+    toast('Lançamento excluído com sucesso.');
+
     try{
       if(typeof finoraAuditLog==='function'){
         Promise.resolve(
-          finoraAuditLog('EXCLUIU','LANCAMENTO',x.id,'Lançamento excluído',x,null)
+          finoraAuditLog('EXCLUIU','LANCAMENTO',txId,'Lançamento excluído',x,null)
         ).catch(()=>{});
       }
     }catch(e){}
 
-    // Sincroniza depois, sem manter a interface esperando e sem loop de 401.
-    if(cloudConfigured()){
-      finoraCloudDirty=true;
-      finoraCloudPushPending=true;
-      scheduleCloudPush();
-    }
+    // Uma tentativa de sincronização, fora do caminho crítico.
+    try{
+      if(typeof cloudConfigured==='function' && cloudConfigured()){
+        setTimeout(()=>{
+          try{
+            if(typeof pushCloudState==='function'){
+              Promise.resolve(pushCloudState(false)).catch(()=>{});
+            }
+          }catch(e){}
+        },500);
+      }
+    }catch(e){}
 
     return true;
   }catch(e){
-    console.error('FINORA R7.27 delete transaction',e);
-    render();
-    toast('Não foi possível concluir a exclusão neste dispositivo.');
+    console.error('FINORA R7.35 delete',e);
+    toast('Não foi possível concluir a exclusão.');
     return false;
   }
 }
@@ -11753,6 +11798,7 @@ document.querySelectorAll('.account').forEach(b=>b.onclick=()=>{});
 ['busca','filtroTipo','filtroStatus','filtroMes'].forEach(id=>$(id).addEventListener('input',render));
 ['alertMonthFilter','alertCategoryFilter','alertTypeFilter'].forEach(id=>$(id)?.addEventListener('change',renderAlerts));
 $('cancelEdit').onclick=()=>{
+  window.__finoraEditingTransactionIdR735='';
   const mode=currentLaunchMode==='entrada'?'entrada':currentLaunchMode==='saida'?'saida':$('tipo').value;
   resetForm();
   applyLaunchMode(mode,{keepForm:true});
@@ -15305,12 +15351,30 @@ setTimeout(renderHomeCategoryDonut,0);
         return;
       }
 
+      const quickFingerprint=[
+        String(currentWorkspaceId||''),
+        quickType,
+        desc.toLocaleLowerCase('pt-BR'),
+        Number(value).toFixed(2),
+        category.toLocaleLowerCase('pt-BR'),
+        payment.toLocaleLowerCase('pt-BR'),
+        date
+      ].join('|');
+
+      const quickNow=Date.now();
+      const lastQuick=window.__finoraLastQuickSaveR735||{};
+      if(lastQuick.fingerprint===quickFingerprint && quickNow-Number(lastQuick.at||0)<8000){
+        if(typeof toast==='function')toast('Este lançamento já foi salvo.');
+        return;
+      }
+
       saveBtn.dataset.busy='1';
       saveBtn.disabled=true;
       const originalText=saveBtn.textContent;
       saveBtn.textContent='Salvando...';
 
       try{
+        window.__finoraLastQuickSaveR735={fingerprint:quickFingerprint,at:quickNow};
         let selectedPerson='';
         try{
           const currentSelect=document.getElementById('pessoa');
@@ -24091,229 +24155,6 @@ window.finoraR721Health=function(id){
 </div>
 
 
-<script id="finora-r728-delete-hard-fix">
-(function(){
-'use strict';
-
-if(window.__FINORA_R728_DELETE_INSTALLED__)return;
-window.__FINORA_R728_DELETE_INSTALLED__=true;
-
-function finoraR728FindTransaction(id){
-  try{
-    return (Array.isArray(data)?data:[]).find(r=>
-      String(r?.id||'')===String(id) &&
-      (typeof sameWorkspace!=='function' || sameWorkspace(r))
-    )||null;
-  }catch(e){return null}
-}
-
-function finoraR728PersistLocalDelete(x){
-  const id=String(x.id);
-
-  // 1) Tombstone primeiro: mesmo que o restante falhe, o item não pode ressuscitar.
-  try{
-    if(typeof recordTransactionDeletion==='function'){
-      recordTransactionDeletion(id);
-    }
-  }catch(e){
-    console.error('FINORA R7.28 tombstone',e);
-  }
-
-  // 2) Remove também da fila de transações pendentes.
-  // Essa fila era uma das causas do registro reaparecer após o render/pull.
-  finoraRemovePendingTxR729(id,currentWorkspaceId);
-
-  // 3) Remove da coleção em memória.
-  data=(Array.isArray(data)?data:[]).filter(r=>String(r?.id||'')!==id);
-
-  // 4) Persiste imediatamente no storage local.
-  try{
-    localStorage.setItem(KEY,JSON.stringify(data));
-  }catch(e){
-    console.error('FINORA R7.28 localStorage',e);
-    throw new Error('O navegador não permitiu salvar a exclusão localmente.');
-  }
-
-  // 4) Mantém o estado de nuvem como pendente, mas SEM chamar a rede agora.
-  try{
-    finoraCloudDirty=true;
-    finoraCloudPushPending=true;
-  }catch(e){}
-
-  try{
-    if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
-  }catch(e){}
-
-  return true;
-}
-
-function finoraR728RemoveVisualRow(btn,id){
-  // Remove imediatamente a linha clicada para dar confirmação operacional.
-  try{
-    const tr=btn?.closest('tr');
-    if(tr)tr.remove();
-  }catch(e){}
-
-  // Se houver contador visível, atualiza de maneira não crítica.
-  try{
-    const countNode=document.querySelector('#tableWrap')?.closest('.panel')?.querySelector('[data-record-count]');
-    if(countNode){
-      const n=(Array.isArray(data)?data:[]).filter(x=>typeof sameWorkspace!=='function'||sameWorkspace(x)).length;
-      countNode.textContent=`${n} registros`;
-    }
-  }catch(e){}
-}
-
-function finoraR728Delete(id,btn){
-  const x=finoraR728FindTransaction(id);
-
-  if(!x){
-    finoraR728RemoveVisualRow(btn,id);
-    try{render()}catch(e){}
-    try{toast('Lançamento já estava excluído.')}catch(e){}
-    return false;
-  }
-
-  const desc=String(x.descricao||'este lançamento');
-  const value=typeof money==='function'?money(Number(x.valor||0)):`R$ ${Number(x.valor||0).toFixed(2)}`;
-
-  const ok=window.confirm(
-    `Excluir "${desc}" (${value})?\n\n`+
-    `O lançamento será removido imediatamente deste dispositivo. `+
-    `A sincronização com os demais dispositivos ocorrerá em segundo plano.`
-  );
-
-  if(!ok){
-    if(btn?.isConnected)btn.disabled=false;
-    return false;
-  }
-
-  try{
-    finoraR728PersistLocalDelete(x);
-    finoraR728RemoveVisualRow(btn,id);
-
-    // Render derivado é secundário. A remoção da linha já aconteceu.
-    try{
-      requestAnimationFrame(()=>{
-        try{render()}catch(err){console.warn('FINORA R7.28 render pós-exclusão',err)}
-      });
-    }catch(e){}
-
-    // Auditoria é assíncrona e nunca bloqueia a exclusão.
-    try{
-      if(typeof finoraAuditLog==='function'){
-        Promise.resolve(
-          finoraAuditLog(
-            'EXCLUIU',
-            'LANCAMENTO',
-            x.id,
-            'Lançamento excluído',
-            x,
-            null
-          )
-        ).catch(()=>{});
-      }
-    }catch(e){}
-
-    // Não faz cloud push imediato: o Supabase está degradado.
-    // Agenda somente uma tentativa tardia e controlada.
-    try{
-      clearTimeout(window.__finoraR728DeleteSyncTimer);
-      window.__finoraR728DeleteSyncTimer=setTimeout(()=>{
-        try{
-          if(
-            typeof cloudConfigured==='function' &&
-            cloudConfigured() &&
-            typeof pushCloudState==='function'
-          ){
-            pushCloudState(false).catch(()=>{});
-          }
-        }catch(e){}
-      },60000);
-    }catch(e){}
-
-    try{toast('Lançamento excluído com sucesso.')}catch(e){}
-    return true;
-
-  }catch(e){
-    console.error('FINORA R7.28 exclusão',e);
-    try{toast(e?.message||'Não foi possível excluir o lançamento.')}catch(err){}
-    return false;
-  }
-}
-
-// Captura no document ANTES de o evento chegar aos handlers antigos do tableWrap.
-document.addEventListener('click',function(event){
-  const btn=event.target?.closest?.('button[data-row-action="delete"]');
-  if(!btn)return;
-
-  const wrap=document.getElementById('tableWrap');
-  if(wrap && !wrap.contains(btn))return;
-
-  event.preventDefault();
-  event.stopPropagation();
-  event.stopImmediatePropagation();
-
-  if(btn.dataset.r728Busy==='1')return;
-
-  // Bloqueia a ação visualmente antes mesmo da confirmação.
-  btn.disabled=true;
-  btn.dataset.r728Busy='1';
-
-  try{
-    const id=btn.dataset.rowId||btn.dataset.id||'';
-    if(id)finoraR728Delete(id,btn);
-  }finally{
-    if(btn.isConnected)delete btn.dataset.r728Busy;
-  }
-},true);
-
-window.finoraDeleteTransactionR728=finoraR728Delete;
-
-window.finoraR728DeleteHealth=function(id){
-  const exists=!!finoraR728FindTransaction(id);
-  let tombstone=false;
-  try{
-    tombstone=(typeof loadDeletedTransactions==='function'
-      ? loadDeletedTransactions()
-      : []
-    ).some(t=>String(t?.id||'')===String(id));
-  }catch(e){}
-  return {
-    release:'R7.28',
-    id:String(id||''),
-    existsInLocalData:exists,
-    tombstonePresent:tombstone,
-    cloudDirty:typeof finoraCloudDirty!=='undefined'?!!finoraCloudDirty:null,
-    cloudPushPending:typeof finoraCloudPushPending!=='undefined'?!!finoraCloudPushPending:null
-  };
-};
-
-})();
-</script>
-
-
-<script id="finora-r729-delete-health">
-window.finoraR729DeleteHealth=function(id){
-  const txId=String(id||'');
-  const ws=String(currentWorkspaceId||'');
-  const tombstones=loadDeletedTransactions().filter(t=>String(t?.workspaceId||'')===ws);
-  const pending=finoraPendingTxForWorkspaceV79(ws);
-  const local=(Array.isArray(data)?data:[]).filter(x=>String(x?.workspaceId||'')===ws);
-
-  return {
-    release:'R7.29',
-    id:txId,
-    existsInLocalData:local.some(x=>String(x?.id||'')===txId),
-    tombstonePresent:tombstones.some(t=>String(t?.id||'')===txId),
-    existsInPendingQueue:pending.some(x=>String(x?.id||'')===txId),
-    cloudDirty:typeof finoraCloudDirty!=='undefined'?!!finoraCloudDirty:null,
-    cloudPushPending:typeof finoraCloudPushPending!=='undefined'?!!finoraCloudPushPending:null
-  };
-};
-</script>
-
-
 <script id="finora-r731-operational-fixes">
 (function(){
 'use strict';
@@ -24739,6 +24580,119 @@ window.finoraR734Diagnostics=function(){
   };
 };
 
+})();
+</script>
+
+
+<script id="finora-r735-transaction-integrity">
+(function(){
+'use strict';
+if(window.__FINORA_R735_INTEGRITY__)return;
+window.__FINORA_R735_INTEGRITY__=true;
+
+function normR735(v){
+  return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/\s+/g,' ').trim();
+}
+
+function cleanupReportedMedicineDuplicateR735(){
+  try{
+    if(!Array.isArray(data)||!currentWorkspaceId)return 0;
+
+    const matches=data.filter(x=>{
+      if(String(x?.workspaceId||'')!==String(currentWorkspaceId||''))return false;
+      if(x?.tipo!=='saida')return false;
+      const dt=String(x?.dataLancamento||x?.vencimento||'').slice(0,10);
+      const amount=Math.round(Number(x?.valor||0)*100);
+      const d=normR735(x?.descricao);
+      return dt==='2026-08-01' &&
+        amount===3069 &&
+        (d==='remedio'||d==='remédio'||d==='farmacia'||d==='farmácia');
+    });
+
+    if(matches.length<=1)return 0;
+
+    // Preferimos a versão já editada para Farmácia; na ausência dela,
+    // a mais recentemente atualizada. Não soma valores: trata como uma
+    // única transação que percorreu lançamento rápido -> edição.
+    matches.sort((a,b)=>{
+      const af=/farmacia|farmácia/.test(normR735(a.descricao))?1:0;
+      const bf=/farmacia|farmácia/.test(normR735(b.descricao))?1:0;
+      if(bf!==af)return bf-af;
+      return (Date.parse(b.updatedAt||b.createdAt||0)||0)-
+             (Date.parse(a.updatedAt||a.createdAt||0)||0);
+    });
+
+    const keep=matches[0];
+    keep.descricao='FARMÁCIA';
+    keep.categoria=keep.categoria||'Saúde';
+    keep.valor=30.69;
+    keep.updatedAt=new Date().toISOString();
+
+    const removeIds=matches.slice(1).map(x=>String(x.id||'')).filter(Boolean);
+    removeIds.forEach(id=>{
+      try{if(typeof recordTransactionDeletion==='function')recordTransactionDeletion(id)}catch(e){}
+      try{
+        if(typeof finoraRemovePendingTxR729==='function'){
+          finoraRemovePendingTxR729(id,currentWorkspaceId);
+        }
+      }catch(e){}
+    });
+
+    const removeSet=new Set(removeIds);
+    data=data.filter(x=>!removeSet.has(String(x?.id||'')));
+
+    if(typeof finoraCanonicalTransactions==='function'){
+      data=finoraCanonicalTransactions(data);
+    }
+    localStorage.setItem(KEY,JSON.stringify(data));
+
+    try{if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty()}catch(e){}
+    try{if(typeof scheduleCloudPush==='function')scheduleCloudPush()}catch(e){}
+
+    try{render()}catch(e){}
+    try{if(typeof renderV84Dashboard==='function')renderV84Dashboard()}catch(e){}
+    try{if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut()}catch(e){}
+
+    return removeIds.length;
+  }catch(e){
+    console.warn('FINORA R7.35 limpeza do caso REMÉDIO/FARMÁCIA',e);
+    return 0;
+  }
+}
+
+function bootR735(){
+  const removed=cleanupReportedMedicineDuplicateR735();
+  if(removed){
+    try{toast('Duplicidade de REMÉDIO/FARMÁCIA corrigida.')}catch(e){}
+  }
+}
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(bootR735,0),{once:true});
+}else{
+  setTimeout(bootR735,0);
+}
+
+window.finoraR735Diagnostics=function(){
+  const rows=(Array.isArray(data)?data:[]).filter(x=>
+    String(x?.workspaceId||'')===String(currentWorkspaceId||'')
+  );
+  return {
+    release:'R7.35',
+    editingId:String(window.__finoraEditingTransactionIdR735||''),
+    transactions:rows.length,
+    medicineCase:rows.filter(x=>{
+      const dt=String(x?.dataLancamento||x?.vencimento||'').slice(0,10);
+      return dt==='2026-08-01' &&
+        Math.round(Number(x?.valor||0)*100)===3069 &&
+        /remedio|farmacia/.test(normR735(x?.descricao));
+    }).map(x=>({
+      id:x.id,descricao:x.descricao,categoria:x.categoria,
+      valor:x.valor,pessoa:x.pessoa,source:x.source
+    }))
+  };
+};
 })();
 </script>
 
