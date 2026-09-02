@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.36-definitive-cloud-delete">
+<meta name="finora-release" content="R7.37-war-room-cards-alerts">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -9224,6 +9224,67 @@ function finoraResolveCardForAlertR718(x){
   }
 }
 
+
+function finoraCardInvoicePaidR737(card,date){
+  try{
+    const cardId=String(card?.id||'');
+    const month=String(date||'').slice(0,7);
+    if(!cardId||!month)return false;
+
+    // Fonte 1: marcador explícito de fatura paga.
+    try{
+      const feature=typeof loadFinoraFeatureState==='function'
+        ? (loadFinoraFeatureState()||{})
+        : {};
+      const marker=feature?.paidCardInvoices?.[`${cardId}|${month}`];
+      if(marker?.paid)return true;
+    }catch(e){}
+
+    const normalized=s=>String(s||'').normalize('NFD')
+      .replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+
+    const cardName=normalized(card?.name);
+    const issuer=normalized(card?.issuer);
+
+    // Fonte 2: lançamento materializado/pago daquela fatura.
+    return (Array.isArray(data)?data:[]).some(x=>{
+      if(typeof sameWorkspace==='function'&&!sameWorkspace(x))return false;
+      if(x?.tipo!=='saida')return false;
+
+      const xMonth=String(
+        (typeof recordMonth==='function'?recordMonth(x):'') ||
+        x?.vencimento ||
+        x?.dataLancamento ||
+        ''
+      ).slice(0,7);
+      if(xMonth!==month)return false;
+
+      const paid=(typeof effectiveStatus==='function'
+        ? effectiveStatus(x)
+        : (x?.status||'pendente'))==='pago' || !!x?.dataPagamento;
+      if(!paid)return false;
+
+      if(String(x?.cardId||'')===cardId)return true;
+
+      // Compatibilidade com faturas antigas gravadas antes do cardId.
+      const desc=normalized(x?.descricao);
+      if(cardName && desc.includes('fatura') && desc.includes(cardName))return true;
+      if(issuer && desc.includes('fatura') && desc.includes(issuer))return true;
+
+      return false;
+    });
+  }catch(e){
+    return false;
+  }
+}
+
+function finoraRefreshCardSurfacesR737(){
+  try{if(typeof renderFinoraCards==='function')renderFinoraCards()}catch(e){}
+  try{if(typeof fillLaunchCards==='function')fillLaunchCards()}catch(e){}
+  try{if(typeof renderAlerts==='function')renderAlerts()}catch(e){}
+  try{if(typeof renderV84Dashboard==='function')renderV84Dashboard()}catch(e){}
+}
+
 function renderAlerts(){
   finoraNormalizePendingZeroR718();
 
@@ -9332,6 +9393,11 @@ function renderAlerts(){
     projectionYears.forEach(y=>{
       for(let mo=1;mo<=12;mo++){
         const date=safeDateForDay(y,mo,c.dueDay);
+
+        // R7.37: uma fatura já paga/materializada nunca volta como
+        // "Valor a definir", mesmo em meses passados.
+        if(finoraCardInvoicePaidR737(c,date))continue;
+
         virtualCards.push({
           id:`card-alert-${c.id}-${date}`,
           account:'family',workspaceId:currentWorkspaceId,tipo:'saida',
@@ -9357,7 +9423,14 @@ function renderAlerts(){
   const candidates=[...actual,...virtualRecurring,...virtualCards].map(x=>{
     const date=x.vencimento||x.dataLancamento;
     return {...x,_date:date,_days:date?daysBetween(today(),date):9999,_month:(date||'').slice(0,7)};
-  }).filter(x=>x._date);
+  }).filter(x=>{
+    if(!x._date)return false;
+    if(x.virtualCardAlert){
+      const card=accountCards().find(c=>String(c.id)===String(x.cardId||''));
+      if(card && finoraCardInvoicePaidR737(card,x._date))return false;
+    }
+    return true;
+  });
 
   const dedup=new Map();
   candidates.forEach(x=>{
@@ -9734,9 +9807,9 @@ function mergeCards(localRows,remoteRows,tombstones){
     const prev=map.get(x.id),xt=Date.parse(x.updatedAt||0)||0,pt=Date.parse(prev?.updatedAt||0)||0;
     if(!prev||xt>=pt)map.set(x.id,x);
   });
+  // R7.37: exclusão de cartão é terminal para o ID.
   (Array.isArray(tombstones)?tombstones:[]).forEach(t=>{
-    const row=map.get(t.id);
-    if(!row||Date.parse(t.deletedAt||0)>=(Date.parse(row.updatedAt||0)||0))map.delete(t.id);
+    map.delete(t.id);
   });
   return [...map.values()];
 }
@@ -13339,12 +13412,18 @@ async function pullCloudState(showToast=false){
 
     const localCurrentCards=loadFinoraCards().filter(c=>c.workspaceId===currentWorkspaceId);
     const localCardTombstones=loadCardTombstones().filter(t=>t.workspaceId===currentWorkspaceId);
-    const mergedCardTombstones=firstHydration
-      ? remoteCardTombstones
-      : mergeCardTombstones(remoteCardTombstones,localCardTombstones);
-    const mergedCards=firstHydration
-      ? remoteCards
-      : mergeCards(localCurrentCards,remoteCards,mergedCardTombstones);
+    // R7.37 WAR ROOM:
+    // Cartão recém-cadastrado localmente não pode desaparecer se um pull
+    // remoto chegar antes do push. Sempre fazemos merge por updatedAt.
+    const mergedCardTombstones=mergeCardTombstones(
+      remoteCardTombstones,
+      localCardTombstones
+    );
+    const mergedCards=mergeCards(
+      localCurrentCards,
+      remoteCards,
+      mergedCardTombstones
+    );
 
     saveFinoraCards(
       loadFinoraCards().filter(c=>c.workspaceId!==currentWorkspaceId).concat(
@@ -24772,6 +24851,150 @@ window.finoraR735Diagnostics=function(){
       id:x.id,descricao:x.descricao,categoria:x.categoria,
       valor:x.valor,pessoa:x.pessoa,source:x.source
     }))
+  };
+};
+})();
+</script>
+
+
+<script id="finora-r737-war-room">
+(function(){
+'use strict';
+if(window.__FINORA_R737_WAR_ROOM__)return;
+window.__FINORA_R737_WAR_ROOM__=true;
+
+const RELEASE='R7.37-war-room-cards-alerts';
+
+function cardSnapshotR737(){
+  try{
+    return typeof accountCards==='function'
+      ? accountCards().map(c=>({...c}))
+      : [];
+  }catch(e){return[]}
+}
+
+function ensureCardLocalR737(card){
+  if(!card?.id)return false;
+  try{
+    const all=typeof loadFinoraCards==='function'?loadFinoraCards():[];
+    const idx=all.findIndex(c=>String(c.id)===String(card.id));
+    if(idx>=0){
+      const local=all[idx];
+      const lt=Date.parse(local?.updatedAt||0)||0;
+      const ct=Date.parse(card?.updatedAt||0)||0;
+      if(ct>=lt)all[idx]={...local,...card};
+    }else{
+      all.push({...card});
+    }
+    saveFinoraCards(all);
+    return true;
+  }catch(e){
+    console.error('FINORA R7.37 ensure card local',e);
+    return false;
+  }
+}
+
+const originalSaveCardR737=window.saveFinoraCard;
+if(typeof originalSaveCardR737==='function'){
+  window.saveFinoraCard=async function(){
+    const before=cardSnapshotR737();
+    const result=await originalSaveCardR737.apply(this,arguments);
+
+    // Descobre qual cartão foi incluído/atualizado pela diferença de updatedAt/ID.
+    const after=cardSnapshotR737();
+    let changed=null;
+
+    const beforeById=new Map(before.map(c=>[String(c.id),c]));
+    changed=after
+      .filter(c=>{
+        const old=beforeById.get(String(c.id));
+        return !old || String(old.updatedAt||'')!==String(c.updatedAt||'');
+      })
+      .sort((a,b)=>(Date.parse(b.updatedAt||0)||0)-(Date.parse(a.updatedAt||0)||0))[0]||null;
+
+    if(changed){
+      // O registro local é a fonte operacional enquanto a nuvem confirma.
+      ensureCardLocalR737(changed);
+
+      try{if(typeof renderFinoraCards==='function')renderFinoraCards()}catch(e){}
+      try{if(typeof fillLaunchCards==='function')fillLaunchCards(changed.id)}catch(e){}
+
+      // Push imediato, sem bloquear a existência local do cartão.
+      try{
+        if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
+        if(typeof cloudConfigured==='function'&&cloudConfigured()&&typeof pushCloudState==='function'){
+          const ok=await pushCloudState(false);
+          if(!ok){
+            ensureCardLocalR737(changed);
+            if(typeof scheduleCloudPush==='function')scheduleCloudPush();
+          }
+        }
+      }catch(e){
+        ensureCardLocalR737(changed);
+        try{if(typeof scheduleCloudPush==='function')scheduleCloudPush()}catch(err){}
+      }
+
+      // Mesmo que um pull tenha corrido em paralelo, mantém o cartão local.
+      ensureCardLocalR737(changed);
+      try{if(typeof renderFinoraCards==='function')renderFinoraCards()}catch(e){}
+      try{if(typeof fillLaunchCards==='function')fillLaunchCards()}catch(e){}
+    }
+
+    return result;
+  };
+}
+
+// Toda baixa de fatura deve atualizar imediatamente os alertas.
+// Fazemos wrapper depois de todos os hotfixes anteriores.
+const originalMarkPaidR737=window.finoraV109MarkInvoicePaid;
+if(typeof originalMarkPaidR737==='function'){
+  window.finoraV109MarkInvoicePaid=function(){
+    const r=originalMarkPaidR737.apply(this,arguments);
+    setTimeout(()=>{
+      try{if(typeof renderAlerts==='function')renderAlerts()}catch(e){}
+    },0);
+    return r;
+  };
+}
+
+// Quando o estado remoto chega, força apenas as superfícies relacionadas.
+// Não cria polling extra.
+const originalPullR737=window.pullCloudState;
+if(typeof originalPullR737==='function'){
+  window.pullCloudState=async function(){
+    const ok=await originalPullR737.apply(this,arguments);
+    if(ok){
+      try{if(typeof renderFinoraCards==='function')renderFinoraCards()}catch(e){}
+      try{if(typeof fillLaunchCards==='function')fillLaunchCards()}catch(e){}
+      try{if(typeof renderAlerts==='function')renderAlerts()}catch(e){}
+    }
+    return ok;
+  };
+}
+
+window.finoraR737Diagnostics=function(){
+  let paidMarkers={};
+  try{
+    paidMarkers=(typeof loadFinoraFeatureState==='function'
+      ? loadFinoraFeatureState()?.paidCardInvoices
+      : {})||{};
+  }catch(e){}
+  return {
+    release:RELEASE,
+    cards:cardSnapshotR737().map(c=>({
+      id:c.id,name:c.name,type:c.cardType||c.type,updatedAt:c.updatedAt
+    })),
+    paidInvoiceMarkers:Object.keys(paidMarkers).filter(k=>paidMarkers[k]?.paid).length,
+    august2026PaidMarkers:Object.keys(paidMarkers)
+      .filter(k=>k.endsWith('|2026-08')&&paidMarkers[k]?.paid),
+    august2026PaidTransactions:(Array.isArray(data)?data:[])
+      .filter(x=>{
+        const d=String(x.vencimento||x.dataLancamento||'').slice(0,7);
+        const st=typeof effectiveStatus==='function'?effectiveStatus(x):x.status;
+        return d==='2026-08'&&x.tipo==='saida'&&st==='pago'&&
+          String(x.descricao||'').toLowerCase().includes('fatura');
+      })
+      .map(x=>({id:x.id,descricao:x.descricao,cardId:x.cardId,valor:x.valor}))
   };
 };
 })();
