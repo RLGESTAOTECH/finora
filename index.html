@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.33-combo-stability-fix">
+<meta name="finora-release" content="R7.34-combo-performance-recovery">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -24314,158 +24314,6 @@ window.finoraR729DeleteHealth=function(id){
 </script>
 
 
-<script id="finora-r730-category-sync">
-(function(){
-'use strict';
-if(window.__FINORA_R730_CATEGORY_SYNC__)return;
-window.__FINORA_R730_CATEGORY_SYNC__=true;
-
-function norm(v){
-  return String(v==null?'':v).trim();
-}
-function key(v){
-  return norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
-}
-function isCategorySelect(el){
-  if(!el || el.tagName!=='SELECT')return false;
-  const hay=[
-    el.id,el.name,el.dataset?.field,el.dataset?.type,
-    el.getAttribute('aria-label'),
-    el.closest('label')?.textContent,
-    el.parentElement?.querySelector('label')?.textContent
-  ].filter(Boolean).join(' ').toLowerCase();
-  return hay.includes('categoria') || hay.includes('category');
-}
-function categoriesFromDOM(){
-  const out=[];
-  document.querySelectorAll('select').forEach(sel=>{
-    if(!isCategorySelect(sel))return;
-    [...sel.options].forEach(o=>{
-      const v=norm(o.value||o.textContent);
-      if(v && !/selecione|categoria/i.test(v))out.push(v);
-    });
-  });
-  return out;
-}
-function categoriesFromStorage(){
-  const out=[];
-  try{
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i)||'';
-      if(!/categor/i.test(k))continue;
-      let v;
-      try{v=JSON.parse(localStorage.getItem(k))}catch(e){continue}
-      const walk=x=>{
-        if(Array.isArray(x))return x.forEach(walk);
-        if(x && typeof x==='object'){
-          const candidate=x.nome??x.name??x.categoria??x.category??x.descricao??x.label;
-          if(typeof candidate==='string')out.push(candidate);
-          else Object.values(x).forEach(walk);
-        }else if(typeof x==='string')out.push(x);
-      };
-      walk(v);
-    }
-  }catch(e){}
-  return out;
-}
-function categoriesFromGlobals(){
-  const out=[];
-  const names=['categories','categorias','CATEGORIES','CATEGORIAS','categoryList','listaCategorias'];
-  names.forEach(n=>{
-    try{
-      const v=window[n];
-      if(!Array.isArray(v))return;
-      v.forEach(x=>{
-        if(typeof x==='string')out.push(x);
-        else if(x && typeof x==='object')out.push(x.nome||x.name||x.categoria||x.category||x.descricao||x.label||'');
-      });
-    }catch(e){}
-  });
-  return out;
-}
-function categoriesFromTransactions(){
-  const out=[];
-  try{
-    (Array.isArray(data)?data:[]).forEach(x=>{
-      const c=x?.categoria??x?.category;
-      if(c)out.push(c);
-    });
-  }catch(e){}
-  return out;
-}
-function allCategories(){
-  const map=new Map();
-  [
-    ...categoriesFromDOM(),
-    ...categoriesFromStorage(),
-    ...categoriesFromGlobals(),
-    ...categoriesFromTransactions()
-  ].forEach(v=>{
-    v=norm(v);
-    if(!v)return;
-    const k=key(v);
-    if(!map.has(k))map.set(k,v);
-  });
-  return [...map.values()].sort((a,b)=>a.localeCompare(b,'pt-BR',{sensitivity:'base'}));
-}
-function syncSelect(sel){
-  if(!isCategorySelect(sel))return;
-  const selected=norm(sel.value);
-  const existing=new Set([...sel.options].map(o=>key(o.value||o.textContent)));
-  allCategories().forEach(cat=>{
-    if(existing.has(key(cat)))return;
-    const opt=document.createElement('option');
-    opt.value=cat;
-    opt.textContent=cat;
-    sel.appendChild(opt);
-    existing.add(key(cat));
-  });
-  if(selected && [...sel.options].some(o=>norm(o.value)===selected))sel.value=selected;
-}
-function syncAll(){
-  document.querySelectorAll('select').forEach(syncSelect);
-}
-window.finoraSyncCategoriesR730=syncAll;
-
-// Sincroniza imediatamente, inclusive Lançamento Rápido e modal Editar.
-syncAll();
-
-// Qualquer modal/formulário criado depois recebe as categorias automaticamente.
-const observer=new MutationObserver(mutations=>{
-  let needed=false;
-  for(const m of mutations){
-    if(m.addedNodes?.length){needed=true;break}
-  }
-  if(needed)queueMicrotask(syncAll);
-});
-observer.observe(document.documentElement,{childList:true,subtree:true});
-
-// Ao salvar/cadastrar categoria, atualiza todos os selects sem exigir F5.
-document.addEventListener('click',e=>{
-  const b=e.target?.closest?.('button');
-  if(!b)return;
-  const t=(b.textContent||'').toLowerCase();
-  if(/salvar|adicionar|cadastrar|criar/.test(t)){
-    setTimeout(syncAll,0);
-    setTimeout(syncAll,150);
-    setTimeout(syncAll,500);
-  }
-},true);
-
-// Mudanças de storage também propagam a lista.
-window.addEventListener('storage',e=>{
-  if(/categor/i.test(e.key||''))syncAll();
-});
-
-// Defesa adicional: antes de abrir/usar qualquer select de categoria.
-document.addEventListener('pointerdown',e=>{
-  const sel=e.target?.closest?.('select');
-  if(sel && isCategorySelect(sel))syncSelect(sel);
-},true);
-})();
-</script>
-
-
 <script id="finora-r731-operational-fixes">
 (function(){
 'use strict';
@@ -24692,284 +24540,205 @@ window.finoraR731Diagnostics=function(){
 </script>
 
 
-
-<script id="finora-r733-combo-stability-fix">
+<script id="finora-r734-combo-performance-recovery">
 (function(){
 'use strict';
-if(window.__FINORA_R733__)return;
-window.__FINORA_R733__=true;
+if(window.__FINORA_R734__)return;
+window.__FINORA_R734__=true;
 
-const RELEASE='R7.33-combo-stability-fix';
+const RELEASE='R7.34-combo-performance-recovery';
 const $=id=>document.getElementById(id);
 
 function norm(v){return String(v??'').trim()}
-function unique(values){
-  const out=[],seen=new Set();
-  for(const raw of (values||[])){
-    const v=norm(raw);
-    if(!v)continue;
-    const k=v.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-    if(seen.has(k))continue;
-    seen.add(k);out.push(v);
-  }
-  return out;
-}
-function optionExists(el,v){
-  return !!el && [...el.options].some(o=>String(o.value)===String(v));
-}
-function signature(items,emptyLabel){
-  return JSON.stringify([emptyLabel??null,...unique(items)]);
-}
-function currentSignature(el){
-  return JSON.stringify([...el.options].map(o=>o.value===''?['',o.textContent]:o.value));
+function featureCatalogSignature(state){
+  const categories=(state?.categories||[])
+    .map(x=>[String(x?.name||''),x?.active!==false])
+    .sort((a,b)=>a[0].localeCompare(b[0],'pt-BR'));
+  const payments=(state?.payments||[])
+    .map(x=>[String(x?.name||''),x?.active!==false])
+    .sort((a,b)=>a[0].localeCompare(b[0],'pt-BR'));
+  return JSON.stringify({categories,payments});
 }
 
-/* Atualiza somente quando o catálogo mudou. Não reconstrói um <select>
-   enquanto ele está sendo usado pelo usuário. */
-function stablePopulate(el,items,emptyLabel=null,preferred=''){
-  if(!el)return;
-  const list=unique(items);
-  const desired=[];
-  if(emptyLabel!==null)desired.push({value:'',text:emptyLabel});
-  list.forEach(v=>desired.push({value:v,text:v}));
+let lastCatalogSignature='';
+let catalogRefreshTimer=0;
+let selectedCardLock='';
+let selectedCardUsageLock='';
 
-  const same =
-    el.options.length===desired.length &&
-    desired.every((x,i)=>
-      String(el.options[i]?.value||'')===String(x.value) &&
-      String(el.options[i]?.textContent||'')===String(x.text)
+function refreshNativeCatalogs(){
+  clearTimeout(catalogRefreshTimer);
+  catalogRefreshTimer=setTimeout(()=>{
+    try{
+      if(typeof window.refreshFinoraV90Controls==='function'){
+        window.refreshFinoraV90Controls();
+      }
+    }catch(e){
+      console.warn('FINORA R7.34 refresh de catálogos',e);
+    }
+
+    try{
+      const date=$('v84QuickDate');
+      if(date && !date.value){
+        const now=new Date();
+        const local=new Date(now.getTime()-now.getTimezoneOffset()*60000);
+        date.value=local.toISOString().slice(0,10);
+      }
+    }catch(e){}
+  },20);
+}
+
+const originalSaveFeature=window.saveFinoraFeatureState;
+if(typeof originalSaveFeature==='function'){
+  try{
+    lastCatalogSignature=featureCatalogSignature(
+      typeof window.loadFinoraFeatureState==='function'
+        ? window.loadFinoraFeatureState()
+        : null
     );
-
-  const keep=norm(preferred||el.value);
-  if(!same){
-    const frag=document.createDocumentFragment();
-    desired.forEach(x=>{
-      const o=document.createElement('option');
-      o.value=x.value;o.textContent=x.text;frag.appendChild(o);
-    });
-    el.replaceChildren(frag);
-  }
-  if(keep && optionExists(el,keep))el.value=keep;
-}
-
-function categories(){
-  try{
-    if(typeof window.getFinoraActiveCategories==='function'){
-      const v=window.getFinoraActiveCategories();
-      if(Array.isArray(v)&&v.length)return unique(v);
-    }
   }catch(e){}
-  try{
-    const s=typeof window.loadFinoraFeatureState==='function'
-      ? window.loadFinoraFeatureState():null;
-    const v=(s?.categories||[]).filter(x=>x?.active!==false).map(x=>x?.name);
-    if(v.length)return unique(v);
-  }catch(e){}
-  return [];
+
+  window.saveFinoraFeatureState=function(state,opts){
+    const before=lastCatalogSignature;
+    const result=originalSaveFeature.apply(this,arguments);
+
+    try{
+      const actual=(typeof window.loadFinoraFeatureState==='function')
+        ? window.loadFinoraFeatureState()
+        : state;
+      const after=featureCatalogSignature(actual);
+      lastCatalogSignature=after;
+      if(after!==before)refreshNativeCatalogs();
+    }catch(e){}
+
+    return result;
+  };
 }
 
-function payments(){
-  try{
-    if(typeof window.getFinoraActivePayments==='function'){
-      const v=window.getFinoraActivePayments();
-      if(Array.isArray(v)&&v.length)return unique(v);
-    }
-  }catch(e){}
-  try{
-    const s=typeof window.loadFinoraFeatureState==='function'
-      ? window.loadFinoraFeatureState():null;
-    const v=(s?.payments||[]).filter(x=>x?.active!==false).map(x=>x?.name);
-    if(v.length)return unique(v);
-  }catch(e){}
-  return ['PIX','Débito','Transferência','Dinheiro','Boleto','Cartão de crédito','Outro'];
-}
-
-function cards(){
-  try{return typeof accountCards==='function'?accountCards():[]}catch(e){return[]}
-}
-
-function cardType(card){
-  const t=String(card?.cardType||card?.type||'').toLowerCase();
-  return ['credito','debito','debito_credito'].includes(t)?t:'credito';
-}
-
-function fillQuickCombos(){
-  const expense=$('v84QuickExpense')?.classList.contains('active');
-  const qc=$('v84QuickCategory');
-  const qp=$('v84QuickPayment');
-  const qd=$('v84QuickDate');
-
-  if(qc){
-    const current=qc.value;
-    const cats=expense
-      ? categories()
-      : unique(['Renda','Outras entradas',...categories()]);
-    stablePopulate(qc,cats,'Selecione',current);
-  }
-  if(qp)stablePopulate(qp,payments(),'Selecione',qp.value);
-  if(qd && !qd.value){
-    const d=new Date();
-    const local=new Date(d.getTime()-d.getTimezoneOffset()*60000);
-    qd.value=local.toISOString().slice(0,10);
-  }
-}
-
-function fillMainCombos(){
-  const cats=categories(),pays=payments();
-  if($('categoriaExpense'))stablePopulate($('categoriaExpense'),cats,'Selecione uma categoria',$('categoriaExpense').value);
-  if($('cardDefaultCategory'))stablePopulate($('cardDefaultCategory'),cats,'Sem categoria padrão',$('cardDefaultCategory').value);
-  if($('forma'))stablePopulate($('forma'),pays,null,$('forma').value);
-}
-
-function fillCardCombo(selected){
-  const el=$('launchCard');if(!el)return;
-  const wanted=norm(selected||el.value);
-  const rows=cards();
-  const desired=[{value:'',text:'Nenhum / não se aplica'}].concat(
-    rows.map(c=>({value:String(c.id),text:`${c.name||'Cartão'} · final ${c.last4||'—'}`}))
-  );
-  const same=el.options.length===desired.length &&
-    desired.every((x,i)=>String(el.options[i]?.value||'')===x.value &&
-      String(el.options[i]?.textContent||'')===x.text);
-  if(!same){
-    const frag=document.createDocumentFragment();
-    desired.forEach(x=>{
-      const o=document.createElement('option');o.value=x.value;o.textContent=x.text;frag.appendChild(o);
-    });
-    el.replaceChildren(frag);
-  }
-  if(wanted&&optionExists(el,wanted))el.value=wanted;
-}
-
-function syncHybrid(){
-  const el=$('launchCard'),field=$('finoraCardUsageField'),usage=$('finoraCardUsage');
-  if(!el||!field||!usage)return;
-  const card=cards().find(c=>String(c.id)===String(el.value));
-  if(!card){field.hidden=true;field.style.display='none';usage.required=false;return}
-  const type=cardType(card);
-  const hybrid=type==='debito_credito';
-  field.hidden=!hybrid;
-  field.style.display=hybrid?'':'none';
-  usage.required=hybrid;
-  if(!hybrid){
-    usage.value=type;
-    const forma=$('forma');
-    const wanted=type==='credito'?'Cartão de crédito':'Débito';
-    if(forma&&optionExists(forma,wanted))forma.value=wanted;
-  }
-}
-
-/* Usa os mecanismos nativos já existentes do FINORA primeiro. */
-function refreshControlledCombos(){
-  try{
-    if(typeof window.refreshFinoraV90Controls==='function'){
-      window.refreshFinoraV90Controls();
-    }
-  }catch(e){}
-  fillQuickCombos();
-  fillMainCombos();
-  fillCardCombo();
-  syncHybrid();
-}
-
-/* Corrige a preservação do cartão sem criar observer nem loop. */
 const originalFillLaunchCards=window.fillLaunchCards;
 if(typeof originalFillLaunchCards==='function'){
   window.fillLaunchCards=function(selected=''){
-    const before=norm(selected||$('launchCard')?.value||'');
-    const result=originalFillLaunchCards.apply(this,arguments);
-    fillCardCombo(before);
-    syncHybrid();
+    const el=$('launchCard');
+    const wanted=norm(selected || selectedCardLock || el?.value || '');
+    const result=originalFillLaunchCards.call(this,wanted);
+
+    const fresh=$('launchCard');
+    if(wanted && fresh && [...fresh.options].some(o=>String(o.value)===wanted)){
+      fresh.value=wanted;
+      selectedCardLock=wanted;
+    }
     return result;
   };
 }
 
-document.addEventListener('change',e=>{
+document.addEventListener('change',function(e){
   const id=e.target?.id||'';
+
   if(id==='launchCard'){
-    syncHybrid();
+    selectedCardLock=e.target.value||'';
+    selectedCardUsageLock='';
+    try{
+      if(typeof updateCardUsage==='function')updateCardUsage();
+    }catch(err){}
   }
-  if(id==='v84QuickCategory'||id==='v84QuickPayment'||id==='v84QuickDate'){
-    /* intencionalmente não reconstrói nada aqui */
+
+  if(id==='finoraCardUsage'){
+    selectedCardUsageLock=e.target.value||'';
   }
 },true);
 
-/* Antes de o usuário abrir um combo dinâmico, garante que ele possui dados.
-   Não há polling e não há MutationObserver alterando <option>. */
-document.addEventListener('pointerdown',e=>{
-  const el=e.target?.closest?.('select');
-  if(!el)return;
-  const id=el.id;
-  if(id==='v84QuickCategory'||id==='v84QuickPayment'){
-    fillQuickCombos();
-  }else if(id==='categoriaExpense'||id==='cardDefaultCategory'||id==='forma'){
-    fillMainCombos();
-  }else if(id==='launchCard'){
-    fillCardCombo(el.value);
-    syncHybrid();
-  }
-},true);
-
-/* Alternância Entrada/Saída do lançamento rápido. */
-document.addEventListener('click',e=>{
-  const id=e.target?.id||'';
-  if(id==='v84QuickIncome'||id==='v84QuickExpense'){
-    setTimeout(fillQuickCombos,0);
-  }
-
-  /* Após salvar cadastro de categoria / forma de pagamento, atualiza uma única vez. */
-  const txt=String(e.target?.textContent||'').toLowerCase();
-  if(
-    /salvar|adicionar|cadastrar|criar|ativar|desativar/.test(txt) &&
-    e.target?.closest?.('#finoraUtilityPanel,#finoraCategories')
-  ){
-    setTimeout(refreshControlledCombos,80);
-  }
-},true);
-
-/* Edição: deixa a função original preencher tudo e só então garante os catálogos. */
 const originalEditRow=window.editRow;
 if(typeof originalEditRow==='function'){
   window.editRow=function(id){
-    const row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id));
+    let row=null;
+    try{
+      row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id))||null;
+      selectedCardLock=String(row?.cardId||'');
+      selectedCardUsageLock=String(row?.cardUsageType||'');
+    }catch(e){}
+
     const result=originalEditRow.apply(this,arguments);
+
     requestAnimationFrame(()=>{
-      refreshControlledCombos();
-      if(row?.cardId&&optionExists($('launchCard'),String(row.cardId))){
-        $('launchCard').value=String(row.cardId);
-      }
-      if(row?.cardUsageType&&$('finoraCardUsage')){
-        $('finoraCardUsage').value=row.cardUsageType;
-      }
-      syncHybrid();
+      try{
+        const card=$('launchCard');
+        if(selectedCardLock && card &&
+           [...card.options].some(o=>String(o.value)===selectedCardLock)){
+          card.value=selectedCardLock;
+        }
+        const usage=$('finoraCardUsage');
+        if(selectedCardUsageLock && usage){
+          usage.value=selectedCardUsageLock;
+        }
+        if(typeof updateCardUsage==='function')updateCardUsage();
+      }catch(e){}
     });
+
     return result;
   };
 }
 
-/* Bootstrap limitado: três execuções e encerra. */
-function boot(){
-  refreshControlledCombos();
-  setTimeout(refreshControlledCombos,180);
-  setTimeout(refreshControlledCombos,800);
+const originalOpenLaunch=window.openLaunchModal;
+if(typeof originalOpenLaunch==='function' && !originalOpenLaunch.__r734){
+  const wrapped=function(){
+    try{
+      if(typeof window.refreshFinoraV90Controls==='function'){
+        window.refreshFinoraV90Controls();
+      }
+    }catch(e){}
+    return originalOpenLaunch.apply(this,arguments);
+  };
+  wrapped.__r734=true;
+  window.openLaunchModal=wrapped;
 }
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
-else boot();
 
-window.finoraR733Diagnostics=function(){
-  const ids=[
+document.addEventListener('click',function(e){
+  const id=e.target?.id||'';
+  if(id==='v84QuickIncome'||id==='v84QuickExpense'){
+    setTimeout(refreshNativeCatalogs,0);
+  }
+},true);
+
+function boot(){
+  try{
+    lastCatalogSignature=featureCatalogSignature(
+      typeof window.loadFinoraFeatureState==='function'
+        ? window.loadFinoraFeatureState()
+        : null
+    );
+  }catch(e){}
+  refreshNativeCatalogs();
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',boot,{once:true});
+}else{
+  boot();
+}
+
+window.finoraR734Diagnostics=function(){
+  const selectIds=[
     'tipo','pessoa','expenseOwner','categoriaExpense','status','recorrente',
     'valorRecorrente','isInstallment','installmentCurrent','installmentTotal',
     'launchCard','finoraCardUsage','forma',
-    'v84QuickCategory','v84QuickPayment','v84QuickDate'
+    'v84QuickCategory','v84QuickPayment'
   ];
   const combos={};
-  ids.forEach(id=>{
+  selectIds.forEach(id=>{
     const el=$(id);
-    if(el)combos[id]={options:el.options?.length??null,value:el.value};
+    if(el)combos[id]={
+      options:el.options?.length??0,
+      value:el.value,
+      disabled:!!el.disabled
+    };
   });
-  return {release:RELEASE,combos,categories:categories(),payments:payments(),cards:cards().length};
+  return {
+    release:RELEASE,
+    combos,
+    quickDate:$('v84QuickDate')?.value||'',
+    cardLock:selectedCardLock,
+    catalogSignature:lastCatalogSignature
+  };
 };
+
 })();
 </script>
 
