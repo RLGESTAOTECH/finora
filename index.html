@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.30-category-sync">
+<meta name="finora-release" content="R7.31-alerts-money-hybrid-card">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -7646,6 +7646,29 @@ body.dark #finoraSyncIndicatorR726{
 }
 </style>
 
+
+<style id="finora-r731-style">
+.finora-r731-alert-toolbar{
+  display:grid!important;
+  grid-template-columns:minmax(125px,.65fr) minmax(155px,.85fr) minmax(190px,1.2fr) minmax(155px,.9fr) minmax(210px,1.35fr)!important;
+  gap:10px!important;
+}
+.finora-r731-alert-toolbar>select,
+.finora-r731-alert-toolbar>input{
+  width:100%!important;
+  min-width:0!important;
+}
+#finoraCardUsageField[hidden]{display:none!important}
+@media(max-width:980px){
+  .finora-r731-alert-toolbar{grid-template-columns:1fr 1fr!important}
+  .finora-r731-alert-toolbar>#alertSearchFilter{grid-column:1/-1}
+}
+@media(max-width:620px){
+  .finora-r731-alert-toolbar{grid-template-columns:1fr!important}
+  .finora-r731-alert-toolbar>#alertSearchFilter{grid-column:auto}
+}
+</style>
+
 </head>
 <body>
 
@@ -8202,14 +8225,16 @@ body.dark #finoraSyncIndicatorR726{
     <h2>Alertas por mês, categoria e gasto</h2>
     <span id="alertCount">0 alertas</span>
   </div>
-  <div class="alert-toolbar">
-    <select id="alertMonthFilter"><option value="">Todos os meses próximos</option></select>
-    <select id="alertCategoryFilter"><option value="">Todas as categorias</option></select>
-    <select id="alertTypeFilter">
+  <div class="alert-toolbar finora-r731-alert-toolbar">
+    <select id="alertYearFilter" aria-label="Ano dos alertas"><option value="">Todos os anos</option></select>
+    <select id="alertMonthFilter" aria-label="Mês dos alertas"><option value="">Todos os meses</option></select>
+    <select id="alertCategoryFilter" aria-label="Categoria dos alertas"><option value="">Todas as categorias</option></select>
+    <select id="alertTypeFilter" aria-label="Tipo dos alertas">
       <option value="">Entradas e gastos</option>
       <option value="saida">Somente gastos</option>
       <option value="entrada">Somente recebimentos</option>
     </select>
+    <input id="alertSearchFilter" type="search" placeholder="Pesquisar descrição..." aria-label="Pesquisar alertas pela descrição">
   </div>
   <div class="alert-summary-row">
     <div class="alert-summary-card"><span>Gastos alertados</span><strong id="alertExpenseTotal">R$ 0,00</strong></div>
@@ -8391,6 +8416,15 @@ body.dark #finoraSyncIndicatorR726{
       <label>Cartão utilizado (opcional)</label>
       <select id="launchCard"><option value="">Nenhum / não se aplica</option></select>
       <div class="file-note">O cartão identifica o meio de pagamento; a categoria do gasto continua sendo escolhida separadamente.</div>
+    </div>
+    <div class="field" id="finoraCardUsageField" hidden>
+      <label>Função utilizada neste lançamento</label>
+      <select id="finoraCardUsage">
+        <option value="">Selecione</option>
+        <option value="credito">Crédito</option>
+        <option value="debito">Débito</option>
+      </select>
+      <div class="file-note">Obrigatório quando o cartão cadastrado possui as funções débito e crédito.</div>
     </div>
 
     <div class="field" id="paymentMethodField">
@@ -9192,41 +9226,200 @@ function finoraResolveCardForAlertR718(x){
 
 function renderAlerts(){
   finoraNormalizePendingZeroR718();
-  const savedMonth=$('alertMonthFilter')?.value||'';
-  const savedCategory=$('alertCategoryFilter')?.value||'';
-  const typeFilter=$('alertTypeFilter')?.value||'';
 
-  const acc=data.filter(x=>sameWorkspace(x) && effectiveStatus(x)!=='pago');
-  const cardAlerts=cardInvoiceAlerts();
-  let all=[...acc,...cardAlerts].map(x=>{
+  const yearEl=$('alertYearFilter');
+  const monthEl=$('alertMonthFilter');
+  const catEl=$('alertCategoryFilter');
+  const typeEl=$('alertTypeFilter');
+  const searchEl=$('alertSearchFilter');
+
+  const savedYear=yearEl?.value||String(new Date().getFullYear());
+  const savedMonth=monthEl?.value||'';
+  const savedCategory=catEl?.value||'';
+  const typeFilter=typeEl?.value||'';
+  const searchFilter=String(searchEl?.value||'').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+  const norm=s=>String(s||'').toLowerCase().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+
+  const currentYear=new Date().getFullYear();
+
+  // Disponibiliza histórico + anos futuros, sem limitar os alertas a 90 dias.
+  const dataYears=(Array.isArray(data)?data:[])
+    .filter(x=>sameWorkspace(x))
+    .map(x=>Number(String(x.vencimento||x.dataLancamento||'').slice(0,4)))
+    .filter(y=>Number.isFinite(y)&&y>=2000&&y<=2200);
+
+  const minDataYear=dataYears.length?Math.min(...dataYears):currentYear;
+  const maxDataYear=dataYears.length?Math.max(...dataYears):currentYear;
+  const minYear=Math.min(minDataYear,currentYear-3);
+  const maxYear=Math.max(maxDataYear,currentYear+5);
+
+  const years=[];
+  for(let y=minYear;y<=maxYear;y++)years.push(y);
+
+  if(yearEl){
+    yearEl.innerHTML='<option value="">Todos os anos</option>'+
+      years.map(y=>`<option value="${y}">${y}</option>`).join('');
+    yearEl.value=years.includes(Number(savedYear))?String(savedYear):String(currentYear);
+  }
+
+  const selectedYear=Number(yearEl?.value||0);
+
+  // Cria projeções virtuais para recorrências mensais. Não grava dezenas de
+  // lançamentos no banco apenas para exibir alertas.
+  const virtualRecurring=[];
+  const roots=(Array.isArray(data)?data:[]).filter(x=>
+    sameWorkspace(x) &&
+    x.recorrente==='mensal' &&
+    !x.generatedReminder &&
+    !x.materializedOccurrence
+  );
+
+  const projectionYears=selectedYear?[selectedYear]:years;
+  roots.forEach(root=>{
+    const base=referenceDate(root);
+    if(!base)return;
+    const [by,bm,bd]=base.split('-').map(Number);
+    const rootId=String(root.seriesRootId||root.id||'');
+    if(!rootId)return;
+
+    projectionYears.forEach(y=>{
+      for(let mo=1;mo<=12;mo++){
+        if(y<by || (y===by&&mo<bm))continue;
+
+        const date=safeDateForDay(y,mo,bd);
+        const exists=(Array.isArray(data)?data:[]).some(r=>{
+          if(!sameWorkspace(r))return false;
+          const sameSeries=String(r.seriesRootId||'')===rootId ||
+            String(r.parentRecurringId||'')===String(root.id||'');
+          const legacy=sameSeries || (
+            norm(r.descricao)===norm(root.descricao) &&
+            norm(r.pessoa)===norm(root.pessoa) &&
+            r.tipo===root.tipo
+          );
+          return legacy && referenceDate(r)===date;
+        });
+        if(exists)continue;
+
+        virtualRecurring.push({
+          ...root,
+          id:`virtual-rec-${rootId}-${date}`,
+          parentRecurringId:root.id,
+          seriesRootId:rootId,
+          generatedReminder:true,
+          virtualRecurringAlert:true,
+          recorrente:'nao',
+          dataLancamento:date,
+          vencimento:date,
+          status:'pendente',
+          valor:root.valorRecorrente==='variavel'?0:Number(root.valor||0),
+          valorPendente:root.valorRecorrente==='variavel'
+        });
+      }
+    });
+  });
+
+  // Faturas virtuais de cartão para os anos exibíveis.
+  const virtualCards=[];
+  const cards=accountCards().filter(c=>{
+    const t=String(c.cardType||c.type||'').toLowerCase();
+    return t!=='debito' && Number(c.dueDay)>=1;
+  });
+
+  cards.forEach(c=>{
+    projectionYears.forEach(y=>{
+      for(let mo=1;mo<=12;mo++){
+        const date=safeDateForDay(y,mo,c.dueDay);
+        virtualCards.push({
+          id:`card-alert-${c.id}-${date}`,
+          account:'family',workspaceId:currentWorkspaceId,tipo:'saida',
+          pessoa:c.owner||'Família',
+          descricao:`Fatura ${c.name}`,
+          beneficiario:c.issuer||c.name,
+          categoria:'Cartão de crédito',
+          valor:0,valorPendente:true,
+          valorRecorrente:'variavel',
+          dataLancamento:date,vencimento:date,
+          status:'pendente',forma:'Cartão de crédito',
+          cardId:c.id,virtualCardAlert:true
+        });
+      }
+    });
+  });
+
+  const actual=(Array.isArray(data)?data:[]).filter(x=>
+    sameWorkspace(x) && effectiveStatus(x)!=='pago'
+  );
+
+  // Mescla e elimina duplicidades de mesma série/cartão/data.
+  const candidates=[...actual,...virtualRecurring,...virtualCards].map(x=>{
     const date=x.vencimento||x.dataLancamento;
     return {...x,_date:date,_days:date?daysBetween(today(),date):9999,_month:(date||'').slice(0,7)};
-  }).filter(x=>x._date && x._days<=90).sort((a,b)=>a._date.localeCompare(b._date));
+  }).filter(x=>x._date);
+
+  const dedup=new Map();
+  candidates.forEach(x=>{
+    // Regra específica aprovada: IPTU correto vence dia 24.
+    // Qualquer sobra antiga de alerta IPTU no dia 12 não deve reaparecer.
+    if(norm(x.descricao)==='iptu' && String(x._date).slice(8,10)==='12')return;
+
+    const recurrenceKey=x.cardId
+      ? `card|${x.cardId}|${x._date}`
+      : `${norm(x.descricao)}|${norm(x.pessoa)}|${x.tipo}|${x._date}`;
+
+    const prev=dedup.get(recurrenceKey);
+    if(!prev || (
+      (prev.virtualRecurringAlert||prev.virtualCardAlert) &&
+      !(x.virtualRecurringAlert||x.virtualCardAlert)
+    )){
+      dedup.set(recurrenceKey,x);
+    }
+  });
+
+  let all=[...dedup.values()].sort((a,b)=>a._date.localeCompare(b._date));
 
   const monthNames=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  const months=[...new Set(all.map(x=>x._month).filter(Boolean))].sort();
-  const mf=$('alertMonthFilter');
-  if(mf){
-    mf.innerHTML='<option value="">Todos os meses próximos</option>'+months.map(m=>{
-      const [y,mo]=m.split('-');return `<option value="${m}">${monthNames[+mo]} / ${y}</option>`;
-    }).join('');
-    mf.value=months.includes(savedMonth)?savedMonth:'';
+
+  if(monthEl){
+    const months=selectedYear
+      ? Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0'))
+      : Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0'));
+
+    monthEl.innerHTML='<option value="">Todos os meses</option>'+
+      months.map(m=>`<option value="${m}">${monthNames[Number(m)]}</option>`).join('');
+
+    if(savedMonth){
+      const raw=String(savedMonth);
+      const monthOnly=raw.includes('-')?raw.slice(5,7):raw.padStart(2,'0');
+      monthEl.value=months.includes(monthOnly)?monthOnly:'';
+    }
   }
 
-  const cats=[...new Set(all.map(x=>x.categoria||'Sem categoria'))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
-  const cf=$('alertCategoryFilter');
-  if(cf){
-    cf.innerHTML='<option value="">Todas as categorias</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
-    cf.value=cats.includes(savedCategory)?savedCategory:'';
+  const cats=[...new Set(all.map(x=>x.categoria||'Sem categoria'))]
+    .sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  if(catEl){
+    catEl.innerHTML='<option value="">Todas as categorias</option>'+
+      cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    catEl.value=cats.includes(savedCategory)?savedCategory:'';
   }
 
-  const monthFilter=mf?.value||'';
-  const categoryFilter=cf?.value||'';
-  const upcoming=all.filter(x=>
-    (!monthFilter || x._month===monthFilter) &&
-    (!categoryFilter || (x.categoria||'Sem categoria')===categoryFilter) &&
-    (!typeFilter || x.tipo===typeFilter)
-  );
+  const selectedMonth=monthEl?.value||'';
+  const categoryFilter=catEl?.value||'';
+
+  const upcoming=all.filter(x=>{
+    const y=Number(String(x._date).slice(0,4));
+    const m=String(x._date).slice(5,7);
+    const text=norm(`${x.descricao||''} ${x.pessoa||''} ${x.beneficiario||''} ${x.categoria||''}`);
+    return (
+      (!selectedYear || y===selectedYear) &&
+      (!selectedMonth || m===selectedMonth) &&
+      (!categoryFilter || (x.categoria||'Sem categoria')===categoryFilter) &&
+      (!typeFilter || x.tipo===typeFilter) &&
+      (!searchFilter || text.includes(searchFilter))
+    );
+  });
 
   $('alertCount').textContent=`${upcoming.length} alerta${upcoming.length===1?'':'s'}`;
   const exp=upcoming.filter(x=>x.tipo==='saida'&&hasKnownValue(x)).reduce((s,x)=>s+Number(x.valor||0),0);
@@ -9243,8 +9436,8 @@ function renderAlerts(){
 
   const grouped={};
   upcoming.forEach(x=>{
-    const m=x._month, c=x.categoria||'Sem categoria';
-    grouped[m]??={}; grouped[m][c]??=[]; grouped[m][c].push(x);
+    const m=x._month,c=x.categoria||'Sem categoria';
+    grouped[m]??={};grouped[m][c]??=[];grouped[m][c].push(x);
   });
 
   $('alertsBox').innerHTML=Object.keys(grouped).sort().map(m=>{
@@ -9259,30 +9452,22 @@ function renderAlerts(){
       return `<div class="alert-category">
         <div class="alert-category-head"><div class="alert-category-name">${esc(c)}</div><div class="alert-category-total">${money(catTotal)}</div></div>
         ${items.map(x=>{
-          const isIncome=x.tipo==='entrada', late=x._days<0;
+          const isIncome=x.tipo==='entrada',late=x._days<0;
           const when=late?`${Math.abs(x._days)} dia${Math.abs(x._days)===1?'':'s'} atrasado`:x._days===0?'Hoje':x._days===1?'Amanhã':`em ${x._days} dias`;
           const amount=finoraAlertAmountR718(x);
-          const alertPendingStatus=(
-            (typeof effectiveStatus==='function'?effectiveStatus(x):(x.status||'pendente'))!=='pago'
-          );
-          const showPayAction=!isIncome && alertPendingStatus;
-          const realId=(!x.virtualCardAlert && x.id)?String(x.id):'';
+          const pending=(typeof effectiveStatus==='function'?effectiveStatus(x):(x.status||'pendente'))!=='pago';
+          const realId=(!x.virtualCardAlert&&!x.virtualRecurringAlert&&x.id)?String(x.id):'';
           const resolvedCard=finoraResolveCardForAlertR718(x);
-          const payAction=showPayAction
-            ? (
-                realId
-                  ? `<button type="button" class="finora-v109-alert-paid" onclick="finoraR718RegisterTransactionPaid('${esc(realId)}')">Registrar paga</button>`
-                  : (resolvedCard
-                      ? `<button type="button" class="finora-v109-alert-paid" onclick="finoraV109MarkInvoicePaid('${esc(String(resolvedCard.id))}','${esc(String(x._date||''))}')">Registrar paga</button>`
-                      : '')
-              )
+          const payAction=!isIncome&&pending
+            ? (realId
+              ? `<button type="button" class="finora-v109-alert-paid" onclick="finoraR718RegisterTransactionPaid('${esc(realId)}')">Registrar paga</button>`
+              : (resolvedCard
+                ? `<button type="button" class="finora-v109-alert-paid" onclick="finoraV109MarkInvoicePaid('${esc(String(resolvedCard.id))}','${esc(String(x._date||''))}')">Registrar paga</button>`
+                : ''))
             : '';
           return `<div class="alert-item ${isIncome?'income':'expense'} ${late?'late':''}">
             <div><div class="meta">${isIncome?'Recebimento':'Gasto'} · ${when} · ${dateBR(x._date)}</div><strong>${esc(x.descricao)}</strong> · ${esc(x.pessoa)}</div>
-            <div class="finora-v109-alert-actions">
-              <div class="amount">${amount}</div>
-              ${payAction}
-            </div>
+            <div class="finora-v109-alert-actions"><div class="amount">${amount}</div>${payAction}</div>
           </div>`;
         }).join('')}
       </div>`;
@@ -9294,7 +9479,6 @@ function renderAlerts(){
     </div>`;
   }).join('');
 }
-
 function renderFinanceDashboard(){
   const month=$('filtroMes').value||currentMonth();
   const rows=data.filter(x=>sameWorkspace(x) && recordMonth(x)===month);
@@ -11111,6 +11295,7 @@ $('entryForm').addEventListener('submit',async e=>{
     parcelado:$('parcelado')?.value||'',
     parcelas:$('parcelado')?.value==='sim'?$('parcelas').value.trim():'',
     cardId:$('launchCard')?.value||'',
+    cardUsageType:$('finoraCardUsage')?.value||'',
     forma:$('forma').value,
     paymentAccount:paymentNeedsAccount($('forma').value)?$('paymentAccount').value.trim():'',
     goalId:($('tipo').value==='entrada' && $('goalUseCheck')?.checked)?($('goalUseSelect')?.value||''):(old?.goalId||''),
@@ -24277,6 +24462,232 @@ document.addEventListener('pointerdown',e=>{
   const sel=e.target?.closest?.('select');
   if(sel && isCategorySelect(sel))syncSelect(sel);
 },true);
+})();
+</script>
+
+
+<script id="finora-r731-operational-fixes">
+(function(){
+'use strict';
+if(window.__FINORA_R731__)return;
+window.__FINORA_R731__=true;
+
+const $=id=>document.getElementById(id);
+const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+
+function markDirty(){
+  try{if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty()}catch(e){}
+  try{if(typeof scheduleCloudPush==='function')scheduleCloudPush()}catch(e){}
+}
+
+// ------------------------------------------------------------
+// A. MIGRAÇÃO OPERACIONAL: IPTU dia 12 indevido
+// Mantém o IPTU de vencimento dia 24.
+// ------------------------------------------------------------
+function cleanupWrongIPTUR731(){
+  try{
+    if(!Array.isArray(data)||!currentWorkspaceId)return 0;
+    const bad=data.filter(x=>{
+      if(String(x.workspaceId||'')!==String(currentWorkspaceId||''))return false;
+      if(norm(x.descricao)!=='iptu')return false;
+      const dt=String(x.vencimento||x.dataLancamento||'');
+      return dt.length>=10 && dt.slice(8,10)==='12' &&
+        (typeof effectiveStatus!=='function'||effectiveStatus(x)!=='pago');
+    });
+    if(!bad.length)return 0;
+
+    const ids=new Set(bad.map(x=>String(x.id||'')).filter(Boolean));
+    bad.forEach(x=>{
+      try{if(typeof recordTransactionDeletion==='function')recordTransactionDeletion(x.id)}catch(e){}
+      try{if(typeof finoraRemovePendingTxR729==='function')finoraRemovePendingTxR729(x.id,currentWorkspaceId)}catch(e){}
+    });
+    data=data.filter(x=>!ids.has(String(x.id||'')));
+    localStorage.setItem(KEY,JSON.stringify(data));
+    markDirty();
+    return bad.length;
+  }catch(e){
+    console.warn('FINORA R7.31 limpeza IPTU',e);
+    return 0;
+  }
+}
+
+// ------------------------------------------------------------
+// B. MOEDA BRL: usuário digita somente números.
+// 1 -> R$ 0,01 | 123 -> R$ 1,23 | 12345 -> R$ 123,45
+// ------------------------------------------------------------
+function isMoneyInput(el){
+  if(!(el instanceof HTMLInputElement))return false;
+  if(['date','datetime-local','month','time','checkbox','radio','file','range','color','hidden'].includes(el.type))return false;
+
+  const id=norm(el.id),name=norm(el.name);
+  const label=norm(
+    el.closest('.field')?.querySelector('label')?.textContent ||
+    el.parentElement?.querySelector('label')?.textContent || ''
+  );
+
+  if(el.dataset.currency==='brl')return true;
+  if(/valor|amount|preco|price|limite|anuidade|saldo|meta|orcamento|economia|renda/.test(id+' '+name))return true;
+  if(/valor|limite|anuidade|saldo|meta|orcamento|economia|renda/.test(label))return true;
+  return false;
+}
+function brlFromDigits(raw){
+  const digits=String(raw??'').replace(/\D/g,'');
+  if(!digits)return '';
+  const cents=Number(digits);
+  if(!Number.isFinite(cents))return '';
+  return (cents/100).toLocaleString('pt-BR',{
+    style:'currency',currency:'BRL',
+    minimumFractionDigits:2,maximumFractionDigits:2
+  });
+}
+function applyMoneyRule(el){
+  if(!isMoneyInput(el))return;
+  el.type='text';
+  el.inputMode='numeric';
+  el.autocomplete='off';
+  el.dataset.finoraCents='1';
+}
+function prepareMoneyFields(root=document){
+  root.querySelectorAll?.('input').forEach(applyMoneyRule);
+}
+prepareMoneyFields();
+
+document.addEventListener('focusin',e=>applyMoneyRule(e.target),true);
+document.addEventListener('input',e=>{
+  const el=e.target;
+  if(!isMoneyInput(el))return;
+  applyMoneyRule(el);
+  const formatted=brlFromDigits(el.value);
+  if(el.value!==formatted)el.value=formatted;
+  try{el.setSelectionRange(el.value.length,el.value.length)}catch(err){}
+},true);
+
+new MutationObserver(ms=>{
+  ms.forEach(m=>m.addedNodes.forEach(n=>{
+    if(n.nodeType===1)prepareMoneyFields(n);
+  }));
+}).observe(document.body,{childList:true,subtree:true});
+
+window.finoraBRLFromDigitsR731=brlFromDigits;
+
+// ------------------------------------------------------------
+// C. CARTÃO DÉBITO E CRÉDITO
+// ------------------------------------------------------------
+function cardType(card){
+  const t=String(card?.cardType||card?.type||'').toLowerCase();
+  return ['debito','credito','debito_credito'].includes(t)?t:'credito';
+}
+function selectedCard(){
+  const id=$('launchCard')?.value||'';
+  if(!id)return null;
+  try{return accountCards().find(c=>String(c.id)===String(id))||null}catch(e){return null}
+}
+function updateCardUsage(){
+  const field=$('finoraCardUsageField');
+  const usage=$('finoraCardUsage');
+  if(!field||!usage)return;
+
+  const card=selectedCard();
+  const hybrid=cardType(card)==='debito_credito';
+
+  field.hidden=!hybrid;
+  field.style.display=hybrid?'':'none';
+
+  if(!card){
+    usage.value='';
+    usage.required=false;
+    return;
+  }
+
+  if(hybrid){
+    usage.required=true;
+  }else{
+    usage.required=false;
+    usage.value=cardType(card);
+    if(cardType(card)==='credito' && $('forma'))$('forma').value='Cartão de crédito';
+    if(cardType(card)==='debito' && $('forma'))$('forma').value='Débito';
+  }
+
+  try{if(typeof updatePaymentAccountField==='function')updatePaymentAccountField()}catch(e){}
+}
+
+$('launchCard')?.addEventListener('change',updateCardUsage);
+$('finoraCardUsage')?.addEventListener('change',()=>{
+  const v=$('finoraCardUsage')?.value||'';
+  if(v==='credito'&&$('forma'))$('forma').value='Cartão de crédito';
+  if(v==='debito'&&$('forma'))$('forma').value='Débito';
+  try{if(typeof updatePaymentAccountField==='function')updatePaymentAccountField()}catch(e){}
+});
+
+// Validação ocorre antes do submit principal.
+$('entryForm')?.addEventListener('submit',e=>{
+  const card=selectedCard();
+  if(cardType(card)==='debito_credito' && !$('finoraCardUsage')?.value){
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    $('finoraCardUsage')?.reportValidity();
+    try{toast('Informe se a despesa foi feita no débito ou no crédito.')}catch(err){}
+    return;
+  }
+},true);
+
+// Editar lançamento: restaura a função usada.
+const oldEdit=window.editRow;
+if(typeof oldEdit==='function'){
+  window.editRow=function(id){
+    const result=oldEdit.apply(this,arguments);
+    try{
+      const row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id));
+      updateCardUsage();
+      if(row?.cardUsageType && $('finoraCardUsage')){
+        $('finoraCardUsage').value=row.cardUsageType;
+      }else{
+        const card=selectedCard();
+        const t=cardType(card);
+        if(t!=='debito_credito'&&$('finoraCardUsage'))$('finoraCardUsage').value=t;
+      }
+    }catch(e){}
+    return result;
+  };
+}
+
+// Após reset/abertura mantém UI coerente.
+document.addEventListener('click',e=>{
+  if(e.target?.closest?.('[data-action="new-expense"],[data-launch="saida"],#newExpenseBtn')){
+    setTimeout(updateCardUsage,0);
+  }
+},true);
+
+// ------------------------------------------------------------
+// D. ALERTAS — eventos dos novos filtros
+// ------------------------------------------------------------
+['alertYearFilter','alertMonthFilter','alertCategoryFilter','alertTypeFilter'].forEach(id=>{
+  $(id)?.addEventListener('change',()=>renderAlerts());
+});
+$('alertSearchFilter')?.addEventListener('input',()=>renderAlerts());
+
+const removed=cleanupWrongIPTUR731();
+if(removed){
+  try{render()}catch(e){}
+}
+setTimeout(()=>{
+  try{renderAlerts()}catch(e){}
+  try{updateCardUsage()}catch(e){}
+},0);
+
+window.finoraR731Diagnostics=function(){
+  return {
+    release:'R7.31',
+    iptuDia12Restante:(Array.isArray(data)?data:[]).filter(x=>
+      String(x.workspaceId||'')===String(currentWorkspaceId||'') &&
+      norm(x.descricao)==='iptu' &&
+      String(x.vencimento||x.dataLancamento||'').slice(8,10)==='12'
+    ).length,
+    cardUsageField:!!$('finoraCardUsageField'),
+    alertYearFilter:!!$('alertYearFilter'),
+    alertSearchFilter:!!$('alertSearchFilter')
+  };
+};
 })();
 </script>
 
