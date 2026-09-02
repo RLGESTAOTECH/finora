@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.29-delete-anti-resurrection">
+<meta name="finora-release" content="R7.30-category-sync">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -24126,6 +24126,158 @@ window.finoraR729DeleteHealth=function(id){
     cloudPushPending:typeof finoraCloudPushPending!=='undefined'?!!finoraCloudPushPending:null
   };
 };
+</script>
+
+
+<script id="finora-r730-category-sync">
+(function(){
+'use strict';
+if(window.__FINORA_R730_CATEGORY_SYNC__)return;
+window.__FINORA_R730_CATEGORY_SYNC__=true;
+
+function norm(v){
+  return String(v==null?'':v).trim();
+}
+function key(v){
+  return norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+}
+function isCategorySelect(el){
+  if(!el || el.tagName!=='SELECT')return false;
+  const hay=[
+    el.id,el.name,el.dataset?.field,el.dataset?.type,
+    el.getAttribute('aria-label'),
+    el.closest('label')?.textContent,
+    el.parentElement?.querySelector('label')?.textContent
+  ].filter(Boolean).join(' ').toLowerCase();
+  return hay.includes('categoria') || hay.includes('category');
+}
+function categoriesFromDOM(){
+  const out=[];
+  document.querySelectorAll('select').forEach(sel=>{
+    if(!isCategorySelect(sel))return;
+    [...sel.options].forEach(o=>{
+      const v=norm(o.value||o.textContent);
+      if(v && !/selecione|categoria/i.test(v))out.push(v);
+    });
+  });
+  return out;
+}
+function categoriesFromStorage(){
+  const out=[];
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i)||'';
+      if(!/categor/i.test(k))continue;
+      let v;
+      try{v=JSON.parse(localStorage.getItem(k))}catch(e){continue}
+      const walk=x=>{
+        if(Array.isArray(x))return x.forEach(walk);
+        if(x && typeof x==='object'){
+          const candidate=x.nome??x.name??x.categoria??x.category??x.descricao??x.label;
+          if(typeof candidate==='string')out.push(candidate);
+          else Object.values(x).forEach(walk);
+        }else if(typeof x==='string')out.push(x);
+      };
+      walk(v);
+    }
+  }catch(e){}
+  return out;
+}
+function categoriesFromGlobals(){
+  const out=[];
+  const names=['categories','categorias','CATEGORIES','CATEGORIAS','categoryList','listaCategorias'];
+  names.forEach(n=>{
+    try{
+      const v=window[n];
+      if(!Array.isArray(v))return;
+      v.forEach(x=>{
+        if(typeof x==='string')out.push(x);
+        else if(x && typeof x==='object')out.push(x.nome||x.name||x.categoria||x.category||x.descricao||x.label||'');
+      });
+    }catch(e){}
+  });
+  return out;
+}
+function categoriesFromTransactions(){
+  const out=[];
+  try{
+    (Array.isArray(data)?data:[]).forEach(x=>{
+      const c=x?.categoria??x?.category;
+      if(c)out.push(c);
+    });
+  }catch(e){}
+  return out;
+}
+function allCategories(){
+  const map=new Map();
+  [
+    ...categoriesFromDOM(),
+    ...categoriesFromStorage(),
+    ...categoriesFromGlobals(),
+    ...categoriesFromTransactions()
+  ].forEach(v=>{
+    v=norm(v);
+    if(!v)return;
+    const k=key(v);
+    if(!map.has(k))map.set(k,v);
+  });
+  return [...map.values()].sort((a,b)=>a.localeCompare(b,'pt-BR',{sensitivity:'base'}));
+}
+function syncSelect(sel){
+  if(!isCategorySelect(sel))return;
+  const selected=norm(sel.value);
+  const existing=new Set([...sel.options].map(o=>key(o.value||o.textContent)));
+  allCategories().forEach(cat=>{
+    if(existing.has(key(cat)))return;
+    const opt=document.createElement('option');
+    opt.value=cat;
+    opt.textContent=cat;
+    sel.appendChild(opt);
+    existing.add(key(cat));
+  });
+  if(selected && [...sel.options].some(o=>norm(o.value)===selected))sel.value=selected;
+}
+function syncAll(){
+  document.querySelectorAll('select').forEach(syncSelect);
+}
+window.finoraSyncCategoriesR730=syncAll;
+
+// Sincroniza imediatamente, inclusive Lançamento Rápido e modal Editar.
+syncAll();
+
+// Qualquer modal/formulário criado depois recebe as categorias automaticamente.
+const observer=new MutationObserver(mutations=>{
+  let needed=false;
+  for(const m of mutations){
+    if(m.addedNodes?.length){needed=true;break}
+  }
+  if(needed)queueMicrotask(syncAll);
+});
+observer.observe(document.documentElement,{childList:true,subtree:true});
+
+// Ao salvar/cadastrar categoria, atualiza todos os selects sem exigir F5.
+document.addEventListener('click',e=>{
+  const b=e.target?.closest?.('button');
+  if(!b)return;
+  const t=(b.textContent||'').toLowerCase();
+  if(/salvar|adicionar|cadastrar|criar/.test(t)){
+    setTimeout(syncAll,0);
+    setTimeout(syncAll,150);
+    setTimeout(syncAll,500);
+  }
+},true);
+
+// Mudanças de storage também propagam a lista.
+window.addEventListener('storage',e=>{
+  if(/categor/i.test(e.key||''))syncAll();
+});
+
+// Defesa adicional: antes de abrir/usar qualquer select de categoria.
+document.addEventListener('pointerdown',e=>{
+  const sel=e.target?.closest?.('select');
+  if(sel && isCategorySelect(sel))syncSelect(sel);
+},true);
+})();
 </script>
 
 </body>
