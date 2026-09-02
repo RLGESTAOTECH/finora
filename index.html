@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.35-transaction-integrity">
+<meta name="finora-release" content="R7.36-definitive-cloud-delete">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -10881,6 +10881,20 @@ function finoraHideZeroExpenseRows(){
 }
 
 function render(){
+  // R7.36: nenhuma tela pode renderizar IDs já excluídos.
+  try{
+    const other=data.filter(x=>typeof sameWorkspace==='function'&&!sameWorkspace(x));
+    const current=data.filter(x=>typeof sameWorkspace!=='function'||sameWorkspace(x));
+    data=finoraCanonicalTransactions(
+      other.concat(
+        finoraApplyHardDeletesR736(
+          finoraFilterDeletedRowsR729(current,currentWorkspaceId),
+          currentWorkspaceId
+        )
+      )
+    );
+  }catch(e){}
+
   updateAdminDangerControls();
   document.querySelectorAll('.account').forEach(b=>b.classList.toggle('active',b.dataset.account===account));
   $('accountLabel').textContent=currentWorkspaceName||'Meu ambiente';
@@ -11622,77 +11636,69 @@ async function deleteRow(id){
   const desc=x.descricao||'este lançamento';
   const value=money(Number(x.valor)||0);
 
-  if(!confirm(`Excluir "${desc}" (${value})?\n\nA exclusão será aplicada imediatamente e não poderá reaparecer pela sincronização.`)){
+  if(!confirm(`Excluir "${desc}" (${value})?\n\nO lançamento será removido do FINORA e do estado salvo na nuvem.`)){
     return false;
   }
 
   try{
-    // 1. Tombstone vem antes de qualquer remoção.
-    if(typeof recordTransactionDeletion==='function'){
-      recordTransactionDeletion(txId);
-    }
+    // 1) Exclusão terminal: tombstone + fila durável de remoção física do JSONB.
+    recordTransactionDeletion(txId);
+    finoraQueueHardDeleteR736(txId,currentWorkspaceId);
 
-    // 2. Retira qualquer cópia da fila de alterações pendentes.
-    try{
-      if(typeof finoraRemovePendingTxR729==='function'){
-        finoraRemovePendingTxR729(txId,currentWorkspaceId);
-      }
-    }catch(e){}
+    // 2) Remove de qualquer fila de mutação pendente.
+    try{finoraRemovePendingTxR729(txId,currentWorkspaceId)}catch(e){}
 
-    // 3. Remove TODAS as cópias locais com o mesmo ID.
+    // 3) Remove localmente imediatamente.
     data=(Array.isArray(data)?data:[]).filter(r=>String(r?.id||'')!==txId);
-
-    // 4. Filtro defensivo: nenhum ID tombstonado permanece no workspace atual.
-    try{
-      if(typeof finoraFilterDeletedRowsR729==='function'){
-        const other=data.filter(r=>typeof sameWorkspace==='function'&&!sameWorkspace(r));
-        const current=data.filter(r=>typeof sameWorkspace!=='function'||sameWorkspace(r));
-        data=typeof finoraCanonicalTransactions==='function'
-          ? finoraCanonicalTransactions(other.concat(
-              finoraFilterDeletedRowsR729(current,currentWorkspaceId)
-            ))
-          : other.concat(finoraFilterDeletedRowsR729(current,currentWorkspaceId));
-      }
-    }catch(e){}
-
+    data=finoraCanonicalTransactions(
+      finoraApplyHardDeletesR736(
+        finoraFilterDeletedRowsR729(data,currentWorkspaceId),
+        currentWorkspaceId
+      )
+    );
     localStorage.setItem(KEY,JSON.stringify(data));
 
-    try{if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty()}catch(e){}
+    finoraMarkCloudDirty();
+
+    // 4) Atualização imediata de todas as telas dependentes.
+    // render() já recalcula KPIs, alertas, dashboard, categorias e tabela.
+    render();
+    try{renderHomeCategoryDonut()}catch(e){}
+    try{renderCategoryFigures()}catch(e){}
+    try{renderFinanceDashboard()}catch(e){}
+    try{renderSimpleDashboard()}catch(e){}
+
+    toast('Lançamento excluído.');
+
     try{
+      Promise.resolve(
+        finoraAuditLog?.('EXCLUIU','LANCAMENTO',txId,'Lançamento excluído',x,null)
+      ).catch(()=>{});
+    }catch(e){}
+
+    // 5) Persistência remota imediata.
+    // O push R7.36 remove o ID do state.transactions mesmo que ainda exista
+    // em uma leitura remota anterior.
+    let synced=false;
+    try{
+      synced=await pushCloudState(true);
+    }catch(e){
+      console.warn('FINORA R7.36 exclusão remota pendente',e);
+    }
+
+    if(synced){
+      finoraSyncIndicatorR726('ok','Exclusão sincronizada');
+    }else{
+      // A fila durável mantém a exclusão terminal até a próxima sincronização.
       finoraCloudDirty=true;
       finoraCloudPushPending=true;
-    }catch(e){}
-
-    // UI muda antes da rede.
-    render();
-    try{if(typeof renderV84Dashboard==='function')renderV84Dashboard()}catch(e){}
-    try{if(typeof renderHomeCategoryDonut==='function')renderHomeCategoryDonut()}catch(e){}
-    toast('Lançamento excluído com sucesso.');
-
-    try{
-      if(typeof finoraAuditLog==='function'){
-        Promise.resolve(
-          finoraAuditLog('EXCLUIU','LANCAMENTO',txId,'Lançamento excluído',x,null)
-        ).catch(()=>{});
-      }
-    }catch(e){}
-
-    // Uma tentativa de sincronização, fora do caminho crítico.
-    try{
-      if(typeof cloudConfigured==='function' && cloudConfigured()){
-        setTimeout(()=>{
-          try{
-            if(typeof pushCloudState==='function'){
-              Promise.resolve(pushCloudState(false)).catch(()=>{});
-            }
-          }catch(e){}
-        },500);
-      }
-    }catch(e){}
+      scheduleCloudPush();
+      finoraSyncIndicatorR726('error','Excluído localmente — remoção da nuvem pendente');
+    }
 
     return true;
   }catch(e){
-    console.error('FINORA R7.35 delete',e);
+    console.error('FINORA R7.36 delete',e);
     toast('Não foi possível concluir a exclusão.');
     return false;
   }
@@ -12703,6 +12709,53 @@ function normalizeTxRecord(x){
   return {...x,id,workspaceId:x.workspaceId||currentWorkspaceId,account:'family'};
 }
 
+
+const FINORA_HARD_DELETE_R736_KEY='finora_hard_delete_r736';
+
+function finoraLoadHardDeletesR736(){
+  try{
+    const v=JSON.parse(localStorage.getItem(FINORA_HARD_DELETE_R736_KEY)||'{}');
+    return v&&typeof v==='object'?v:{};
+  }catch(e){return{}}
+}
+function finoraSaveHardDeletesR736(store){
+  localStorage.setItem(FINORA_HARD_DELETE_R736_KEY,JSON.stringify(store||{}));
+}
+function finoraHardDeleteIdsR736(workspaceId=currentWorkspaceId){
+  const ws=String(workspaceId||'');
+  const store=finoraLoadHardDeletesR736();
+  return new Set(Array.isArray(store[ws])?store[ws].map(String):[]);
+}
+function finoraQueueHardDeleteR736(id,workspaceId=currentWorkspaceId){
+  const ws=String(workspaceId||''),txId=String(id||'');
+  if(!ws||!txId)return;
+  const store=finoraLoadHardDeletesR736();
+  const arr=new Set(Array.isArray(store[ws])?store[ws].map(String):[]);
+  arr.add(txId);
+  store[ws]=[...arr];
+  finoraSaveHardDeletesR736(store);
+}
+function finoraClearHardDeleteR736(ids,workspaceId=currentWorkspaceId){
+  const ws=String(workspaceId||'');
+  if(!ws)return;
+  const remove=new Set((Array.isArray(ids)?ids:[]).map(String));
+  const store=finoraLoadHardDeletesR736();
+  const next=(Array.isArray(store[ws])?store[ws]:[]).filter(id=>!remove.has(String(id)));
+  if(next.length)store[ws]=next;
+  else delete store[ws];
+  finoraSaveHardDeletesR736(store);
+}
+function finoraApplyHardDeletesR736(rows,workspaceId=currentWorkspaceId){
+  const hard=finoraHardDeleteIdsR736(workspaceId);
+  return (Array.isArray(rows)?rows:[]).filter(x=>!hard.has(String(x?.id||'')));
+}
+function finoraDeletedOrHardIdSetR736(workspaceId=currentWorkspaceId){
+  const out=finoraHardDeleteIdsR736(workspaceId);
+  try{
+    finoraDeletedIdSetR729(workspaceId).forEach(id=>out.add(String(id)));
+  }catch(e){}
+  return out;
+}
 function finoraDeletedIdSetR729(workspaceId=currentWorkspaceId){
   const ws=String(workspaceId||'');
   return new Set(
@@ -12752,10 +12805,12 @@ function mergeTransactions(localRows,remoteRows,tombstones){
     if(!prev || Date.parse(t.deletedAt||0)>=Date.parse(prev.deletedAt||0))tombMap.set(t.id,t);
   });
 
-  tombMap.forEach((t,id)=>{
-    const row=map.get(id);
-    if(!row || Date.parse(t.deletedAt||0)>=txTime(row))map.delete(id);
-  });
+  // R7.36: exclusão é terminal para um ID.
+  // Um registro tombstonado nunca pode voltar por updatedAt remoto.
+  tombMap.forEach((t,id)=>map.delete(id));
+
+  const hard=finoraHardDeleteIdsR736(currentWorkspaceId);
+  hard.forEach(id=>map.delete(id));
 
   return [...map.values()];
 }
@@ -12782,7 +12837,10 @@ function recordTransactionDeletion(id){
 
 function cloudStatePayload(){
   const workspaceRows=finoraCanonicalTransactions(
-    finoraFilterDeletedRowsR729(data.filter(x=>sameWorkspace(x)),currentWorkspaceId)
+    finoraApplyHardDeletesR736(
+      finoraFilterDeletedRowsR729(data.filter(x=>sameWorkspace(x)),currentWorkspaceId),
+      currentWorkspaceId
+    )
   );
   const cards=accountCards();
   const members=familyMembersDirectory()
@@ -13050,6 +13108,12 @@ async function pushCloudState(showToast=false){
       remoteState.transactions||[],
       mergedTombstones
     );
+
+    // R7.36: remove fisicamente do array state.transactions antes do upsert.
+    const hardDeleteIdsR736=finoraDeletedOrHardIdSetR736(currentWorkspaceId);
+    payload.transactions=(payload.transactions||[])
+      .filter(x=>!hardDeleteIdsR736.has(String(x?.id||'')));
+
     payload.transactionTombstones=mergedTombstones;
 
     const mergedCardTombstones=mergeCardTombstones(remoteState.cardTombstones||[],payload.cardTombstones||[]);
@@ -13070,6 +13134,13 @@ async function pushCloudState(showToast=false){
     // Evita baixar o JSON inteiro uma segunda vez só para confirmar o que acabou de gravar.
     const confirmedRemoteTx=Array.isArray(payload.transactions)?payload.transactions:[];
     const confirmation=finoraClearConfirmedPendingTxV79(confirmedRemoteTx,currentWorkspaceId);
+
+    // A ausência no payload confirmado significa que a exclusão já foi gravada
+    // no JSONB remoto. A fila local de hard-delete pode ser liberada.
+    const hardQueuedR736=[...finoraHardDeleteIdsR736(currentWorkspaceId)];
+    if(hardQueuedR736.length){
+      finoraClearHardDeleteR736(hardQueuedR736,currentWorkspaceId);
+    }
     finoraFinishBootstrap();markFinoraWorkspaceHydrated();
     if(finoraCloudMutationRevision===pushRevision && confirmation.remaining===0){finoraCloudDirty=false;finoraCloudPushPending=false}else{finoraCloudDirty=true;finoraCloudPushPending=true}
 
@@ -13088,7 +13159,14 @@ async function pushCloudState(showToast=false){
       )
     );
     localStorage.setItem(KEY,JSON.stringify(data));
-    saveDeletedTransactions(payload.transactionTombstones||[]);
+    const otherTxTombstonesR736=loadDeletedTransactions()
+      .filter(t=>String(t?.workspaceId||'')!==String(currentWorkspaceId||''));
+    saveDeletedTransactions(
+      mergeTombstones(
+        otherTxTombstonesR736,
+        payload.transactionTombstones||[]
+      )
+    );
     saveFinoraCards(loadFinoraCards().filter(c=>c.workspaceId!==currentWorkspaceId).concat(payload.cards||[]));
     saveCardTombstones(payload.cardTombstones||[]);
     saveCloudMembers(payload.members||[]);
@@ -13201,7 +13279,10 @@ async function pullCloudState(showToast=false){
       saveFinoraWorkspaces(wsRows);
       if($('loggedAccount'))$('loggedAccount').textContent=state.workspaceName;
     }
-    const remoteTx=Array.isArray(state.transactions)?state.transactions:[];
+    const remoteTx=finoraApplyHardDeletesR736(
+      Array.isArray(state.transactions)?state.transactions:[],
+      currentWorkspaceId
+    );
     const remoteCards=Array.isArray(state.cards)?state.cards:[];
     const remoteCardTombstones=Array.isArray(state.cardTombstones)?state.cardTombstones:[];
     const remoteMembers=Array.isArray(state.members)?state.members:[];
