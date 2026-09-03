@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.16"><meta name="finora-build" content="R7.19">
+<meta name="finora-version" content="1.0.17"><meta name="finora-build" content="R7.19">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -25805,5 +25805,61 @@ body.finora-v84-dark .finora-r745-control-start button{background:#17382b;color:
 })();
 </script>
 
+\n<style id="finora-r746-style">
+/* FINORA R7.46 — correções homologação: metas + dark + status */
+/* Metas: camada de interação acima de qualquer decoração/overlay legado. */
+#finoraUtilityPanel.section-modal-active #finoraUtilityBody,
+#finoraUtilityPanel.section-modal-active .finora-v90-goal-form{position:relative!important;isolation:isolate!important;pointer-events:auto!important}
+#finoraUtilityPanel.section-modal-active .finora-v90-goal-form{z-index:50!important}
+#finoraUtilityPanel.section-modal-active .finora-v90-goal-form>div{position:relative!important;z-index:51!important;pointer-events:auto!important}
+#finoraUtilityPanel.section-modal-active .finora-v90-goal-form input,
+#finoraUtilityPanel.section-modal-active .finora-v90-goal-form select,
+#finoraUtilityPanel.section-modal-active .finora-v90-goal-form textarea{position:relative!important;z-index:52!important;pointer-events:auto!important;user-select:text!important;-webkit-user-select:text!important;opacity:1!important}
+
+/* Tema escuro — superfícies que ainda herdavam branco. */
+body.finora-v84-dark :is(.simple-column,.simple-column-head,.simple-table-head,.simple-group-head,.simple-total,.finora-v84-table-wrap,.finora-v84-table,.finora-v84-table tbody,.finora-v84-table tr,.finora-v84-table td,.finora-card-actions button,.iconbtn,.finora-v90-goal-suggestions button,.finora-v90-goal-actions button,.finora-v90-feature-intro,.finora-v90-goal,.finora-v90-budget-kpi,.finora-v90-goal-report,.finora-v90-goal-form input,.finora-v90-goal-form select,.finora-v90-add,.finora-v84-utility-card){background:#12231c!important;color:#f4f8f6!important;border-color:#355247!important}
+body.finora-v84-dark :is(.simple-column-head h3,.simple-column strong,.finora-v84-table td,.finora-v84-table th,.finora-card-actions button,.iconbtn){color:#f4f8f6!important}
+body.finora-v84-dark :is(.simple-column small,.simple-column .meta,.finora-v84-table .meta){color:#c4d3cb!important}
+body.finora-v84-dark .finora-card-actions button:hover,body.finora-v84-dark .iconbtn:hover{background:#1b352a!important}
+
+/* Status semânticos: legíveis nos dois temas e consistentes em todas as telas. */
+body.finora-v84-dark :is(.badge.pendente,.finora-v84-status.finora-status-pendente,.finora-status-pendente){background:#5a4515!important;color:#ffe7a0!important;border:1px solid #8b6d28!important}
+body.finora-v84-dark :is(.badge.pago,.finora-v84-status.finora-status-pago,.finora-status-pago,.finora-v84-status.finora-status-recebido,.finora-status-recebido){background:#173f2d!important;color:#bcebd0!important;border:1px solid #2f6b4c!important}
+body.finora-v84-dark :is(.badge.atrasado,.finora-v84-status.finora-status-atrasado,.finora-status-atrasado){background:#552724!important;color:#ffc9c4!important;border:1px solid #8b413b!important}
+
+@media(max-width:820px){
+ #finoraUtilityPanel.section-modal-active .finora-v90-goal-form{grid-template-columns:1fr!important}
+ #finoraUtilityPanel.section-modal-active .finora-v90-goal-form>div{grid-column:1!important}
+}
+</style>
+
+<script id="finora-r746-script">
+(function(){
+ 'use strict';
+ window.FINORA_RELEASE='1.0.17'; window.FINORA_BUILD='R7.46';
+ function hardEnableGoals(){
+   const panel=document.getElementById('finoraUtilityPanel');
+   const form=panel?.querySelector('.finora-v90-goal-form');
+   if(!form)return;
+   [panel,document.getElementById('finoraUtilityBody'),form].filter(Boolean).forEach(el=>{el.removeAttribute('inert');el.style.pointerEvents='auto'});
+   form.querySelectorAll('input,select,textarea').forEach(el=>{
+     el.disabled=false; el.readOnly=false; el.removeAttribute('disabled'); el.removeAttribute('readonly'); el.removeAttribute('aria-disabled'); el.removeAttribute('inert'); el.tabIndex=0; el.style.pointerEvents='auto'; el.style.userSelect='text';
+     if(el.dataset.r746Native!=='1'){
+       el.dataset.r746Native='1';
+       ['mousedown','pointerdown','touchstart','click'].forEach(type=>el.addEventListener(type,ev=>{ev.stopPropagation();},false));
+     }
+   });
+ }
+ window.finoraR746EnableGoals=hardEnableGoals;
+ const base=window.openFinoraUtilityPanel;
+ if(typeof base==='function'&&!base.__r746){
+   const wrapped=function(type){const out=base.apply(this,arguments);if(type==='goals'){requestAnimationFrame(hardEnableGoals);setTimeout(hardEnableGoals,60);setTimeout(hardEnableGoals,220)}return out};
+   wrapped.__r746=true; window.openFinoraUtilityPanel=wrapped;
+ }
+ const observer=new MutationObserver(()=>{if(document.getElementById('v90GoalName'))hardEnableGoals()});
+ const start=()=>{observer.observe(document.body,{childList:true,subtree:true});hardEnableGoals()};
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+})();
+</script>
 </body>
 </html>
