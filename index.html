@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.47-dark-goals-ux-polish-2">
+<meta name="finora-release" content="R7.47-rootfix-dark-goals">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.18"><meta name="finora-build" content="R7.19">
+<meta name="finora-version" content="1.0.20"><meta name="finora-build" content="R7.19">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -26011,6 +26011,90 @@ body.finora-v84-dark .finora-v84-footer,html.dark body .finora-v84-footer,body.d
  // Ao escolher uma meta, mantém compatibilidade com o checkbox legado usado por versões antigas.
  document.addEventListener('change',e=>{if(e.target?.id==='goalUseSelect'){const cb=document.getElementById('goalUseCheck');if(cb)cb.checked=!!e.target.value}},true);
  setTimeout(syncGoalField,0);
+})();
+</script>
+
+<style id="finora-r747-rootfix-style">
+/* R7.47 root fix — tema escuro centralizado + metas confiáveis. Modo claro não alterado. */
+body.finora-v84-dark,
+body.finora-v84-dark :is(#finoraUtilityPanel,#finoraCategories,#simpleLaunchPanel,#simpleAlertsPanel,#finoraCardsPanel,#finoraReportsPanel,#finoraFamilyAccess,#finoraMonthlySheet){
+  --r747-surface:#10231b;--r747-surface2:#142a21;--r747-surface3:#183228;--r747-border:#355247;--r747-text:#f3f8f5;--r747-muted:#b9cbc2;
+}
+/* Superfícies claras remanescentes */
+body.finora-v84-dark :is(
+ .finora-v93-manager-row,.finora-v93-settings-section,.finora-v93-budget-cell,.finora-v93-budget-faq,.finora-v93-budget-faq h4,
+ .finora-v90-toggle-card,.finora-v90-budget-kpi,.finora-v90-feature-intro,.finora-v90-goal,.finora-v90-goal-report,.finora-v90-add,
+ .footer-tools,.simple-footer,.table-footer,.finora-v84-footer,
+ .finora-v89-user-menu,.finora-v89-user-menu-head,
+ #finoraUtilityPanel .finora-v93-settings-section,#finoraUtilityPanel .finora-v93-manager-row,
+ #finoraUtilityPanel .finora-v93-budget-cell,#finoraUtilityPanel .finora-v93-budget-faq,#finoraUtilityPanel .finora-v93-budget-faq h4
+){background:var(--r747-surface)!important;color:var(--r747-text)!important;border-color:var(--r747-border)!important}
+body.finora-v84-dark :is(.finora-v93-manager-name,.finora-v93-settings-section h3,.finora-v93-budget-cell strong,.finora-v93-budget-faq h4,.finora-v93-budget-faq summary,.finora-v89-user-menu-head strong,.finora-v89-user-menu button){color:var(--r747-text)!important}
+body.finora-v84-dark :is(.finora-v93-manager-kind,.finora-v93-settings-section>p,.finora-v93-setting>label,.finora-v93-budget-cell span,.finora-v93-budget-caption,.finora-v93-budget-faq p,.finora-v89-user-menu-head span){color:var(--r747-muted)!important}
+body.finora-v84-dark .finora-v93-manager-kind{background:var(--r747-surface3)!important;border:1px solid var(--r747-border)!important}
+body.finora-v84-dark .finora-v93-trash{background:#321d1d!important;color:#ffb8b2!important;border-color:#71403c!important}
+body.finora-v84-dark .finora-v93-trash:hover{background:#432321!important}
+body.finora-v84-dark :is(.finora-v93-setting select,.finora-v93-setting input,.finora-v93-setting textarea,.finora-v90-goal-form input,.finora-v90-goal-form select,.finora-v90-add input){background:#0b2119!important;color:#fff!important;border-color:var(--r747-border)!important}
+body.finora-v84-dark :is(.finora-v93-setting select,.finora-v93-setting input,.finora-v90-goal-form input)::placeholder{color:#8fa79c!important;opacity:1!important}
+body.finora-v84-dark .finora-v93-projection th{background:#123126!important;color:#d9e8e1!important}
+body.finora-v84-dark .finora-v93-projection td{border-color:#29463a!important;color:#f3f8f5!important}
+body.finora-v84-dark .finora-v93-budget-meter{background:#294238!important}
+body.finora-v84-dark .finora-v93-budget-faq details{background:var(--r747-surface)!important;border-color:var(--r747-border)!important}
+/* Configurações: cartões e grupos nunca brancos no dark */
+body.finora-v84-dark #finoraUtilityPanel :is(.finora-v93-settings-section,.finora-v93-paychecks,.finora-v93-paychecks label){background:var(--r747-surface)!important;color:var(--r747-text)!important;border-color:var(--r747-border)!important}
+/* Menu do usuário */
+body.finora-v84-dark .finora-v89-user-menu{box-shadow:0 16px 38px rgba(0,0,0,.35)!important}
+body.finora-v84-dark .finora-v89-user-menu button:hover{background:var(--r747-surface3)!important}
+body.finora-v84-dark .finora-v89-user-menu button.finora-v89-signout{color:#ffb8b2!important}
+body.finora-v84-dark .finora-v89-user-menu button.finora-v89-signout:hover{background:#38211f!important}
+/* Rodapés de tabelas */
+body.finora-v84-dark :is(.footer-tools,.simple-footer,.table-footer){min-height:58px!important}
+/* Rodapé principal: fecha a largura útil sem faixa interrompida */
+.finora-v84-footer{width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important;box-sizing:border-box!important}
+body.finora-v84-dark .finora-v84-footer{background:#10231b!important;border-top:1px solid var(--r747-border)!important}
+/* Cabeçalho/menu lateral integrado ao mesmo verde */
+body.finora-v84-dark :is(.topbar,.app-header,.header,.menu-toggle,.sidebar-toggle,.hamburger){border-color:transparent!important}
+/* Metas: o formulário só é interativo após + Adicionar meta */
+#v90GoalForm.finora-r747-goal-disabled{opacity:.45!important;filter:saturate(.45)!important;pointer-events:none!important}
+#v90GoalForm:not(.finora-r747-goal-disabled){opacity:1!important;filter:none!important;pointer-events:auto!important}
+#v90GoalForm:not(.finora-r747-goal-disabled) #v90GoalName{pointer-events:auto!important;user-select:text!important;-webkit-user-select:text!important;cursor:text!important;opacity:1!important}
+</style>
+<script id="finora-r747-rootfix-script">
+(function(){
+ 'use strict';
+ window.FINORA_RELEASE='1.0.20'; window.FINORA_BUILD='R7.47';
+ // Meta: ao clicar em Adicionar, recria o campo Nome sem listeners/atributos legados
+ // que possam bloquear digitação. O restante do save continua usando o mesmo id.
+ document.addEventListener('click',function(e){
+   if(e.target?.id!=='v90GoalAdd')return;
+   setTimeout(function(){
+     const form=document.getElementById('v90GoalForm');
+     const old=document.getElementById('v90GoalName');
+     if(!form||!old)return;
+     form.classList.remove('finora-r747-goal-disabled');
+     let n=old;
+     try{
+       const fresh=old.cloneNode(false);
+       fresh.value=''; fresh.disabled=false; fresh.readOnly=false;
+       fresh.removeAttribute('disabled');fresh.removeAttribute('readonly');fresh.removeAttribute('aria-disabled');fresh.removeAttribute('inert');
+       fresh.tabIndex=0;fresh.style.pointerEvents='auto';fresh.style.userSelect='text';fresh.style.opacity='1';
+       old.replaceWith(fresh);n=fresh;
+     }catch(_){ }
+     ['v90GoalTarget','v90GoalSaved','v90GoalMonthly','v90GoalDeadline'].forEach(function(id){const x=document.getElementById(id);if(x){x.disabled=false;x.readOnly=false;x.removeAttribute('disabled');x.removeAttribute('readonly');x.removeAttribute('inert')}});
+     const save=document.getElementById('v90GoalSave'),cancel=document.getElementById('v90GoalCancel');if(save)save.disabled=false;if(cancel)cancel.disabled=false;
+     requestAnimationFrame(function(){n.focus();try{n.setSelectionRange(n.value.length,n.value.length)}catch(_){}});
+   },0);
+ },true);
+ // Quando o formulário está fechado, mantém realmente bloqueado apesar de patches antigos.
+ function enforceGoalState(){
+   const form=document.getElementById('v90GoalForm');if(!form)return;
+   const closed=form.classList.contains('finora-r747-goal-disabled');
+   form.querySelectorAll('input,select,textarea').forEach(function(x){
+     if(closed){x.disabled=true;x.readOnly=true;x.setAttribute('aria-disabled','true');}
+   });
+ }
+ new MutationObserver(enforceGoalState).observe(document.body,{childList:true,subtree:true});
+ setTimeout(enforceGoalState,0);
 })();
 </script>
 </body>
