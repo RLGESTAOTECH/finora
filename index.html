@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.43-alert-sort-stable">
+<meta name="finora-release" content="R7.44-stability-mobile-dark-goals-cards">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.14"><meta name="finora-build" content="R7.19">
+<meta name="finora-version" content="1.0.15"><meta name="finora-build" content="R7.19">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -25647,5 +25647,112 @@ window.finoraR739Diagnostics=function(){
 })();
 </script>
 
+
+
+<!-- FINORA R7.44 — estabilidade, mobile, dark mode, metas e cartões -->
+<style id="finora-r744-style">
+/* Desktop permanece inalterado; regras abaixo são aditivas e específicas. */
+body.finora-v84-dark{--bg:#08130f;--paper:#10231b;--ink:#eef7f2;--muted:#a9bbb1;--line:#294239;--green2:#17372b;}
+body.finora-v84-dark .finora-v84-monthbar,
+body.finora-v84-dark .finora-v84-monthnav,
+body.finora-v84-dark .finora-v90-monthnav,
+body.finora-v84-dark .finora-v90-mini-monthnav,
+body.finora-v84-dark .finora-v90-monthbuttons,
+body.finora-v84-dark .finora-v90-feature-wrap,
+body.finora-v84-dark .finora-v90-feature-intro,
+body.finora-v84-dark .finora-v90-budget-kpi,
+body.finora-v84-dark .finora-v90-goal,
+body.finora-v84-dark .finora-v90-goal-report,
+body.finora-v84-dark .finora-v90-toggle-card,
+body.finora-v84-dark .finora-v90-add,
+body.finora-v84-dark .category-box,
+body.finora-v84-dark .credit-box,
+body.finora-v84-dark .popup-only-panel,
+body.finora-v84-dark .panel,
+body.finora-v84-dark .modal-card{background:#10231b!important;border-color:#294239!important;color:#eef7f2!important}
+body.finora-v84-dark :is(input,select,textarea){background:#0c1c16!important;color:#eef7f2!important;border-color:#355247!important;color-scheme:dark}
+body.finora-v84-dark :is(option,optgroup){background:#0c1c16!important;color:#eef7f2!important}
+body.finora-v84-dark :is(.finora-v84-monthbar,.finora-v84-monthnav,.finora-v90-monthnav,.finora-v90-mini-monthnav) button{background:#132920!important;color:#eaf4ee!important;border-color:#355247!important}
+body.finora-v84-dark :is(.finora-v84-monthbar,.finora-v84-monthnav,.finora-v90-monthnav,.finora-v90-mini-monthnav) button.active{background:#08784c!important;color:#fff!important}
+body.finora-v84-dark :is(.donut-legend,.report-legend,.finora-home-donut-legend,.finora-home-category-card) :is(span,small,b,strong,div){color:#eaf4ee!important}
+body.finora-v84-dark :is(.finora-v90-section-title,.finora-v90-goal h4,.finora-v90-budget-kpi strong,.finora-v90-goal-stats b){color:#f1f8f4!important}
+body.finora-v84-dark :is(.finora-v90-feature-intro,.finora-v90-goal small,.finora-v90-goal-form label,.finora-v90-budget-kpi span){color:#b4c6bc!important}
+body.finora-v84-dark .finora-v90-goal-suggestions button,
+body.finora-v84-dark .finora-v90-goal-actions button{background:#132920!important;color:#eaf4ee!important;border-color:#355247!important}
+
+@media(max-width:820px){
+  html,body{width:100%!important;max-width:100%!important;overflow-x:hidden!important}
+  body>*{max-width:100vw}
+  .shell{width:100%!important;max-width:100%!important;padding-left:10px!important;padding-right:10px!important;overflow-x:hidden!important}
+  .finora-v84-main-grid,.finora-v84-bottom-grid,.simple-kpis,.finora-home-donut-layout,.finora-v90-feature-grid,.finora-v90-budget-kpis,.finora-v90-goal-cards,.category-dashboard,.cards-dashboard{min-width:0!important;max-width:100%!important}
+  .finora-home-category-card,.finora-v84-panel,.simple-kpi,.finora-v84-quick,.popup-only-panel,.panel{min-width:0!important;max-width:100%!important}
+  .finora-home-category-card .report-donut{max-width:min(235px,72vw)!important;max-height:min(235px,72vw)!important}
+  .finora-v90-goal-form{grid-template-columns:1fr 1fr!important}
+  .finora-v90-goal-form>div:first-child{grid-column:1/-1}
+  .finora-v110-card-toolbar{grid-template-columns:1fr!important}
+  .finora-card-grid{grid-template-columns:1fr!important}
+  .sheet-table-wrap,.table-wrap,.finora-v84-table-wrap{width:100%!important;max-width:100%!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+  .section-modal-active,.popup-only-panel.section-modal-active{width:calc(100vw - 16px)!important;max-width:calc(100vw - 16px)!important;max-height:calc(100dvh - 16px)!important;overflow:auto!important;overscroll-behavior:contain}
+  .modal-card{width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)!important;max-height:calc(100dvh - 20px)!important;overflow:auto!important}
+}
+@media(max-width:540px){
+  .finora-v90-goal-form{grid-template-columns:1fr!important}
+  .finora-v90-goal-form>div{grid-column:1!important}
+  .finora-v90-budget-kpis,.finora-v90-goal-cards,.category-dashboard,.cards-dashboard{grid-template-columns:1fr!important}
+  .finora-v84-footer{flex-direction:column!important;gap:5px!important}
+  #simpleAlertsPanel .finora-r740-alert-legend{grid-template-columns:1fr!important}
+}
+</style>
+<script id="finora-r744-script">
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+
+  function refreshCardCountR744(){
+    try{
+      const all=(typeof accountCards==='function'?accountCards():[]).filter(Boolean);
+      const count=$('finoraCardsCount');
+      if(count) count.textContent=`${all.length} ${all.length===1?'cartão':'cartões'}`;
+    }catch(e){console.warn('FINORA R7.44: contador de cartões',e)}
+  }
+  const oldOpenSection=window.openSectionModal;
+  if(typeof oldOpenSection==='function'){
+    window.openSectionModal=function(id){
+      const r=oldOpenSection.apply(this,arguments);
+      if(id==='finoraCardsPanel') setTimeout(()=>{try{if(typeof renderFinoraCards==='function')renderFinoraCards()}catch(e){} refreshCardCountR744()},0);
+      return r;
+    };
+  }
+
+  function unlockGoalsR744(){
+    const root=$('finoraUtilityBody'); if(!root)return;
+    root.querySelectorAll('.finora-v90-goal-form input,.finora-v90-goal-form select').forEach(el=>{
+      el.disabled=false; el.readOnly=false; el.style.pointerEvents='auto'; el.style.userSelect='text';
+      el.removeAttribute('aria-disabled');
+    });
+    const first=$('v90GoalName'); if(first){first.tabIndex=0;}
+  }
+  document.addEventListener('click',e=>{
+    if(e.target.closest('[onclick*="openFinoraUtilityPanel(\'goals\')"]')) setTimeout(unlockGoalsR744,30);
+  },true);
+  const mo=new MutationObserver(()=>{if($('v90GoalName'))unlockGoalsR744();});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{mo.observe(document.body,{childList:true,subtree:true});refreshCardCountR744()},{once:true});
+  else {mo.observe(document.body,{childList:true,subtree:true});refreshCardCountR744()}
+
+  // Remove somente nós de texto soltos que sejam claramente código JS vazado no corpo visual.
+  function cleanLeakedScriptTextR744(){
+    const markers=['const sorted = [...records].sort','renderedGroups','sortRowsForDisplay','groupOrder.forEach'];
+    const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+    const doomed=[]; let n;
+    while((n=walker.nextNode())){
+      const t=(n.nodeValue||'').trim();
+      if(t.length>40 && markers.some(m=>t.includes(m)) && !n.parentElement?.closest('script,style,textarea,pre,code')) doomed.push(n);
+    }
+    doomed.forEach(n=>n.remove());
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',cleanLeakedScriptTextR744,{once:true}); else cleanLeakedScriptTextR744();
+  new MutationObserver(cleanLeakedScriptTextR744).observe(document.documentElement,{childList:true,subtree:true});
+})();
+</script>
 </body>
 </html>
