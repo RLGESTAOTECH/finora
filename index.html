@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.47-dark-goals-ux-polish">
+<meta name="finora-release" content="R7.47-dark-goals-ux-polish-2">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -11747,7 +11747,7 @@ $('entryForm').addEventListener('submit',async e=>{
     cardUsageType:$('finoraCardUsage')?.value||'',
     forma:$('forma').value,
     paymentAccount:paymentNeedsAccount($('forma').value)?$('paymentAccount').value.trim():'',
-    goalId:($('tipo').value==='entrada' && $('goalUseCheck')?.checked)?($('goalUseSelect')?.value||''):(old?.goalId||''),
+    goalId:($('goalUseSelect')?.value||old?.goalId||''),
     observacao:$('observacao').value.trim(),
     attachment,
     createdAt:old?.createdAt||new Date().toISOString(),
@@ -16655,12 +16655,6 @@ setTimeout(renderHomeCategoryDonut,0);
     root.innerHTML=`<div class="finora-v90-feature-wrap">
       <div class="finora-v90-feature-intro"><strong>Transforme objetivos em números.</strong> Cadastre sonhos, reservas ou quitação de dívidas, defina o valor-alvo e quanto pretende separar por mês. A FINORA mostra a evolução e o ritmo necessário.</div>
       <div class="finora-r747-goal-start"><button type="button" class="finora-v90-primary" id="v90GoalAdd">+ Adicionar meta</button></div>
-      <div class="finora-v90-goal-suggestions finora-r747-goal-disabled" id="v90GoalSuggestions">
-        <button data-v90-suggestion="Reserva de emergência" disabled>Reserva de emergência</button>
-        <button data-v90-suggestion="Quitar dívida" disabled>Quitar dívida</button>
-        <button data-v90-suggestion="Viagem" disabled>Viagem</button>
-        <button data-v90-suggestion="Casa / projeto" disabled>Casa / projeto</button>
-      </div>
       <div class="finora-v90-goal-form finora-r747-goal-disabled" id="v90GoalForm">
         <div><label>Nome da meta</label><input id="v90GoalName" placeholder="Ex.: Reserva de emergência"></div>
         <div><label>Valor-alvo</label><input id="v90GoalTarget" inputmode="decimal" placeholder="R$ 0,00"></div>
@@ -16839,8 +16833,8 @@ setTimeout(renderHomeCategoryDonut,0);
     if(linked)names.add(linked.name);
     return data.filter(x=>{
       if(!sameWorkspace(x)||!hasKnownValue(x))return false;
-      if(x.tipo==='saida' && names.has(x.categoria))return true;
-      if(x.tipo==='entrada' && String(x.goalId||'')===String(g.id))return true;
+      if(String(x.goalId||'')===String(g.id))return true;
+      if(x.tipo==='saida' && names.has(x.categoria))return true; // compatibilidade com lançamentos antigos
       return false;
     }).reduce((sum,x)=>sum+Number(x.valor||0),0);
   }
@@ -25964,6 +25958,60 @@ body.finora-v84-dark *{scrollbar-color:#47675a #102019}
 </style>
 <script id="finora-r747-script">
 (function(){'use strict';window.FINORA_RELEASE='1.0.18';window.FINORA_BUILD='R7.47';})();
+</script>
+
+<style id="finora-r747-hotfix2-style">
+/* R7.47 hotfix 2 — somente refinamentos aprovados; modo claro preservado. */
+/* Metas: nome livre, sem sugestões pré-definidas. */
+#v90GoalSuggestions{display:none!important}
+#v90GoalName{pointer-events:auto!important;user-select:text!important;-webkit-user-select:text!important}
+/* Campo Meta é entidade separada da Categoria e vale para entrada ou saída. */
+#goalUseField.finora-r747-goal-link{display:block!important}
+#goalUseField .finora-v94-goal-check{display:none!important}
+#goalUseField #goalUseSelect{display:block!important;width:100%!important}
+/* Dark: cartões, rodapés de tabelas, FAQs/accordions e superfícies remanescentes. */
+body.finora-v84-dark .finora-v110-card-type,html.dark body .finora-v110-card-type,body.dark .finora-v110-card-type{background:#1a3128!important;color:#eaf5ef!important;border-color:#3a5749!important}
+body.finora-v84-dark :is(.footer-tools,.simple-footer,.table-footer,.finora-v84-footer),html.dark body :is(.footer-tools,.simple-footer,.table-footer,.finora-v84-footer),body.dark :is(.footer-tools,.simple-footer,.table-footer,.finora-v84-footer){background:#10231b!important;color:#dce9e2!important;border-color:#2e493d!important}
+body.finora-v84-dark :is(.footer-tools .btn,.footer-tools label.btn),html.dark body :is(.footer-tools .btn,.footer-tools label.btn),body.dark :is(.footer-tools .btn,.footer-tools label.btn){background:#173027!important;color:#eef6f2!important;border-color:#3a5749!important}
+body.finora-v84-dark :is(details,summary,.faq,.faq-head,.accordion,.accordion-header,.finora-v90-explain),html.dark body :is(details,summary,.faq,.faq-head,.accordion,.accordion-header,.finora-v90-explain),body.dark :is(details,summary,.faq,.faq-head,.accordion,.accordion-header,.finora-v90-explain){background:#14271f!important;color:#eef6f2!important;border-color:#315044!important}
+body.finora-v84-dark #finoraCardsPanel .finora-card-item>small,html.dark body #finoraCardsPanel .finora-card-item>small,body.dark #finoraCardsPanel .finora-card-item>small{color:#c7d7cf!important}
+body.finora-v84-dark #finoraCardsPanel .finora-card-actions button,html.dark body #finoraCardsPanel .finora-card-actions button,body.dark #finoraCardsPanel .finora-card-actions button{background:#173027!important;color:#eef6f2!important;border-color:#3a5749!important}
+body.finora-v84-dark #finoraCardsPanel .finora-card-actions button[data-finora-delete="card"],html.dark body #finoraCardsPanel .finora-card-actions button[data-finora-delete="card"],body.dark #finoraCardsPanel .finora-card-actions button[data-finora-delete="card"]{color:#ffb9b4!important}
+/* fecha visualmente o rodapé em toda a largura útil */
+.finora-v84-footer{box-sizing:border-box!important;border-top:1px solid #dce5df!important}
+body.finora-v84-dark .finora-v84-footer,html.dark body .finora-v84-footer,body.dark .finora-v84-footer{border-top-color:#2e493d!important}
+</style>
+<script id="finora-r747-hotfix2-script">
+(function(){
+ 'use strict';
+ window.FINORA_RELEASE='1.0.19'; window.FINORA_BUILD='R7.47';
+ function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+ function goals(){try{return (typeof loadFinoraFeatureState==='function'&&loadFinoraFeatureState().goals)||[]}catch(e){return []}}
+ function syncGoalField(){
+   const field=document.getElementById('goalUseField'), sel=document.getElementById('goalUseSelect');
+   if(!field||!sel)return;
+   const list=goals(), old=sel.value;
+   sel.innerHTML='<option value="">Nenhuma meta</option>'+list.map(g=>`<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('');
+   if(list.some(g=>String(g.id)===String(old)))sel.value=old;
+   field.classList.add('finora-r747-goal-link','finora-v102-visible'); field.classList.remove('finora-v102-hidden');
+   sel.classList.add('finora-v102-visible','visible'); sel.classList.remove('finora-v102-hidden');
+   const label=field.querySelector(':scope > label:first-child'); if(label)label.textContent='Meta (opcional)';
+   const note=field.querySelector('.file-note'); if(note)note.textContent='Vincule este lançamento a uma meta. O valor será considerado no progresso da meta, seja entrada ou despesa.';
+   const cb=document.getElementById('goalUseCheck'); if(cb)cb.checked=!!sel.value;
+ }
+ // Metas: após +Adicionar meta, o nome é sempre um input livre e recebe foco.
+ document.addEventListener('click',e=>{
+   if(e.target?.id==='v90GoalAdd')setTimeout(()=>{const n=document.getElementById('v90GoalName');if(n){n.disabled=false;n.readOnly=false;n.removeAttribute('disabled');n.removeAttribute('readonly');n.style.pointerEvents='auto';n.focus();}},0);
+   if(e.target?.id==='v90GoalSave'||e.target?.matches?.('[data-v90-goal-del],[data-v90-goal-edit]'))setTimeout(syncGoalField,120);
+ },true);
+ // O checkbox legado não controla mais visibilidade; o select é sempre opcional quando há metas.
+ document.getElementById('tipo')?.addEventListener('change',()=>setTimeout(syncGoalField,0));
+ const launch=document.getElementById('simpleLaunchPanel')||document.body;
+ new MutationObserver(()=>{if(document.getElementById('goalUseField'))setTimeout(syncGoalField,0)}).observe(launch,{childList:true,subtree:true});
+ // Ao escolher uma meta, mantém compatibilidade com o checkbox legado usado por versões antigas.
+ document.addEventListener('change',e=>{if(e.target?.id==='goalUseSelect'){const cb=document.getElementById('goalUseCheck');if(cb)cb.checked=!!e.target.value}},true);
+ setTimeout(syncGoalField,0);
+})();
 </script>
 </body>
 </html>
