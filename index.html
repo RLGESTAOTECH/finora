@@ -12905,6 +12905,19 @@ async function finoraResolveEmailByCpf(cpf){
   }
 }
 
+function finoraAuthTimeoutR724(promise,ms,label){
+  let timer=null;
+  const timeout=new Promise((_,reject)=>{
+    timer=setTimeout(()=>{
+      const err=new Error((label||'Autenticação')+' demorou mais do que o esperado.');
+      err.name='FinoraAuthTimeout';
+      err.status=504;
+      reject(err);
+    },ms);
+  });
+  return Promise.race([promise,timeout]).finally(()=>{ if(timer)clearTimeout(timer); });
+}
+
 async function __finoraLoginWithSupabaseCore(identifier,password){
   const client=getAuthClient();
   if(!client)throw new Error('A configuração pública da FINORA ainda não foi publicada.');
@@ -12919,9 +12932,17 @@ async function __finoraLoginWithSupabaseCore(identifier,password){
     if(!email)throw new Error('CPF não encontrado. Verifique se o CPF está vinculado ao seu perfil FINORA.');
   }
 
-  const {data,error}=await client.auth.signInWithPassword({email,password});
+  const {data,error}=await finoraAuthTimeoutR724(
+    client.auth.signInWithPassword({email,password}),
+    12000,
+    'A conexão com o login'
+  );
   if(error)throw error;
-  const profile=await authProfileByUserId(data.user?.id);
+  const profile=await finoraAuthTimeoutR724(
+    authProfileByUserId(data.user?.id),
+    10000,
+    'A leitura do perfil FINORA'
+  );
   if(!profile)throw new Error('Perfil FINORA não encontrado para este acesso.');
 
   // R7.24: depois de qualquer login válido, memoriza somente hash -> e-mail.
@@ -12973,8 +12994,9 @@ async function loginWithSupabase(...args) {
           throw friendly;
         }
 
-        // Uma única nova tentativa, mais espaçada, para não pressionar o Supabase.
+        // Uma única nova tentativa, mais espaçada, com cliente Auth novo.
         console.warn(`FINORA R7.24: falha transitória; nova tentativa ${attempt + 1}/${maxAttempts}.`,err);
+        try{ finoraAuthClient=null; }catch(e){}
         await __finoraAuthDelay(1800);
       }
     }
@@ -26342,5 +26364,11 @@ body:not(.finora-v84-dark):not(.dark) #simpleImportPanel>.finora-modal-head{padd
  freeGoalCalendar();
 })();
 </script>
+
+<!-- FINORA R7.47 / 1.0.24 — login anti-travamento -->
+<script id="finora-r747-v1024-login-watchdog">(function(){
+  'use strict';
+  window.FINORA_RELEASE='1.0.24'; window.FINORA_BUILD='R7.47';
+})();</script>
 </body>
 </html>
