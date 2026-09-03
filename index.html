@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.40-alerts-login-premium">
+<meta name="finora-release" content="R7.39-consolidado-login-alertas">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
@@ -7733,39 +7733,15 @@ body.dark #finoraSyncIndicatorR726{
  <div class="auth-card">
   <div class="auth-brand">
     <div class="finora-login-brand">
-      <svg class="finora-brand-lockup" viewBox="0 0 560 138" role="img" aria-label="FINORA — Suas finanças, com clareza e controle">
-        <defs>
-          <linearGradient id="finoraBar1" x1="0" x2="1">
-            <stop offset="0" stop-color="#0b8748"/>
-            <stop offset=".5" stop-color="#57e98d"/>
-            <stop offset="1" stop-color="#0e9d55"/>
-          </linearGradient>
-          <filter id="finoraShadow" x="-30%" y="-30%" width="160%" height="180%">
-            <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#001f15" flood-opacity=".38"/>
-          </filter>
-        </defs>
-        <g filter="url(#finoraShadow)" transform="translate(8,12)">
-          <rect x="4" y="56" width="24" height="42" rx="5" fill="url(#finoraBar1)"/>
-          <rect x="35" y="38" width="24" height="60" rx="5" fill="url(#finoraBar1)"/>
-          <rect x="66" y="18" width="24" height="80" rx="5" fill="url(#finoraBar1)"/>
-          <rect x="97" y="0" width="24" height="98" rx="5" fill="url(#finoraBar1)"/>
-        </g>
-        <text x="155" y="84"
-              fill="#ffffff"
-              font-family="Georgia, 'Times New Roman', serif"
-              font-size="63"
-              font-weight="700"
-              letter-spacing="8">FINORA</text>
-        <line x1="155" y1="101" x2="530" y2="101"
-              stroke="#e5b84d" stroke-width="3" stroke-linecap="round"/>
-        <text x="155" y="127"
-              fill="#f0c85a"
-              font-family="Georgia, 'Times New Roman', serif"
-              font-size="17">Suas finanças, com clareza e controle.</text>
-      </svg>
+      <div class="finora-login-logo" aria-label="FINORA">
+        <div class="finora-growth-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div class="finora-wordmark">FINORA</div>
+      </div>
+      <div class="finora-gold-rule"></div>
+      <p class="finora-login-tagline">Suas finanças, com clareza e controle.</p>
     </div>
     <div class="finora-login-promise">
-      <h2>Gestão financeira clara.<br>Decisões com <span>mais controle.</span></h2>
+      <h2>Controle suas finanças.<br>Mantenha seus dados <span>em controle.</span></h2>
       <div class="finora-mini-rule"></div>
       <div class="finora-benefit"><div class="finora-benefit-icon">▣</div><div><strong>Gestão financeira completa</strong><p>Organize receitas, despesas, cartões e contas em um só lugar.</p></div></div>
       <div class="finora-benefit"><div class="finora-benefit-icon">▥</div><div><strong>Relatórios e análises inteligentes</strong><p>Tenha clareza sobre sua vida financeira com gráficos e indicadores.</p></div></div>
@@ -8283,19 +8259,11 @@ body.dark #finoraSyncIndicatorR726{
       <option value="desc">Decrescente</option>
     </select>
   </div>
-  <div class="finora-r740-alert-legend" aria-label="Legenda visual de vencimentos">
-    <div class="finora-r740-legend-card standard" title="Mais de 5 dias para vencer">
-      <span class="signal"></span><strong>Prazo</strong><small>+5 dias</small>
-    </div>
-    <div class="finora-r740-legend-card warning" title="Entre 2 e 5 dias para vencer">
-      <span class="signal"></span><strong>Atenção</strong><small>2–5 dias</small>
-    </div>
-    <div class="finora-r740-legend-card urgent" title="Vence amanhã">
-      <span class="signal"></span><strong>Amanhã</strong><small>1 dia</small>
-    </div>
-    <div class="finora-r740-legend-card overdue" title="Vence hoje ou está atrasado">
-      <span class="signal"></span><strong>Crítico</strong><small>hoje / atrasado</small>
-    </div>
+  <div class="finora-r738-alert-legend" aria-label="Legenda de vencimentos">
+    <span><i class="standard"></i>Mais de 5 dias</span>
+    <span><i class="warning"></i>2 a 5 dias</span>
+    <span><i class="urgent"></i>1 dia para vencer</span>
+    <span><i class="overdue"></i>Vence hoje ou atrasado</span>
   </div>
   <div class="alert-summary-row">
     <div class="alert-summary-card"><span>Gastos alertados</span><strong id="alertExpenseTotal">R$ 0,00</strong></div>
@@ -9623,28 +9591,14 @@ function renderAlerts(){
                 : ''))
             : '';
           const deadlineClass=x._days<=0
-            ? 'finora-r740-overdue'
+            ? 'finora-r738-overdue'
             : x._days===1
-              ? 'finora-r740-urgent'
+              ? 'finora-r738-urgent'
               : x._days<=5
-                ? 'finora-r740-warning'
-                : 'finora-r740-standard';
-
-          const deadlineBadge=x._days<0
-            ? `<span class="finora-r740-deadline-badge overdue">ATRASADO · ${Math.abs(x._days)}D</span>`
-            : x._days===0
-              ? `<span class="finora-r740-deadline-badge overdue">VENCE HOJE</span>`
-              : x._days===1
-                ? `<span class="finora-r740-deadline-badge urgent">VENCE AMANHÃ</span>`
-                : x._days<=5
-                  ? `<span class="finora-r740-deadline-badge warning">${x._days} DIAS</span>`
-                  : '';
-
+                ? 'finora-r738-warning'
+                : 'finora-r738-standard';
           return `<div class="alert-item ${isIncome?'income':'expense'} ${deadlineClass}">
-            <div class="finora-r740-alert-main">
-              <div class="meta">${deadlineBadge}${isIncome?'Recebimento':'Gasto'} · ${when} · ${dateBR(x._date)}</div>
-              <strong>${esc(x.descricao)}</strong> · ${esc(x.pessoa)}
-            </div>
+            <div><div class="meta">${isIncome?'Recebimento':'Gasto'} · ${when} · ${dateBR(x._date)}</div><strong>${esc(x.descricao)}</strong> · ${esc(x.pessoa)}</div>
             <div class="finora-v109-alert-actions"><div class="amount">${amount}</div>${payAction}</div>
           </div>`;
         }).join('')}
@@ -21825,7 +21779,35 @@ window.FINORA_RELEASE='1.0.10';
         .empty{padding:12px;border:1px dashed #ccd9d2;color:#6b7871}
         footer{margin-top:12px;padding-top:6px;border-top:1px solid #dfe6e2;color:#7a8880;font-size:8px}
       </style>
-
+<style id="finora-r738-war-room-css">
+.finora-r731-alert-toolbar{
+  grid-template-columns:repeat(7,minmax(120px,1fr))!important;
+}
+.finora-r738-alert-legend{
+  display:flex;flex-wrap:wrap;gap:10px 18px;padding:10px 18px 12px;
+  border-bottom:1px solid #dce6e0;font:10px Verdana,sans-serif;
+  color:#53675e;align-items:center;
+}
+.finora-r738-alert-legend span{display:inline-flex;align-items:center;gap:7px}
+.finora-r738-alert-legend i{
+  width:13px;height:13px;border-radius:4px;border:1px solid rgba(0,0,0,.12);display:inline-block;
+}
+.finora-r738-alert-legend i.standard{background:#fbf4e8}
+.finora-r738-alert-legend i.warning{background:#fff1a8}
+.finora-r738-alert-legend i.urgent{background:#ffd0a0}
+.finora-r738-alert-legend i.overdue{background:#f7c4c0}
+.alert-item.finora-r738-standard{background:#fbf4e8!important;border-color:#ead8b8!important}
+.alert-item.finora-r738-warning{background:#fff1a8!important;border-color:#e5c84e!important}
+.alert-item.finora-r738-urgent{background:#ffd0a0!important;border-color:#ee963d!important}
+.alert-item.finora-r738-overdue{background:#f7c4c0!important;border-color:#dc6b63!important}
+.dark .alert-item.finora-r738-standard{background:#2c3029!important;border-color:#5b5d4b!important}
+.dark .alert-item.finora-r738-warning{background:#51491e!important;border-color:#8e7c25!important}
+.dark .alert-item.finora-r738-urgent{background:#57371e!important;border-color:#a9612b!important}
+.dark .alert-item.finora-r738-overdue{background:#512a29!important;border-color:#a04e49!important}
+@media(max-width:1250px){.finora-r731-alert-toolbar{grid-template-columns:repeat(4,minmax(140px,1fr))!important}}
+@media(max-width:820px){.finora-r731-alert-toolbar{grid-template-columns:1fr 1fr!important}.finora-r738-alert-legend{gap:8px 12px;padding:10px 12px}}
+@media(max-width:520px){.finora-r731-alert-toolbar{grid-template-columns:1fr!important}}
+</style>
 
 <style id="finora-r739-login-institucional">
 .auth-screen{background:radial-gradient(circle at 78% 18%,rgba(28,116,79,.09),transparent 28%),linear-gradient(135deg,#073d2c 0 49%,#eef4ef 49%)!important;padding:20px!important}
@@ -21846,192 +21828,6 @@ window.FINORA_RELEASE='1.0.10';
 @media(max-width:900px){.auth-screen{overflow:auto!important;align-items:flex-start!important;padding:14px!important}.auth-card{width:100%!important;min-height:auto!important;grid-template-columns:1fr!important;margin:auto!important}.auth-brand{padding:34px 30px!important;gap:26px!important}.finora-login-logo{gap:16px}.finora-growth-mark{width:68px;height:60px}.finora-growth-mark i{width:13px}.finora-growth-mark i:nth-child(1){height:24px}.finora-growth-mark i:nth-child(2){height:36px}.finora-growth-mark i:nth-child(3){height:48px}.finora-growth-mark i:nth-child(4){height:60px}.finora-wordmark{font-size:40px;letter-spacing:5px}.finora-gold-rule{margin-left:84px}.auth-brand .finora-login-tagline{margin-left:84px!important;font-size:15px!important}.finora-benefit{display:none}.auth-panel{padding:34px 30px!important}}
 @media(max-width:520px){.auth-brand{padding:27px 22px!important}.finora-wordmark{font-size:32px;letter-spacing:4px}.finora-growth-mark{width:56px;height:50px;gap:3px}.finora-growth-mark i{width:11px}.finora-growth-mark i:nth-child(1){height:20px}.finora-growth-mark i:nth-child(2){height:30px}.finora-growth-mark i:nth-child(3){height:40px}.finora-growth-mark i:nth-child(4){height:50px}.finora-gold-rule{margin-left:72px}.auth-brand .finora-login-tagline{margin-left:72px!important;font-size:13px!important}.finora-login-promise h2{font-size:19px!important}.auth-panel{padding:28px 22px!important}}
 </style>
-
-<style id="finora-r740-premium-ui">
-/* ===========================
-   LOGIN PREMIUM / LOCKUP SVG
-   =========================== */
-.auth-card{
-  overflow:hidden!important;
-}
-.auth-brand{
-  padding:46px 56px 42px!important;
-  gap:34px!important;
-}
-.finora-login-brand{
-  position:relative!important;
-  z-index:2!important;
-  width:100%!important;
-  margin:0!important;
-}
-.finora-brand-lockup{
-  display:block!important;
-  width:min(100%,520px)!important;
-  height:auto!important;
-  margin:0 auto 4px!important;
-  overflow:visible!important;
-}
-.finora-login-promise{
-  position:relative!important;
-  z-index:2!important;
-  max-width:470px!important;
-  margin:0 auto!important;
-  width:100%!important;
-}
-.finora-login-promise h2{
-  font:700 25px/1.28 Georgia,"Times New Roman",serif!important;
-  letter-spacing:-.2px!important;
-  margin:0 0 14px!important;
-}
-.finora-login-promise h2 span{color:#70df8c!important}
-.finora-mini-rule{margin:0 0 20px!important}
-.finora-benefit{
-  margin:13px 0!important;
-  grid-template-columns:42px 1fr!important;
-  gap:12px!important;
-}
-.finora-benefit-icon{
-  width:38px!important;height:38px!important;border-radius:11px!important;
-  font-size:17px!important;
-}
-.auth-brand .finora-benefit strong{font-size:13px!important}
-.auth-brand .finora-benefit p{font-size:11px!important;line-height:1.45!important}
-.auth-panel{
-  padding:50px 58px!important;
-}
-.auth-inner{
-  width:100%!important;
-  max-width:470px!important;
-}
-
-/* ===========================
-   ALERTAS — LEGENDA
-   =========================== */
-.finora-r731-alert-toolbar{
-  grid-template-columns:minmax(118px,.65fr) minmax(150px,.9fr) minmax(185px,1.2fr) minmax(145px,.9fr) minmax(210px,1.35fr)!important;
-}
-#alertSortField,#alertSortDirection{
-  margin-top:0!important;
-}
-.finora-r740-alert-legend{
-  display:flex!important;
-  gap:8px!important;
-  flex-wrap:wrap!important;
-  align-items:center!important;
-  padding:10px 18px 13px!important;
-  border-bottom:1px solid #dfe8e3!important;
-  background:linear-gradient(180deg,#fff,#fbfdfc)!important;
-}
-.finora-r740-legend-card{
-  display:grid!important;
-  grid-template-columns:10px auto!important;
-  grid-template-rows:auto auto!important;
-  column-gap:7px!important;
-  align-items:center!important;
-  min-width:112px!important;
-  padding:7px 10px!important;
-  border:1px solid #e2e9e5!important;
-  border-radius:10px!important;
-  background:#fff!important;
-  box-shadow:0 2px 8px rgba(5,64,45,.04)!important;
-}
-.finora-r740-legend-card .signal{
-  grid-row:1/3!important;
-  width:7px!important;height:26px!important;border-radius:99px!important;
-}
-.finora-r740-legend-card strong{
-  font:700 10px/1.1 Verdana,sans-serif!important;
-  color:#173c2e!important;
-}
-.finora-r740-legend-card small{
-  font:9px/1.1 Verdana,sans-serif!important;
-  color:#718078!important;
-}
-.finora-r740-legend-card.standard .signal{background:#d8c8aa!important}
-.finora-r740-legend-card.warning .signal{background:#efc630!important}
-.finora-r740-legend-card.urgent .signal{background:#f28b2f!important}
-.finora-r740-legend-card.overdue .signal{background:#d8453d!important}
-
-/* ===========================
-   ALERTAS — SEMÁFORO REAL
-   =========================== */
-.alert-item.finora-r740-standard{
-  position:relative!important;
-  background:#fbf4e8!important;
-  border:1px solid #ead8b8!important;
-  border-left:5px solid #d8c8aa!important;
-}
-.alert-item.finora-r740-warning{
-  position:relative!important;
-  background:linear-gradient(90deg,#fff4bd 0%,#fff9df 100%)!important;
-  border:1px solid #e9cf64!important;
-  border-left:5px solid #efc630!important;
-  box-shadow:0 3px 10px rgba(171,135,0,.08)!important;
-}
-.alert-item.finora-r740-urgent{
-  position:relative!important;
-  background:linear-gradient(90deg,#ffd5aa 0%,#fff0df 100%)!important;
-  border:1px solid #efad6f!important;
-  border-left:5px solid #f28b2f!important;
-  box-shadow:0 4px 12px rgba(189,91,0,.10)!important;
-}
-.alert-item.finora-r740-overdue{
-  position:relative!important;
-  background:linear-gradient(90deg,#f7c8c5 0%,#fde6e4 100%)!important;
-  border:1px solid #df7770!important;
-  border-left:5px solid #d8453d!important;
-  box-shadow:0 4px 12px rgba(150,35,29,.10)!important;
-}
-.finora-r740-alert-main{min-width:0!important}
-.finora-r740-deadline-badge{
-  display:inline-flex!important;
-  align-items:center!important;
-  min-height:17px!important;
-  padding:2px 7px!important;
-  margin-right:8px!important;
-  border-radius:99px!important;
-  font:700 8px/1 Verdana,sans-serif!important;
-  letter-spacing:.35px!important;
-  vertical-align:middle!important;
-}
-.finora-r740-deadline-badge.warning{
-  color:#6c5500!important;background:#ffeb8d!important;border:1px solid #e0bd24!important;
-}
-.finora-r740-deadline-badge.urgent{
-  color:#7e3800!important;background:#ffc98f!important;border:1px solid #e98225!important;
-}
-.finora-r740-deadline-badge.overdue{
-  color:#7c2521!important;background:#f3b3af!important;border:1px solid #cf625b!important;
-}
-
-/* DARK */
-.dark .alert-item.finora-r740-standard{background:#2c3029!important;border-color:#5b5d4b!important}
-.dark .alert-item.finora-r740-warning{background:#51491e!important;border-color:#8e7c25!important}
-.dark .alert-item.finora-r740-urgent{background:#57371e!important;border-color:#a9612b!important}
-.dark .alert-item.finora-r740-overdue{background:#512a29!important;border-color:#a04e49!important}
-.dark .finora-r740-alert-legend{background:#173029!important;border-color:#365047!important}
-.dark .finora-r740-legend-card{background:#1d342d!important;border-color:#3a5149!important}
-.dark .finora-r740-legend-card strong{color:#f2f7f4!important}
-.dark .finora-r740-legend-card small{color:#9eb1a8!important}
-
-/* RESPONSIVO */
-@media(max-width:1250px){
-  .finora-r731-alert-toolbar{grid-template-columns:repeat(3,minmax(150px,1fr))!important}
-}
-@media(max-width:900px){
-  .auth-brand{padding:32px 28px!important;gap:22px!important}
-  .finora-brand-lockup{width:min(100%,460px)!important}
-  .finora-benefit{display:none!important}
-  .finora-login-promise h2{font-size:21px!important}
-  .auth-panel{padding:34px 30px!important}
-  .finora-r731-alert-toolbar{grid-template-columns:1fr 1fr!important}
-}
-@media(max-width:620px){
-  .finora-r731-alert-toolbar{grid-template-columns:1fr!important}
-  .finora-r740-alert-legend{display:grid!important;grid-template-columns:1fr 1fr!important}
-}
-</style>
-
 </head><body>
       <header><div><h1>FINORA</h1><div>Gastos por cartões</div></div>
       <div class="meta">${esc5(workspace)}<br>${esc5(period)}</div></header>
@@ -25356,26 +25152,5 @@ window.finoraR739Diagnostics=function(){
   };
 };
 </script>
-
-<script id="finora-r740-diagnostics">
-window.finoraR740Diagnostics=function(){
-  return {
-    release:'R7.40-alerts-login-premium',
-    loginLogoSvg:!!document.querySelector('.finora-brand-lockup'),
-    legendCards:document.querySelectorAll('.finora-r740-legend-card').length,
-    alerts:{
-      standard:document.querySelectorAll('#alertsBox .finora-r740-standard').length,
-      warning:document.querySelectorAll('#alertsBox .finora-r740-warning').length,
-      urgent:document.querySelectorAll('#alertsBox .finora-r740-urgent').length,
-      overdue:document.querySelectorAll('#alertsBox .finora-r740-overdue').length
-    },
-    sort:{
-      field:document.getElementById('alertSortField')?.value||null,
-      direction:document.getElementById('alertSortDirection')?.value||null
-    }
-  };
-};
-</script>
-
 </body>
 </html>
