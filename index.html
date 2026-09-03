@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.45-stability-ux-alert-start-dark-mobile-goals">
+<meta name="finora-release" content="R7.47-dark-goals-ux-polish">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.17"><meta name="finora-build" content="R7.19">
+<meta name="finora-version" content="1.0.18"><meta name="finora-build" content="R7.19">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -9655,12 +9655,49 @@ function renderAlerts(){
     return t!=='debito' && Number(c.dueDay)>=1;
   });
 
+  // R7.47 — uma fatura real/materializada sempre prevalece sobre o alerta
+  // virtual criado a partir do cadastro do cartão. Isso evita, por exemplo,
+  // exibir "Fatura CARREFOUR · MARCELO · Valor a definir" quando já existe
+  // "FATURA CARREFOUR · SIMONE" lançada para o mesmo vencimento.
+  function finoraHasRealCardInvoiceR747(card,date){
+    try{
+      const targetDate=String(date||'');
+      const cardId=String(card?.id||'');
+      const cardName=norm(card?.name||'');
+      const issuer=norm(card?.issuer||'');
+      const clean=s=>norm(s).replace(/^fatura\s+/,'').replace(/^banco\s+/,'').trim();
+      const wanted=new Set([clean(cardName),clean(issuer)].filter(Boolean));
+
+      return (Array.isArray(data)?data:[]).some(r=>{
+        if(!sameWorkspace(r) || r?.tipo!=='saida')return false;
+        if(String(referenceDate(r)||'')!==targetDate)return false;
+        if(r?.virtualCardAlert)return false;
+
+        // Vínculo explícito com o mesmo cartão é a evidência mais forte.
+        if(cardId && String(r?.cardId||'')===cardId)return true;
+
+        // Compatibilidade com lançamentos antigos, que não possuíam cardId:
+        // exige descrição de fatura e igualdade do nome/emitente normalizado.
+        const desc=norm(r?.descricao||'');
+        if(!desc.startsWith('fatura '))return false;
+        const invoiceName=clean(desc);
+        return !!invoiceName && wanted.has(invoiceName);
+      });
+    }catch(e){
+      return false;
+    }
+  }
+
   cards.forEach(c=>{
     projectionYears.forEach(y=>{
       for(let mo=1;mo<=12;mo++){
         const date=safeDateForDay(y,mo,c.dueDay);
         const controlStart=(typeof window.finoraControlStartDate==='function'?window.finoraControlStartDate():'2026-08-01');
         if(date<controlStart)continue;
+
+        // R7.47: o lançamento real é a fonte de verdade. Se ele já existe
+        // para essa fatura/data, não criamos outro alerta virtual do cartão.
+        if(finoraHasRealCardInvoiceR747(c,date))continue;
 
         // R7.37: uma fatura já paga/materializada nunca volta como
         // "Valor a definir", mesmo em meses passados.
@@ -15990,7 +16027,7 @@ setTimeout(renderHomeCategoryDonut,0);
     if(box){
       box.innerHTML=upcoming.length?upcoming.map(x=>`
         <div class="finora-v84-due-row">
-          <div class="finora-v84-due-icon">▣</div>
+          
           <div><b>${escV84(x.descricao||'Vencimento')}</b><small>${escV84(x.categoria||'Despesa')}</small></div>
           <div class="finora-v84-due-meta">${brDate(x.vencimento).slice(0,5)}<strong>${moneyV84(x.valor||0)}</strong></div>
         </div>`).join(''):'<div style="padding:18px;color:#718078;font-size:10px">Nenhum vencimento futuro.</div>';
@@ -16617,20 +16654,24 @@ setTimeout(renderHomeCategoryDonut,0);
     const root=document.getElementById('finoraUtilityBody');
     root.innerHTML=`<div class="finora-v90-feature-wrap">
       <div class="finora-v90-feature-intro"><strong>Transforme objetivos em números.</strong> Cadastre sonhos, reservas ou quitação de dívidas, defina o valor-alvo e quanto pretende separar por mês. A FINORA mostra a evolução e o ritmo necessário.</div>
-      <div class="finora-v90-goal-suggestions">
-        <button data-v90-suggestion="Reserva de emergência">Reserva de emergência</button>
-        <button data-v90-suggestion="Quitar dívida">Quitar dívida</button>
-        <button data-v90-suggestion="Viagem">Viagem</button>
-        <button data-v90-suggestion="Casa / projeto">Casa / projeto</button>
+      <div class="finora-r747-goal-start"><button type="button" class="finora-v90-primary" id="v90GoalAdd">+ Adicionar meta</button></div>
+      <div class="finora-v90-goal-suggestions finora-r747-goal-disabled" id="v90GoalSuggestions">
+        <button data-v90-suggestion="Reserva de emergência" disabled>Reserva de emergência</button>
+        <button data-v90-suggestion="Quitar dívida" disabled>Quitar dívida</button>
+        <button data-v90-suggestion="Viagem" disabled>Viagem</button>
+        <button data-v90-suggestion="Casa / projeto" disabled>Casa / projeto</button>
       </div>
-      <div class="finora-v90-goal-form">
+      <div class="finora-v90-goal-form finora-r747-goal-disabled" id="v90GoalForm">
         <div><label>Nome da meta</label><input id="v90GoalName" placeholder="Ex.: Reserva de emergência"></div>
         <div><label>Valor-alvo</label><input id="v90GoalTarget" inputmode="decimal" placeholder="R$ 0,00"></div>
         <div><label>Já acumulado</label><input id="v90GoalSaved" inputmode="decimal" placeholder="R$ 0,00"></div>
         <div><label>Aporte mensal</label><input id="v90GoalMonthly" inputmode="decimal" placeholder="R$ 0,00"></div>
         <div><label>Prazo</label><input id="v90GoalDeadline" type="date"></div>
       </div>
-      <button type="button" class="finora-v90-primary" id="v90GoalSave">Cadastrar meta</button>
+      <div class="finora-r747-goal-actions">
+        <button type="button" class="finora-v90-primary" id="v90GoalSave" disabled>Salvar meta</button>
+        <button type="button" id="v90GoalCancel" disabled>Cancelar</button>
+      </div>
 
       <div class="finora-v90-section-title">Metas cadastradas</div>
       <div class="finora-v90-goal-cards">
@@ -16646,7 +16687,7 @@ setTimeout(renderHomeCategoryDonut,0);
               <span>Aporte/mês<b>${v90Money(g.monthly)}</b></span>
             </div>
             <div style="margin-top:8px;font-size:8px;color:#66776e">Para cumprir o prazo: ${needed?v90Money(needed)+'/mês':'defina um prazo'}.</div>
-            <div class="finora-v90-goal-actions"><button data-v90-goal-add="${g.id}">+ Aporte</button><button class="danger" data-v90-goal-del="${g.id}">Excluir</button></div>
+            <div class="finora-v90-goal-actions"><button data-v90-goal-edit="${g.id}">Editar</button><button data-v90-goal-add="${g.id}">+ Aporte</button><button class="danger" data-v90-goal-del="${g.id}">Excluir</button></div>
           </article>`;
         }).join('')||'<div class="finora-v90-feature-intro">Nenhuma meta cadastrada ainda. Use uma sugestão acima ou crie sua própria meta.</div>'}
       </div>
@@ -16662,21 +16703,44 @@ setTimeout(renderHomeCategoryDonut,0);
       </div>
     </div>`;
 
-    root.querySelectorAll('[data-v90-suggestion]').forEach(b=>b.onclick=()=>{document.getElementById('v90GoalName').value=b.dataset.v90Suggestion});
-    document.getElementById('v90GoalSave').onclick=()=>{
+    const goalForm=document.getElementById('v90GoalForm');
+    const goalSuggestions=document.getElementById('v90GoalSuggestions');
+    const goalSave=document.getElementById('v90GoalSave');
+    const goalCancel=document.getElementById('v90GoalCancel');
+    const goalFields=['v90GoalName','v90GoalTarget','v90GoalSaved','v90GoalMonthly','v90GoalDeadline'];
+    const setGoalEditing=(enabled,goal=null)=>{
+      window.__finoraGoalEditIdR747=goal?.id||'';
+      goalForm?.classList.toggle('finora-r747-goal-disabled',!enabled);
+      goalSuggestions?.classList.toggle('finora-r747-goal-disabled',!enabled);
+      goalFields.forEach(id=>{const el=document.getElementById(id);if(!el)return;el.disabled=!enabled;el.readOnly=!enabled;});
+      goalSuggestions?.querySelectorAll('button').forEach(b=>b.disabled=!enabled);
+      if(goalSave){goalSave.disabled=!enabled;goalSave.textContent=goal?'Salvar alterações':'Salvar meta';}
+      if(goalCancel)goalCancel.disabled=!enabled;
+      if(goal){
+        document.getElementById('v90GoalName').value=goal.name||'';
+        document.getElementById('v90GoalTarget').value=goal.target||'';
+        document.getElementById('v90GoalSaved').value=goal.saved||'';
+        document.getElementById('v90GoalMonthly').value=goal.monthly||'';
+        document.getElementById('v90GoalDeadline').value=goal.deadline||'';
+      }else if(enabled){goalFields.forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});}
+      if(enabled)setTimeout(()=>document.getElementById('v90GoalName')?.focus(),30);
+    };
+    setGoalEditing(false);
+    document.getElementById('v90GoalAdd').onclick=()=>setGoalEditing(true);
+    goalCancel.onclick=()=>setGoalEditing(false);
+    root.querySelectorAll('[data-v90-suggestion]').forEach(b=>b.onclick=()=>{if(!b.disabled)document.getElementById('v90GoalName').value=b.dataset.v90Suggestion});
+    root.querySelectorAll('[data-v90-goal-edit]').forEach(b=>b.onclick=()=>{const g=loadFinoraFeatureState().goals.find(x=>String(x.id)===String(b.dataset.v90GoalEdit));if(g)setGoalEditing(true,g)});
+    goalSave.onclick=()=>{
+      if(goalSave.disabled)return;
       const name=document.getElementById('v90GoalName').value.trim();
       const target=v90Num(document.getElementById('v90GoalTarget').value);
       if(!name||target<=0)return toast('Informe o nome e um valor-alvo maior que zero.');
-      const s=loadFinoraFeatureState();
-      s.goals.push({
-        id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),
-        name,target,
-        saved:v90Num(document.getElementById('v90GoalSaved').value),
-        monthly:v90Num(document.getElementById('v90GoalMonthly').value),
-        deadline:document.getElementById('v90GoalDeadline').value||'',
-        createdAt:new Date().toISOString()
-      });
-      s.updatedAt=new Date().toISOString();saveFinoraFeatureState(s);renderGoals();toast('Meta cadastrada.');
+      const state=loadFinoraFeatureState();
+      const payload={name,target,saved:v90Num(document.getElementById('v90GoalSaved').value),monthly:v90Num(document.getElementById('v90GoalMonthly').value),deadline:document.getElementById('v90GoalDeadline').value||''};
+      const editId=window.__finoraGoalEditIdR747;
+      if(editId){const g=state.goals.find(x=>String(x.id)===String(editId));if(g)Object.assign(g,payload,{updatedAt:new Date().toISOString()});}
+      else state.goals.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),...payload,createdAt:new Date().toISOString()});
+      state.updatedAt=new Date().toISOString();saveFinoraFeatureState(state);renderGoals();toast(editId?'Meta atualizada com sucesso.':'Meta cadastrada com sucesso.');
     };
     root.querySelectorAll('[data-v90-goal-add]').forEach(b=>b.onclick=()=>{
       const value=prompt('Valor do aporte realizado:','0,00');if(value===null)return;
@@ -19928,7 +19992,7 @@ window.FINORA_RELEASE='1.0.13';
           box.dataset.signature=sig;
           box.innerHTML=upcoming.length?upcoming.map(x=>`
             <div class="finora-v84-due-row">
-              <div class="finora-v84-due-icon">▣</div>
+              
               <div><b>${esc110(x.descricao||'Vencimento')}</b><small>${esc110(x.categoria||'Despesa')}</small></div>
               <div class="finora-v84-due-meta">${typeof brDate==='function'?brDate(x.vencimento).slice(0,5):esc110(x.vencimento)}
                 <strong>${formatMoney110(x.valor||0)}</strong>
@@ -25566,6 +25630,7 @@ body.finora-v84-dark .finora-v90-goal-actions button{background:#132920!importan
   }
 
   function unlockGoalsR744(){
+    if(document.getElementById('v90GoalForm')?.classList.contains('finora-r747-goal-disabled'))return;
     const root=$('finoraUtilityBody'); if(!root)return;
     root.querySelectorAll('.finora-v90-goal-form input,.finora-v90-goal-form select').forEach(el=>{
       el.disabled=false; el.readOnly=false; el.style.pointerEvents='auto'; el.style.userSelect='text';
@@ -25841,6 +25906,7 @@ body.finora-v84-dark :is(.badge.atrasado,.finora-v84-status.finora-status-atrasa
    const panel=document.getElementById('finoraUtilityPanel');
    const form=panel?.querySelector('.finora-v90-goal-form');
    if(!form)return;
+   if(form.classList.contains('finora-r747-goal-disabled'))return;
    [panel,document.getElementById('finoraUtilityBody'),form].filter(Boolean).forEach(el=>{el.removeAttribute('inert');el.style.pointerEvents='auto'});
    form.querySelectorAll('input,select,textarea').forEach(el=>{
      el.disabled=false; el.readOnly=false; el.removeAttribute('disabled'); el.removeAttribute('readonly'); el.removeAttribute('aria-disabled'); el.removeAttribute('inert'); el.tabIndex=0; el.style.pointerEvents='auto'; el.style.userSelect='text';
@@ -25860,6 +25926,44 @@ body.finora-v84-dark :is(.badge.atrasado,.finora-v84-status.finora-status-atrasa
  const start=()=>{observer.observe(document.body,{childList:true,subtree:true});hardEnableGoals()};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+</script>
+
+<style id="finora-r747-style">
+/* FINORA R7.47 — acabamento dark + nova jornada de metas. Modo claro preservado. */
+.finora-r747-goal-start{display:flex;justify-content:flex-start;margin:2px 0 4px}
+.finora-r747-goal-disabled{opacity:.48;filter:saturate(.55)}
+.finora-r747-goal-disabled input,.finora-r747-goal-disabled button{cursor:not-allowed!important}
+.finora-r747-goal-actions{display:flex;gap:8px;align-items:center}
+.finora-r747-goal-actions>button{min-height:36px;border-radius:9px;padding:8px 14px;border:1px solid #d7e2dc;background:#fff;color:#315c49;font-weight:800}
+.finora-v84-due-row{grid-template-columns:1fr auto!important}
+.finora-v84-footer{width:calc(100% + 56px)!important;margin-left:-28px!important;margin-right:-28px!important}
+
+/* Dark: somente quando o tema escuro estiver ativo. */
+body.finora-v84-dark #simpleAlertsPanel .finora-r740-alert-legend,
+html.dark body #simpleAlertsPanel .finora-r740-alert-legend,body.dark #simpleAlertsPanel .finora-r740-alert-legend{background:#0f201a!important;border-color:#2b463a!important}
+body.finora-v84-dark #simpleAlertsPanel :is(.alert-toolbar,.alert-summary-row,.alert-groups),
+html.dark body #simpleAlertsPanel :is(.alert-toolbar,.alert-summary-row,.alert-groups),body.dark #simpleAlertsPanel :is(.alert-toolbar,.alert-summary-row,.alert-groups){background:#0f201a!important;border-color:#2b463a!important}
+body.finora-v84-dark #simpleAlertsPanel :is(.finora-r110-alert-actions button,.finora-v109-alert-actions button,.iconbtn,button),
+html.dark body #simpleAlertsPanel :is(.finora-r110-alert-actions button,.finora-v109-alert-actions button,.iconbtn,button),body.dark #simpleAlertsPanel :is(.finora-r110-alert-actions button,.finora-v109-alert-actions button,.iconbtn,button){border-color:#3a5749!important}
+body.finora-v84-dark #simpleAlertsPanel :is(.finora-r110-alert-actions button,.finora-v109-alert-actions button,.iconbtn),
+html.dark body #simpleAlertsPanel :is(.finora-r110-alert-actions button,.finora-v109-alert-actions button,.iconbtn),body.dark #simpleAlertsPanel :is(.finora-r110-alert-actions button,.finora-v109-alert-actions button,.iconbtn){background:#183027!important;color:#f3f8f5!important}
+
+body.finora-v84-dark :is(.finora-v90-budget-kpi,.finora-v90-toggle-card,.finora-v90-feature-intro,.finora-v90-goal,.finora-v90-goal-report,.finora-v90-add),
+html.dark body :is(.finora-v90-budget-kpi,.finora-v90-toggle-card,.finora-v90-feature-intro,.finora-v90-goal,.finora-v90-goal-report,.finora-v90-add),body.dark :is(.finora-v90-budget-kpi,.finora-v90-toggle-card,.finora-v90-feature-intro,.finora-v90-goal,.finora-v90-goal-report,.finora-v90-add){background:#14271f!important;border-color:#315044!important;color:#f2f7f4!important}
+body.finora-v84-dark :is(.finora-v90-budget-kpi span,.finora-v90-toggle-card small,.finora-v90-feature-intro),
+html.dark body :is(.finora-v90-budget-kpi span,.finora-v90-toggle-card small,.finora-v90-feature-intro),body.dark :is(.finora-v90-budget-kpi span,.finora-v90-toggle-card small,.finora-v90-feature-intro){color:#bdcec5!important}
+body.finora-v84-dark :is(.finora-v90-budget-kpi strong,.finora-v90-toggle-card span,.finora-v90-section-title,.finora-v90-goal h4),
+html.dark body :is(.finora-v90-budget-kpi strong,.finora-v90-toggle-card span,.finora-v90-section-title,.finora-v90-goal h4),body.dark :is(.finora-v90-budget-kpi strong,.finora-v90-toggle-card span,.finora-v90-section-title,.finora-v90-goal h4){color:#f5faf7!important}
+body.finora-v84-dark :is(.finora-v90-add input,.finora-v90-goal-form input),html.dark body :is(.finora-v90-add input,.finora-v90-goal-form input),body.dark :is(.finora-v90-add input,.finora-v90-goal-form input){background:#172b22!important;color:#fff!important;border-color:#3a5749!important}
+body.finora-v84-dark :is(.finora-v90-toggle-card button,.finora-v90-goal-actions button,.finora-r747-goal-actions>button),html.dark body :is(.finora-v90-toggle-card button,.finora-v90-goal-actions button,.finora-r747-goal-actions>button),body.dark :is(.finora-v90-toggle-card button,.finora-v90-goal-actions button,.finora-r747-goal-actions>button){background:#1a3128!important;color:#eef6f2!important;border-color:#3a5749!important}
+body.finora-v84-dark :is(.finora-v84-panel-head button,.finora-card-actions button,.iconbtn),html.dark body :is(.finora-v84-panel-head button,.finora-card-actions button,.iconbtn),body.dark :is(.finora-v84-panel-head button,.finora-card-actions button,.iconbtn){background:#173027!important;color:#f2f7f4!important;border-color:#3a5749!important}
+body.finora-v84-dark :is(.finora-v84-due-row,.finora-v84-table tbody tr),html.dark body :is(.finora-v84-due-row,.finora-v84-table tbody tr),body.dark :is(.finora-v84-due-row,.finora-v84-table tbody tr){border-color:#294439!important}
+body.finora-v84-dark *{scrollbar-color:#47675a #102019}
+
+@media(max-width:820px){.finora-v84-footer{width:calc(100% + 20px)!important;margin-left:-10px!important;margin-right:-10px!important}.finora-r747-goal-actions{flex-direction:column;align-items:stretch}.finora-r747-goal-actions>button{width:100%}}
+</style>
+<script id="finora-r747-script">
+(function(){'use strict';window.FINORA_RELEASE='1.0.18';window.FINORA_BUILD='R7.47';})();
 </script>
 </body>
 </html>
