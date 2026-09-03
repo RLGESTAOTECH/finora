@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.40-login-logo3d-alertas-visuais">
+<meta name="finora-release" content="R7.42-login-storage-alert-sort">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.11"><meta name="finora-build" content="R7.19">
+<meta name="finora-version" content="1.0.13"><meta name="finora-build" content="R7.19">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -8434,7 +8434,7 @@ body.dark #finoraSyncIndicatorR726{
     <span class="overdue"><i></i><b>Atrasado</b></span>
     <span class="today"><i></i><b>Vence hoje</b></span>
     <span class="soon"><i></i><b>Vence em 1 a 5 dias</b></span>
-    <span class="standard"><i></i><b>Acima de 5 dias</b></span>
+    <span class="standard"><i></i><b>No prazo</b></span>
   </div>
   <div class="alert-summary-row">
     <div class="alert-summary-card"><span>Gastos alertados</span><strong id="alertExpenseTotal">R$ 0,00</strong></div>
@@ -8772,6 +8772,68 @@ function finoraCanonicalTransactions(rows){
   return [...map.values(),...noId];
 }
 
+// FINORA R7.42 — cache local compacto e resiliente.
+// O Supabase continua sendo a fonte autoritativa. O navegador guarda apenas um
+// cache leve dos lançamentos para não estourar o limite do localStorage com
+// anexos/base64 e outros conteúdos volumosos.
+function finoraCompactTransactionForLocalR741(row){
+  if(!row||typeof row!=='object')return row;
+  const out={...row};
+  if(out.attachment&&typeof out.attachment==='object'){
+    const a=out.attachment;
+    out.attachment={
+      name:a.name||'',
+      type:a.type||'',
+      size:Number(a.size||0)||0,
+      cloudOnly:!!(a.data||a.cloudOnly)
+    };
+  }
+  // Campos legados que eventualmente carregaram previews/base64 dentro do lançamento.
+  ['fileData','attachmentData','previewData','base64','dataUrl'].forEach(k=>{
+    if(typeof out[k]==='string' && out[k].length>4096)delete out[k];
+  });
+  return out;
+}
+function finoraSafeStoreTransactionsR741(rows){
+  const compact=finoraCanonicalTransactions(Array.isArray(rows)?rows:[])
+    .map(finoraCompactTransactionForLocalR741);
+  const json=JSON.stringify(compact);
+  try{
+    localStorage.setItem(KEY,json);
+    return true;
+  }catch(err){
+    if(err?.name!=='QuotaExceededError' && !/quota/i.test(String(err?.message||'')))throw err;
+    console.warn('FINORA R7.42: limite do armazenamento local atingido; limpando caches não essenciais.',err);
+    // Remove apenas caches regeneráveis. Nunca apaga sessão, configuração pública,
+    // perfis, workspaces ou a própria base financeira sem tentar preservá-la.
+    const removable=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i)||'';
+      if(k===KEY)continue;
+      if(/^(finora-v90-|finora.*(?:cache|draft|preview|temp)|__finora_storage_test__)/i.test(k))removable.push(k);
+    }
+    removable.forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
+    try{
+      localStorage.removeItem(KEY);
+      localStorage.setItem(KEY,json);
+      return true;
+    }catch(err2){
+      console.warn('FINORA R7.42: cache local completo não coube; mantendo somente o ambiente atual.',err2);
+      const current=String(window.currentWorkspaceId||currentWorkspaceId||'');
+      const reduced=current?compact.filter(x=>String(x?.workspaceId||'')===current):compact.slice(-250);
+      try{
+        localStorage.removeItem(KEY);
+        localStorage.setItem(KEY,JSON.stringify(reduced));
+        return true;
+      }catch(err3){
+        console.warn('FINORA R7.42: cache local mínimo indisponível; a nuvem permanece autoritativa.',err3);
+        try{localStorage.removeItem(KEY)}catch(e){}
+        return false;
+      }
+    }
+  }
+}
+
 let data=finoraCanonicalTransactions(
   JSON.parse(localStorage.getItem(KEY)||'[]')
 );
@@ -8781,7 +8843,7 @@ let data=finoraCanonicalTransactions(
 try{
   const rawLocal=JSON.parse(localStorage.getItem(KEY)||'[]');
   if(Array.isArray(rawLocal) && rawLocal.length!==data.length){
-    localStorage.setItem(KEY,JSON.stringify(data));
+    finoraSafeStoreTransactionsR741(data);
     console.info(`FINORA: cache local normalizado (${rawLocal.length} → ${data.length} lançamentos).`);
   }
 }catch(e){}
@@ -8814,10 +8876,10 @@ function save(){
   finoraDetectAndRememberChangedTxV79(finoraBeforeSaveV79,data,currentWorkspaceId);
 
   try{
-    localStorage.setItem(KEY,JSON.stringify(data));
+    finoraSafeStoreTransactionsR741(data);
   }catch(e){
-    console.error('FINORA R7.19 storage',e);
-    throw new Error('O navegador não permitiu gravar os dados localmente.');
+    // R7.42: falha no cache local não derruba login nem sincronização em nuvem.
+    console.warn('FINORA R7.42 cache local indisponível; mantendo fluxo online.',e);
   }
 
   if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
@@ -9375,7 +9437,7 @@ function finoraNormalizePendingZeroR718(){
 
   if(!changed.length)return false;
 
-  try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}
+  try{finoraSafeStoreTransactionsR741(data)}catch(e){}
 
   try{
     if(typeof finoraRememberPendingTxV79==='function'){
@@ -9741,7 +9803,7 @@ function renderAlerts(){
     const monthExpense=monthItems.filter(x=>x.tipo==='saida'&&hasKnownValue(x)).reduce((s,x)=>s+Number(x.valor||0),0);
     const monthIncome=monthItems.filter(x=>x.tipo==='entrada'&&hasKnownValue(x)).reduce((s,x)=>s+Number(x.valor||0),0);
 
-    const categories=Object.keys(grouped[m]).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(c=>{
+    const categories=Object.keys(grouped[m]).map(c=>{
       const items=grouped[m][c];
       // A ordem de `upcoming` já respeita o filtro de ordenação R7.38.
       const catTotal=items.filter(x=>hasKnownValue(x)).reduce((s,x)=>s+Number(x.valor||0),0);
@@ -11692,7 +11754,7 @@ $('entryForm').addEventListener('submit',async e=>{
   // R3: confirmação visual local acontece no mesmo ciclo do primeiro clique
   // e todas as visões derivadas são atualizadas a partir do mesmo objeto canônico.
   data=typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(data):data;
-  localStorage.setItem(KEY,JSON.stringify(data));
+  finoraSafeStoreTransactionsR741(data);
   render();
   try{if(typeof renderAlerts==='function')renderAlerts()}catch(e){}
   try{if(typeof finoraRefreshAllR2==='function')finoraRefreshAllR2()}catch(e){}
@@ -11845,7 +11907,7 @@ function finoraReconcilePaidStatusR716(x){
 
   // Persistência local imediata e fila de sincronização já existente.
   try{
-    localStorage.setItem(KEY,JSON.stringify(data));
+    finoraSafeStoreTransactionsR741(data);
   }catch(e){}
 
   try{
@@ -11959,7 +12021,7 @@ async function deleteRow(id){
         currentWorkspaceId
       )
     );
-    localStorage.setItem(KEY,JSON.stringify(data));
+    finoraSafeStoreTransactionsR741(data);
 
     finoraMarkCloudDirty();
 
@@ -12105,7 +12167,9 @@ function downloadFile(id){
 }
 document.querySelectorAll('.account').forEach(b=>b.onclick=()=>{});
 ['busca','filtroTipo','filtroStatus','filtroMes'].forEach(id=>$(id).addEventListener('input',render));
-['alertMonthFilter','alertCategoryFilter','alertTypeFilter'].forEach(id=>$(id)?.addEventListener('change',renderAlerts));
+['alertYearFilter','alertMonthFilter','alertCategoryFilter','alertTypeFilter','alertSortField','alertSortDirection']
+  .forEach(id=>$(id)?.addEventListener('change',renderAlerts));
+$('alertSearchFilter')?.addEventListener('input',renderAlerts);
 $('cancelEdit').onclick=()=>{
   window.__finoraEditingTransactionIdR735='';
   const mode=currentLaunchMode==='entrada'?'entrada':currentLaunchMode==='saida'?'saida':$('tipo').value;
@@ -13461,7 +13525,7 @@ async function pushCloudState(showToast=false){
         )
       )
     );
-    localStorage.setItem(KEY,JSON.stringify(data));
+    finoraSafeStoreTransactionsR741(data);
     const otherTxTombstonesR736=loadDeletedTransactions()
       .filter(t=>String(t?.workspaceId||'')!==String(currentWorkspaceId||''));
     saveDeletedTransactions(
@@ -13635,7 +13699,7 @@ async function pullCloudState(showToast=false){
         mergedTx.map(x=>({...x,workspaceId:currentWorkspaceId,account:'family'}))
       )
     );
-    localStorage.setItem(KEY,JSON.stringify(data));
+    finoraSafeStoreTransactionsR741(data);
     saveDeletedTransactions(
       loadDeletedTransactions().filter(t=>t.workspaceId!==currentWorkspaceId).concat(mergedTombstones)
     );
@@ -14026,7 +14090,7 @@ function inviteByCode(code){
 function migrateWorkspaceData(){
   let changed=false;
   data.forEach(x=>{if(!x.workspaceId){x.workspaceId=currentWorkspaceId;x.account='family';changed=true}});
-  if(changed)localStorage.setItem(KEY,JSON.stringify(data));
+  if(changed)finoraSafeStoreTransactionsR741(data);
   const cards=loadFinoraCards();let cc=false;
   cards.forEach(c=>{if(!c.workspaceId){c.workspaceId=currentWorkspaceId;c.account='family';cc=true}});
   if(cc)saveFinoraCards(cards);
@@ -14088,7 +14152,7 @@ async function finoraRecoverWorkspaceDataIfEmpty(){
 
     const currentOther=data.filter(x=>!sameWorkspace(x));
     data=[...currentOther,...recoveredTx];
-    localStorage.setItem(KEY,JSON.stringify(data));
+    finoraSafeStoreTransactionsR741(data);
 
     // Cartões também acompanham a recuperação visual do mesmo ambiente.
     if(Array.isArray(recoveredState.cards) && recoveredState.cards.length){
@@ -18632,7 +18696,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
 
 <script id="finora-v107-release-marker">
-window.FINORA_RELEASE='1.0.11';
+window.FINORA_RELEASE='1.0.13';
 </script>
 
 
@@ -18961,7 +19025,7 @@ window.FINORA_RELEASE='1.0.11';
       });
       try{
         if(typeof save==='function')save();
-        else localStorage.setItem(typeof KEY!=='undefined'?KEY:'controleFinanceiroFamiliar_v1',JSON.stringify(data));
+        else if(typeof finoraSafeStoreTransactionsR741==='function')finoraSafeStoreTransactionsR741(data);
       }catch(e){}
     }else{
       const s=typeof loadFinoraFeatureState==='function'?loadFinoraFeatureState():{};
@@ -19156,7 +19220,7 @@ window.FINORA_RELEASE='1.0.11';
   requestAnimationFrame(()=>{
     try{
       data=finoraCanonicalTransactions(data);
-      localStorage.setItem(KEY,JSON.stringify(data));
+      finoraSafeStoreTransactionsR741(data);
       if(typeof render==='function')render();
     }catch(e){console.error('FINORA root dedup fix',e)}
   });
@@ -19908,7 +19972,7 @@ window.FINORA_RELEASE='1.0.11';
       data=(typeof finoraCanonicalTransactions==='function'
         ?finoraCanonicalTransactions(data.filter(r=>String(r.id)!==String(x.id)))
         :data.filter(r=>String(r.id)!==String(x.id)));
-      localStorage.setItem(KEY,JSON.stringify(data));
+      finoraSafeStoreTransactionsR741(data);
       try{if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty()}catch(e){}
       if(typeof finoraAuditLog==='function'){
         finoraAuditLog('EXCLUIU','LANCAMENTO',x.id,'Lançamento excluído',x,null);
@@ -20036,7 +20100,51 @@ window.FINORA_RELEASE='1.0.11';
         ${printRowsTable(rows)}
         <footer>FINORA · Versão 1.0.11 · Relatório gerado em ${new Date().toLocaleString('pt-BR')}</footer>
         <script>window.addEventListener('load',()=>{setTimeout(()=>window.print(),120)});<\/script>
-        </body></html>`);
+        
+
+<style id="finora-r742-alert-visual-fix">
+/* FINORA R7.42 — regra visual aprovada para Alertas por mês */
+#simpleAlertsPanel .finora-r740-alert-legend .today{background:#ffe0c4!important;border-color:#f39a4c!important;color:#3f250c!important}
+#simpleAlertsPanel .finora-r740-alert-legend .today i{background:#f58a2a!important}
+#simpleAlertsPanel .finora-r740-alert-legend .soon{background:#fff1a9!important;border-color:#e4c643!important;color:#3d3208!important}
+#simpleAlertsPanel .finora-r740-alert-legend .soon i{background:#f5c518!important}
+#simpleAlertsPanel .finora-r740-alert-legend .standard{background:#e3f5e9!important;border-color:#79bf8d!important;color:#174d2b!important}
+#simpleAlertsPanel .finora-r740-alert-legend .standard i{background:#36a85a!important;border-color:#2d914c!important}
+#simpleAlertsPanel .alert-item.finora-r740-today{background:linear-gradient(100deg,#f5a14c,#ffc477)!important;border-color:#e4872c!important;color:#17120d!important}
+#simpleAlertsPanel .alert-item.finora-r740-today :is(.meta,strong,.amount,span,div){color:#17120d!important}
+#simpleAlertsPanel .alert-item.finora-r740-soon{background:linear-gradient(100deg,#ffe270,#fff0a8)!important;border-color:#e2bd29!important;color:#17150c!important}
+#simpleAlertsPanel .alert-item.finora-r740-soon :is(.meta,strong,.amount,span,div){color:#17150c!important}
+#simpleAlertsPanel .alert-item.finora-r740-standard{background:linear-gradient(100deg,#e4f6e9,#f2fbf5)!important;border-color:#8bc79b!important;color:#173d24!important}
+#simpleAlertsPanel .alert-item.finora-r740-standard :is(.meta,strong,.amount,span,div){color:#173d24!important}
+@media(max-width:720px){#simpleAlertsPanel .finora-r740-alert-legend{grid-template-columns:1fr 1fr!important;gap:8px!important}#simpleAlertsPanel .finora-r740-alert-legend span{padding:7px 8px!important;font-size:10px!important}}
+</style>
+<script id="finora-r742-alert-sort-bind">
+(function(){
+  window.FINORA_RELEASE='1.0.13';
+  window.FINORA_BUILD='R7.42';
+  function applyAlertOrder(){
+    try{
+      if(typeof window.renderAlerts==='function') window.renderAlerts();
+      else if(typeof renderAlerts==='function') renderAlerts();
+    }catch(e){console.warn('FINORA R7.42 — ordenação de alertas',e);}
+  }
+  function bind(){
+    ['alertYearFilter','alertMonthFilter','alertCategoryFilter','alertTypeFilter','alertSortField','alertSortDirection'].forEach(function(id){
+      var el=document.getElementById(id); if(!el || el.dataset.r742Bound==='1') return;
+      el.dataset.r742Bound='1';
+      el.addEventListener('change',applyAlertOrder,{passive:true});
+      el.addEventListener('input',applyAlertOrder,{passive:true});
+    });
+    var q=document.getElementById('alertSearchFilter');
+    if(q && q.dataset.r742Bound!=='1'){q.dataset.r742Bound='1';q.addEventListener('input',applyAlertOrder,{passive:true});q.addEventListener('change',applyAlertOrder,{passive:true});}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
+  setTimeout(bind,300); setTimeout(bind,1200); setTimeout(bind,3000);
+  document.addEventListener('click',function(e){if(e.target && e.target.closest && e.target.closest('[data-action="alerts"],#openAlertsBtn')) setTimeout(bind,100);});
+})();
+</script>
+
+</body></html>`);
       w.document.close();
     }catch(err){
       console.error('FINORA 1.0.10 print',err);
@@ -20654,7 +20762,7 @@ window.FINORA_RELEASE='1.0.11';
       if(typeof recordTransactionDeletion==='function')recordTransactionDeletion(row.id);
       data=data.filter(x=>String(x.id)!==String(row.id));
       data=typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(data):data;
-      localStorage.setItem(KEY,JSON.stringify(data));
+      finoraSafeStoreTransactionsR741(data);
       try{if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty()}catch(e){}
       if(typeof finoraAuditLog==='function'){
         finoraAuditLog('EXCLUIU','LANCAMENTO',row.id,'Lançamento excluído',before,null);
@@ -20968,7 +21076,50 @@ window.FINORA_RELEASE='1.0.11';
         ${content}
         <footer>FINORA · Versão 1.0.11 · ${new Date().toLocaleString('pt-BR')}</footer>
         <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),120));<\/script>
-        </body></html>`);
+        
+<style id="finora-r742-alert-visual-fix">
+/* FINORA R7.42 — regra visual aprovada para Alertas por mês */
+#simpleAlertsPanel .finora-r740-alert-legend .today{background:#ffe0c4!important;border-color:#f39a4c!important;color:#3f250c!important}
+#simpleAlertsPanel .finora-r740-alert-legend .today i{background:#f58a2a!important}
+#simpleAlertsPanel .finora-r740-alert-legend .soon{background:#fff1a9!important;border-color:#e4c643!important;color:#3d3208!important}
+#simpleAlertsPanel .finora-r740-alert-legend .soon i{background:#f5c518!important}
+#simpleAlertsPanel .finora-r740-alert-legend .standard{background:#e3f5e9!important;border-color:#79bf8d!important;color:#174d2b!important}
+#simpleAlertsPanel .finora-r740-alert-legend .standard i{background:#36a85a!important;border-color:#2d914c!important}
+#simpleAlertsPanel .alert-item.finora-r740-today{background:linear-gradient(100deg,#f5a14c,#ffc477)!important;border-color:#e4872c!important;color:#17120d!important}
+#simpleAlertsPanel .alert-item.finora-r740-today :is(.meta,strong,.amount,span,div){color:#17120d!important}
+#simpleAlertsPanel .alert-item.finora-r740-soon{background:linear-gradient(100deg,#ffe270,#fff0a8)!important;border-color:#e2bd29!important;color:#17150c!important}
+#simpleAlertsPanel .alert-item.finora-r740-soon :is(.meta,strong,.amount,span,div){color:#17150c!important}
+#simpleAlertsPanel .alert-item.finora-r740-standard{background:linear-gradient(100deg,#e4f6e9,#f2fbf5)!important;border-color:#8bc79b!important;color:#173d24!important}
+#simpleAlertsPanel .alert-item.finora-r740-standard :is(.meta,strong,.amount,span,div){color:#173d24!important}
+@media(max-width:720px){#simpleAlertsPanel .finora-r740-alert-legend{grid-template-columns:1fr 1fr!important;gap:8px!important}#simpleAlertsPanel .finora-r740-alert-legend span{padding:7px 8px!important;font-size:10px!important}}
+</style>
+<script id="finora-r742-alert-sort-bind">
+(function(){
+  window.FINORA_RELEASE='1.0.13';
+  window.FINORA_BUILD='R7.42';
+  function applyAlertOrder(){
+    try{
+      if(typeof window.renderAlerts==='function') window.renderAlerts();
+      else if(typeof renderAlerts==='function') renderAlerts();
+    }catch(e){console.warn('FINORA R7.42 — ordenação de alertas',e);}
+  }
+  function bind(){
+    ['alertYearFilter','alertMonthFilter','alertCategoryFilter','alertTypeFilter','alertSortField','alertSortDirection'].forEach(function(id){
+      var el=document.getElementById(id); if(!el || el.dataset.r742Bound==='1') return;
+      el.dataset.r742Bound='1';
+      el.addEventListener('change',applyAlertOrder,{passive:true});
+      el.addEventListener('input',applyAlertOrder,{passive:true});
+    });
+    var q=document.getElementById('alertSearchFilter');
+    if(q && q.dataset.r742Bound!=='1'){q.dataset.r742Bound='1';q.addEventListener('input',applyAlertOrder,{passive:true});q.addEventListener('change',applyAlertOrder,{passive:true});}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
+  setTimeout(bind,300); setTimeout(bind,1200); setTimeout(bind,3000);
+  document.addEventListener('click',function(e){if(e.target && e.target.closest && e.target.closest('[data-action="alerts"],#openAlertsBtn')) setTimeout(bind,100);});
+})();
+</script>
+
+</body></html>`);
       w.document.close();
     }catch(e){
       console.error('FINORA R2 print',e);toast('Não foi possível preparar a impressão.');
@@ -21083,7 +21234,7 @@ window.FINORA_RELEASE='1.0.11';
       setTimeout(()=>{
         try{
           data=typeof finoraCanonicalTransactions==='function'?finoraCanonicalTransactions(data):data;
-          localStorage.setItem(KEY,JSON.stringify(data));
+          finoraSafeStoreTransactionsR741(data);
           r3Refresh();
 
           if(typeof pushCloudState==='function' &&
@@ -21613,7 +21764,50 @@ window.FINORA_RELEASE='1.0.11';
         ${personPrintHTML(rows)}
         <footer>FINORA · Versão 1.0.11 · ${new Date().toLocaleString('pt-BR')}</footer>
         <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),120));<\/script>
-        </body></html>`);
+        
+<style id="finora-r742-alert-visual-fix">
+/* FINORA R7.42 — regra visual aprovada para Alertas por mês */
+#simpleAlertsPanel .finora-r740-alert-legend .today{background:#ffe0c4!important;border-color:#f39a4c!important;color:#3f250c!important}
+#simpleAlertsPanel .finora-r740-alert-legend .today i{background:#f58a2a!important}
+#simpleAlertsPanel .finora-r740-alert-legend .soon{background:#fff1a9!important;border-color:#e4c643!important;color:#3d3208!important}
+#simpleAlertsPanel .finora-r740-alert-legend .soon i{background:#f5c518!important}
+#simpleAlertsPanel .finora-r740-alert-legend .standard{background:#e3f5e9!important;border-color:#79bf8d!important;color:#174d2b!important}
+#simpleAlertsPanel .finora-r740-alert-legend .standard i{background:#36a85a!important;border-color:#2d914c!important}
+#simpleAlertsPanel .alert-item.finora-r740-today{background:linear-gradient(100deg,#f5a14c,#ffc477)!important;border-color:#e4872c!important;color:#17120d!important}
+#simpleAlertsPanel .alert-item.finora-r740-today :is(.meta,strong,.amount,span,div){color:#17120d!important}
+#simpleAlertsPanel .alert-item.finora-r740-soon{background:linear-gradient(100deg,#ffe270,#fff0a8)!important;border-color:#e2bd29!important;color:#17150c!important}
+#simpleAlertsPanel .alert-item.finora-r740-soon :is(.meta,strong,.amount,span,div){color:#17150c!important}
+#simpleAlertsPanel .alert-item.finora-r740-standard{background:linear-gradient(100deg,#e4f6e9,#f2fbf5)!important;border-color:#8bc79b!important;color:#173d24!important}
+#simpleAlertsPanel .alert-item.finora-r740-standard :is(.meta,strong,.amount,span,div){color:#173d24!important}
+@media(max-width:720px){#simpleAlertsPanel .finora-r740-alert-legend{grid-template-columns:1fr 1fr!important;gap:8px!important}#simpleAlertsPanel .finora-r740-alert-legend span{padding:7px 8px!important;font-size:10px!important}}
+</style>
+<script id="finora-r742-alert-sort-bind">
+(function(){
+  window.FINORA_RELEASE='1.0.13';
+  window.FINORA_BUILD='R7.42';
+  function applyAlertOrder(){
+    try{
+      if(typeof window.renderAlerts==='function') window.renderAlerts();
+      else if(typeof renderAlerts==='function') renderAlerts();
+    }catch(e){console.warn('FINORA R7.42 — ordenação de alertas',e);}
+  }
+  function bind(){
+    ['alertYearFilter','alertMonthFilter','alertCategoryFilter','alertTypeFilter','alertSortField','alertSortDirection'].forEach(function(id){
+      var el=document.getElementById(id); if(!el || el.dataset.r742Bound==='1') return;
+      el.dataset.r742Bound='1';
+      el.addEventListener('change',applyAlertOrder,{passive:true});
+      el.addEventListener('input',applyAlertOrder,{passive:true});
+    });
+    var q=document.getElementById('alertSearchFilter');
+    if(q && q.dataset.r742Bound!=='1'){q.dataset.r742Bound='1';q.addEventListener('input',applyAlertOrder,{passive:true});q.addEventListener('change',applyAlertOrder,{passive:true});}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
+  setTimeout(bind,300); setTimeout(bind,1200); setTimeout(bind,3000);
+  document.addEventListener('click',function(e){if(e.target && e.target.closest && e.target.closest('[data-action="alerts"],#openAlertsBtn')) setTimeout(bind,100);});
+})();
+</script>
+
+</body></html>`);
       w.document.close();
     }catch(e){
       console.error('FINORA R4 impressão por pessoa',e);
@@ -22006,7 +22200,50 @@ window.FINORA_RELEASE='1.0.11';
       ${bars}
       <footer>FINORA · Versão 1.0.11 · ${new Date().toLocaleString('pt-BR')}</footer>
       <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),120));<\/script>
-      </body></html>`);
+      
+<style id="finora-r742-alert-visual-fix">
+/* FINORA R7.42 — regra visual aprovada para Alertas por mês */
+#simpleAlertsPanel .finora-r740-alert-legend .today{background:#ffe0c4!important;border-color:#f39a4c!important;color:#3f250c!important}
+#simpleAlertsPanel .finora-r740-alert-legend .today i{background:#f58a2a!important}
+#simpleAlertsPanel .finora-r740-alert-legend .soon{background:#fff1a9!important;border-color:#e4c643!important;color:#3d3208!important}
+#simpleAlertsPanel .finora-r740-alert-legend .soon i{background:#f5c518!important}
+#simpleAlertsPanel .finora-r740-alert-legend .standard{background:#e3f5e9!important;border-color:#79bf8d!important;color:#174d2b!important}
+#simpleAlertsPanel .finora-r740-alert-legend .standard i{background:#36a85a!important;border-color:#2d914c!important}
+#simpleAlertsPanel .alert-item.finora-r740-today{background:linear-gradient(100deg,#f5a14c,#ffc477)!important;border-color:#e4872c!important;color:#17120d!important}
+#simpleAlertsPanel .alert-item.finora-r740-today :is(.meta,strong,.amount,span,div){color:#17120d!important}
+#simpleAlertsPanel .alert-item.finora-r740-soon{background:linear-gradient(100deg,#ffe270,#fff0a8)!important;border-color:#e2bd29!important;color:#17150c!important}
+#simpleAlertsPanel .alert-item.finora-r740-soon :is(.meta,strong,.amount,span,div){color:#17150c!important}
+#simpleAlertsPanel .alert-item.finora-r740-standard{background:linear-gradient(100deg,#e4f6e9,#f2fbf5)!important;border-color:#8bc79b!important;color:#173d24!important}
+#simpleAlertsPanel .alert-item.finora-r740-standard :is(.meta,strong,.amount,span,div){color:#173d24!important}
+@media(max-width:720px){#simpleAlertsPanel .finora-r740-alert-legend{grid-template-columns:1fr 1fr!important;gap:8px!important}#simpleAlertsPanel .finora-r740-alert-legend span{padding:7px 8px!important;font-size:10px!important}}
+</style>
+<script id="finora-r742-alert-sort-bind">
+(function(){
+  window.FINORA_RELEASE='1.0.13';
+  window.FINORA_BUILD='R7.42';
+  function applyAlertOrder(){
+    try{
+      if(typeof window.renderAlerts==='function') window.renderAlerts();
+      else if(typeof renderAlerts==='function') renderAlerts();
+    }catch(e){console.warn('FINORA R7.42 — ordenação de alertas',e);}
+  }
+  function bind(){
+    ['alertYearFilter','alertMonthFilter','alertCategoryFilter','alertTypeFilter','alertSortField','alertSortDirection'].forEach(function(id){
+      var el=document.getElementById(id); if(!el || el.dataset.r742Bound==='1') return;
+      el.dataset.r742Bound='1';
+      el.addEventListener('change',applyAlertOrder,{passive:true});
+      el.addEventListener('input',applyAlertOrder,{passive:true});
+    });
+    var q=document.getElementById('alertSearchFilter');
+    if(q && q.dataset.r742Bound!=='1'){q.dataset.r742Bound='1';q.addEventListener('input',applyAlertOrder,{passive:true});q.addEventListener('change',applyAlertOrder,{passive:true});}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
+  setTimeout(bind,300); setTimeout(bind,1200); setTimeout(bind,3000);
+  document.addEventListener('click',function(e){if(e.target && e.target.closest && e.target.closest('[data-action="alerts"],#openAlertsBtn')) setTimeout(bind,100);});
+})();
+</script>
+
+</body></html>`);
     w.document.close();
   };
 
@@ -23106,7 +23343,7 @@ window.finoraR73Health=async function(){
           if(typeof finoraCanonicalTransactions==='function'){
             data=finoraCanonicalTransactions(data);
           }
-          localStorage.setItem(KEY,JSON.stringify(data));
+          finoraSafeStoreTransactionsR741(data);
 
           // Marca mutação e salva na mesma fonte usada por Web/Mobile.
           try{
@@ -23159,7 +23396,7 @@ window.finoraR73Health=async function(){
         }
       });
       if(repaired){
-        try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}
+        try{finoraSafeStoreTransactionsR741(data)}catch(e){}
       }
       return result;
     };
@@ -23858,7 +24095,7 @@ function dialogR718(){
     }
 
     try{
-      localStorage.setItem(KEY,JSON.stringify(data));
+      finoraSafeStoreTransactionsR741(data);
       if(typeof finoraRememberPendingTxV79==='function'){
         finoraRememberPendingTxV79([row],currentWorkspaceId);
       }
@@ -24662,7 +24899,7 @@ function cleanupWrongIPTUR731(){
       try{if(typeof finoraRemovePendingTxR729==='function')finoraRemovePendingTxR729(x.id,currentWorkspaceId)}catch(e){}
     });
     data=data.filter(x=>!ids.has(String(x.id||'')));
-    localStorage.setItem(KEY,JSON.stringify(data));
+    finoraSafeStoreTransactionsR741(data);
     markDirty();
     return bad.length;
   }catch(e){
@@ -25116,7 +25353,7 @@ function cleanupReportedMedicineDuplicateR735(){
     if(typeof finoraCanonicalTransactions==='function'){
       data=finoraCanonicalTransactions(data);
     }
-    localStorage.setItem(KEY,JSON.stringify(data));
+    finoraSafeStoreTransactionsR741(data);
 
     try{if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty()}catch(e){}
     try{if(typeof scheduleCloudPush==='function')scheduleCloudPush()}catch(e){}
@@ -25323,5 +25560,77 @@ window.finoraR739Diagnostics=function(){
   };
 };
 </script>
+<script id="finora-r741-login-storage-and-alert-sort-fix">
+(function(){
+  window.FINORA_RELEASE='1.0.13';
+  // Garante listeners mesmo se um patch posterior tiver refeito o painel.
+  function bind741(){
+    const rerender=()=>{try{if(typeof window.renderAlerts==='function')window.renderAlerts()}catch(e){console.warn('FINORA R7.42 alert sort',e)}};
+    ['alertYearFilter','alertMonthFilter','alertCategoryFilter','alertTypeFilter','alertSortField','alertSortDirection'].forEach(id=>{
+      const el=document.getElementById(id);if(!el||el.dataset.r741Bound)return;
+      el.dataset.r741Bound='1';el.addEventListener('change',rerender);
+    });
+    const search=document.getElementById('alertSearchFilter');
+    if(search&&!search.dataset.r741Bound){search.dataset.r741Bound='1';search.addEventListener('input',rerender)}
+  }
+  document.addEventListener('DOMContentLoaded',bind741);
+  setTimeout(bind741,250);
+  setTimeout(bind741,1200);
+
+  // Se um erro de quota antigo escapar para o box de autenticação, troca por mensagem útil.
+  const obs=new MutationObserver(()=>{
+    const e=document.getElementById('authError');if(!e)return;
+    if(/quota|setitem|storage/i.test(e.textContent||'')){
+      e.textContent='O FINORA ajustou o armazenamento deste navegador. Tente entrar novamente.';
+    }
+  });
+  document.addEventListener('DOMContentLoaded',()=>{
+    const e=document.getElementById('authError');if(e)obs.observe(e,{childList:true,subtree:true,characterData:true});
+  });
+})();
+</script>
+
+<style id="finora-r742-alert-visual-fix">
+/* FINORA R7.42 — regra visual aprovada para Alertas por mês */
+#simpleAlertsPanel .finora-r740-alert-legend .today{background:#ffe0c4!important;border-color:#f39a4c!important;color:#3f250c!important}
+#simpleAlertsPanel .finora-r740-alert-legend .today i{background:#f58a2a!important}
+#simpleAlertsPanel .finora-r740-alert-legend .soon{background:#fff1a9!important;border-color:#e4c643!important;color:#3d3208!important}
+#simpleAlertsPanel .finora-r740-alert-legend .soon i{background:#f5c518!important}
+#simpleAlertsPanel .finora-r740-alert-legend .standard{background:#e3f5e9!important;border-color:#79bf8d!important;color:#174d2b!important}
+#simpleAlertsPanel .finora-r740-alert-legend .standard i{background:#36a85a!important;border-color:#2d914c!important}
+#simpleAlertsPanel .alert-item.finora-r740-today{background:linear-gradient(100deg,#f5a14c,#ffc477)!important;border-color:#e4872c!important;color:#17120d!important}
+#simpleAlertsPanel .alert-item.finora-r740-today :is(.meta,strong,.amount,span,div){color:#17120d!important}
+#simpleAlertsPanel .alert-item.finora-r740-soon{background:linear-gradient(100deg,#ffe270,#fff0a8)!important;border-color:#e2bd29!important;color:#17150c!important}
+#simpleAlertsPanel .alert-item.finora-r740-soon :is(.meta,strong,.amount,span,div){color:#17150c!important}
+#simpleAlertsPanel .alert-item.finora-r740-standard{background:linear-gradient(100deg,#e4f6e9,#f2fbf5)!important;border-color:#8bc79b!important;color:#173d24!important}
+#simpleAlertsPanel .alert-item.finora-r740-standard :is(.meta,strong,.amount,span,div){color:#173d24!important}
+@media(max-width:720px){#simpleAlertsPanel .finora-r740-alert-legend{grid-template-columns:1fr 1fr!important;gap:8px!important}#simpleAlertsPanel .finora-r740-alert-legend span{padding:7px 8px!important;font-size:10px!important}}
+</style>
+<script id="finora-r742-alert-sort-bind">
+(function(){
+  window.FINORA_RELEASE='1.0.13';
+  window.FINORA_BUILD='R7.42';
+  function applyAlertOrder(){
+    try{
+      if(typeof window.renderAlerts==='function') window.renderAlerts();
+      else if(typeof renderAlerts==='function') renderAlerts();
+    }catch(e){console.warn('FINORA R7.42 — ordenação de alertas',e);}
+  }
+  function bind(){
+    ['alertYearFilter','alertMonthFilter','alertCategoryFilter','alertTypeFilter','alertSortField','alertSortDirection'].forEach(function(id){
+      var el=document.getElementById(id); if(!el || el.dataset.r742Bound==='1') return;
+      el.dataset.r742Bound='1';
+      el.addEventListener('change',applyAlertOrder,{passive:true});
+      el.addEventListener('input',applyAlertOrder,{passive:true});
+    });
+    var q=document.getElementById('alertSearchFilter');
+    if(q && q.dataset.r742Bound!=='1'){q.dataset.r742Bound='1';q.addEventListener('input',applyAlertOrder,{passive:true});q.addEventListener('change',applyAlertOrder,{passive:true});}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
+  setTimeout(bind,300); setTimeout(bind,1200); setTimeout(bind,3000);
+  document.addEventListener('click',function(e){if(e.target && e.target.closest && e.target.closest('[data-action="alerts"],#openAlertsBtn')) setTimeout(bind,100);});
+})();
+</script>
+
 </body>
 </html>
