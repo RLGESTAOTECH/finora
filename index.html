@@ -26272,5 +26272,75 @@ body:not(.finora-v84-dark):not(.dark) :is(
   protectGoalName();
 })();
 </script>
+
+<!-- FINORA R7.47 / 1.0.23 — cabeçalhos claros unificados + calendário de metas -->
+<style id="finora-r747-v1023-unified-light-headers">
+/* Tema claro: um único padrão visual de cabeçalho para TODAS as telas/modais FINORA. */
+body:not(.finora-v84-dark):not(.dark) :is(
+ #simpleLaunchPanel #launchFormPanel>.panel-head,
+ #simpleLaunchPanel #launchListPanel>.panel-head,
+ #finoraCardsPanel>.finora-cards-head,
+ #finoraUtilityPanel>.panel-head,
+ #finoraReportsPanel>.finora-report-head,
+ #finoraFamilyAccess>.finora-family-head,
+ #simpleAlertsPanel>.panel-head,
+ #finoraAuditModal>.panel-head,
+ #finoraAuditPanel>.panel-head,
+ #simpleImportPanel>.finora-modal-head,
+ .section-modal-active>.finora-category-head,
+ .section-modal-active>.finora-report-head,
+ .section-modal-active>.finora-family-head,
+ .section-modal-active>.finora-cards-head,
+ .section-modal-active>.panel-head
+){
+ background:#0b5f42!important;color:#fff!important;border-color:#0b5f42!important;
+ border-radius:14px!important;box-shadow:none!important;
+}
+body:not(.finora-v84-dark):not(.dark) :is(
+ #simpleLaunchPanel #launchFormPanel>.panel-head,
+ #simpleLaunchPanel #launchListPanel>.panel-head,
+ #finoraCardsPanel>.finora-cards-head,
+ #finoraUtilityPanel>.panel-head,
+ #finoraReportsPanel>.finora-report-head,
+ #finoraFamilyAccess>.finora-family-head,
+ #simpleAlertsPanel>.panel-head,
+ #finoraAuditModal>.panel-head,
+ #finoraAuditPanel>.panel-head,
+ #simpleImportPanel>.finora-modal-head,
+ .section-modal-active>.finora-category-head,
+ .section-modal-active>.finora-report-head,
+ .section-modal-active>.finora-family-head,
+ .section-modal-active>.finora-cards-head,
+ .section-modal-active>.panel-head
+) :is(h1,h2,h3,p,span,small,strong,label){color:#fff!important}
+/* Ações dentro do cabeçalho continuam legíveis no verde. */
+body:not(.finora-v84-dark):not(.dark) :is(.finora-cards-head,.finora-report-head,.finora-family-head,.panel-head)>.report-actions button,
+body:not(.finora-v84-dark):not(.dark) .finora-cards-head>.simple-action,
+body:not(.finora-v84-dark):not(.dark) .finora-family-head .simple-action{
+ background:#fff!important;color:#0b5f42!important;border-color:rgba(255,255,255,.75)!important;
+}
+/* Importação/extrato: cabeçalho verde mesmo quando aberto pelo modal próprio. */
+body:not(.finora-v84-dark):not(.dark) #simpleImportPanel>.finora-modal-head{padding:16px 18px!important}
+/* O tema escuro não é alterado por este bloco. */
+</style>
+<script id="finora-r747-v1023-runtime">
+(function(){
+ 'use strict';
+ window.FINORA_RELEASE='1.0.23'; window.FINORA_BUILD='R7.47';
+ function freeGoalCalendar(){
+   const el=document.getElementById('r748GoalDeadline'); if(!el)return;
+   ['min','max','step'].forEach(a=>el.removeAttribute(a));
+   el.disabled=false; el.readOnly=false;
+ }
+ document.addEventListener('pointerdown',function(e){
+   const el=e.target?.closest?.('#r748GoalDeadline'); if(!el)return;
+   freeGoalCalendar();
+ },true);
+ document.addEventListener('focusin',function(e){if(e.target?.id==='r748GoalDeadline')freeGoalCalendar()},true);
+ document.addEventListener('change',function(e){if(e.target?.id==='r748GoalDeadline')freeGoalCalendar()},true);
+ new MutationObserver(freeGoalCalendar).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['min','max','step','disabled','readonly']});
+ freeGoalCalendar();
+})();
+</script>
 </body>
 </html>
