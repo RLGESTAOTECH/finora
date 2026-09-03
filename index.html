@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.47-rootfix-dark-goals">
+<meta name="finora-release" content="R7.47-goals-rebuild-light-header">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.20"><meta name="finora-build" content="R7.19">
+<meta name="finora-version" content="1.0.21"><meta name="finora-build" content="R7.19">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -26095,6 +26095,120 @@ body.finora-v84-dark :is(.topbar,.app-header,.header,.menu-toggle,.sidebar-toggl
  }
  new MutationObserver(enforceGoalState).observe(document.body,{childList:true,subtree:true});
  setTimeout(enforceGoalState,0);
+})();
+</script>
+
+<!-- FINORA R7.47 / 1.0.21 — reconstrução definitiva de Metas + restauração do verde no cabeçalho claro -->
+<style id="finora-r747-goals-rebuild-style">
+/* Tema claro: restaura o verde suave dos controles do cabeçalho sem alterar o restante do tema claro. */
+body:not(.finora-v84-dark) .finora-v84-icon-btn,
+body:not(.finora-v84-dark) .finora-v88-menu-toggle{
+  background:#e7f3ed!important;
+  border-color:#c9dfd4!important;
+  color:#0b5f42!important;
+}
+body:not(.finora-v84-dark) .finora-v84-icon-btn:hover,
+body:not(.finora-v84-dark) .finora-v88-menu-toggle:hover{
+  background:#dceee5!important;
+  border-color:#afd2c1!important;
+}
+body:not(.finora-v84-dark) .finora-v88-menu-toggle span{background:#0b5f42!important}
+
+/* Metas R7.47 rebuild: formulário próprio, sem herdar bloqueios/readonly de versões legadas. */
+.finora-r748-goals{display:flex;flex-direction:column;gap:14px}
+.finora-r748-goal-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:8px}
+.finora-r748-goal-form{display:none;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:10px;padding:13px;border:1px solid #dbe7e1;border-radius:14px;background:#fbfdfc}
+.finora-r748-goal-form.is-open{display:grid}
+.finora-r748-goal-form label{display:block;margin:0 0 5px;font:700 9px Verdana,sans-serif;color:#385548;text-transform:uppercase;letter-spacing:.35px}
+.finora-r748-goal-form input{width:100%;box-sizing:border-box;min-height:38px;padding:8px 10px;border:1px solid #cfded6;border-radius:9px;background:#fff;color:#173d30;font:10px Verdana,sans-serif;outline:none;pointer-events:auto!important;user-select:text!important;-webkit-user-select:text!important}
+.finora-r748-goal-form input:focus{border-color:#0a8057;box-shadow:0 0 0 3px rgba(10,128,87,.12)}
+.finora-r748-goal-form-actions{display:none;gap:8px;justify-content:flex-end}
+.finora-r748-goal-form-actions.is-open{display:flex}
+.finora-r748-goal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.finora-r748-empty{padding:16px;border:1px dashed #cbdcd3;border-radius:12px;color:#6b7c73;font:10px Verdana,sans-serif;background:#fbfdfc}
+.finora-r748-goal-card{padding:13px;border:1px solid #dce7e1;border-radius:13px;background:#fff}
+.finora-r748-goal-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.finora-r748-goal-card h4{margin:0;color:#0b3f31;font-size:12px}
+.finora-r748-goal-card small{color:#718079;font-size:9px}
+.finora-r748-goal-progress{height:8px;background:#e5ece8;border-radius:999px;overflow:hidden;margin:11px 0 9px}
+.finora-r748-goal-progress i{display:block;height:100%;background:#0b8a5b;border-radius:999px}
+.finora-r748-goal-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:8px;color:#6c7c73}
+.finora-r748-goal-stats b{display:block;margin-top:3px;color:#173e31;font-size:10px}
+.finora-r748-goal-card-actions{display:flex;justify-content:flex-end;gap:7px;margin-top:11px}
+.finora-r748-goal-card-actions button{min-height:30px;padding:5px 10px;border:1px solid #cbded4;border-radius:8px;background:#f8fbf9;color:#20523f;font:700 9px Verdana,sans-serif;cursor:pointer}
+.finora-r748-goal-card-actions button.danger{color:#b13737;border-color:#efd1d1;background:#fffafa}
+
+body.finora-v84-dark .finora-r748-goal-form,
+body.finora-v84-dark .finora-r748-goal-card,
+body.finora-v84-dark .finora-r748-empty{background:#10231b!important;border-color:#355247!important;color:#eef6f2!important}
+body.finora-v84-dark .finora-r748-goal-form label,
+body.finora-v84-dark .finora-r748-goal-card h4,
+body.finora-v84-dark .finora-r748-goal-stats b{color:#f3f8f5!important}
+body.finora-v84-dark .finora-r748-goal-card small,
+body.finora-v84-dark .finora-r748-goal-stats{color:#b8cbc1!important}
+body.finora-v84-dark .finora-r748-goal-form input{background:#0b2119!important;color:#fff!important;border-color:#355247!important}
+body.finora-v84-dark .finora-r748-goal-progress{background:#294238!important}
+body.finora-v84-dark .finora-r748-goal-card-actions button{background:#173027!important;color:#eef6f2!important;border-color:#3a5749!important}
+body.finora-v84-dark .finora-r748-goal-card-actions button.danger{color:#ffb8b2!important;background:#321d1d!important;border-color:#71403c!important}
+@media(max-width:900px){.finora-r748-goal-form{grid-template-columns:1fr 1fr}.finora-r748-goal-form>div:first-child{grid-column:1/-1}.finora-r748-goal-grid{grid-template-columns:1fr}}
+@media(max-width:540px){.finora-r748-goal-form{grid-template-columns:1fr}.finora-r748-goal-form>div:first-child{grid-column:auto}.finora-r748-goal-stats{grid-template-columns:1fr 1fr}}
+</style>
+<script id="finora-r747-goals-rebuild-script">
+(function(){
+  'use strict';
+  window.FINORA_RELEASE='1.0.21'; window.FINORA_BUILD='R7.47';
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const money=v=>(Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const num=v=>{if(typeof v==='number')return v;let s=String(v??'').trim().replace(/R\$\s?/g,'').replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,'');return Number(s)||0};
+  const state=()=>{try{return typeof loadFinoraFeatureState==='function'?loadFinoraFeatureState():{goals:[]}}catch(_){return {goals:[]}}};
+  const save=s=>{if(typeof saveFinoraFeatureState==='function')saveFinoraFeatureState(s)};
+  const notify=m=>{try{if(typeof toast==='function')toast(m)}catch(_){}};
+  function pct(g){const t=Number(g.target||0),a=Number(g.saved||0);return t>0?Math.max(0,Math.min(100,a/t*100)):0}
+  function syncGoalSelect(){
+    const sel=document.getElementById('goalUseSelect'); if(!sel)return;
+    const list=(state().goals||[]),old=sel.value;
+    sel.innerHTML='<option value="">Nenhuma meta</option>'+list.map(g=>'<option value="'+esc(g.id)+'">'+esc(g.name)+'</option>').join('');
+    if(list.some(g=>String(g.id)===String(old)))sel.value=old;
+    const field=document.getElementById('goalUseField');if(field){field.style.display='block';field.classList.add('finora-r747-goal-link','finora-v102-visible');field.classList.remove('finora-v102-hidden')}
+  }
+  function mountGoals(){
+    const root=document.getElementById('finoraUtilityBody'); if(!root)return;
+    const s=state(); s.goals=Array.isArray(s.goals)?s.goals:[];
+    root.innerHTML='<div class="finora-r748-goals">'+
+      '<div class="finora-v90-feature-intro"><strong>Transforme objetivos em números.</strong> Crie uma meta com qualquer nome, acompanhe o progresso e vincule entradas ou despesas a ela.</div>'+
+      '<div class="finora-r748-goal-toolbar"><button type="button" class="finora-v90-primary" id="r748GoalAdd">+ Adicionar meta</button></div>'+
+      '<div class="finora-r748-goal-form" id="r748GoalForm">'+
+        '<div><label>Nome da meta</label><input type="text" id="r748GoalName" autocomplete="off" placeholder="Ex.: Comprar minha moto"></div>'+
+        '<div><label>Valor-alvo</label><input type="text" id="r748GoalTarget" inputmode="decimal" placeholder="R$ 0,00"></div>'+
+        '<div><label>Já acumulado</label><input type="text" id="r748GoalSaved" inputmode="decimal" placeholder="R$ 0,00"></div>'+
+        '<div><label>Aporte mensal</label><input type="text" id="r748GoalMonthly" inputmode="decimal" placeholder="R$ 0,00"></div>'+
+        '<div><label>Prazo</label><input type="date" id="r748GoalDeadline"></div>'+
+      '</div>'+
+      '<div class="finora-r748-goal-form-actions" id="r748GoalActions"><button type="button" class="finora-v90-primary" id="r748GoalSave">Salvar meta</button><button type="button" id="r748GoalCancel">Cancelar</button></div>'+
+      '<div class="finora-v90-section-title">Metas cadastradas</div><div class="finora-r748-goal-grid" id="r748GoalGrid"></div>'+
+    '</div>';
+    let editId='';
+    const form=document.getElementById('r748GoalForm'),actions=document.getElementById('r748GoalActions'),name=document.getElementById('r748GoalName');
+    function closeForm(){editId='';form.classList.remove('is-open');actions.classList.remove('is-open');['r748GoalName','r748GoalTarget','r748GoalSaved','r748GoalMonthly','r748GoalDeadline'].forEach(id=>{const x=document.getElementById(id);if(x)x.value=''})}
+    function openForm(g){editId=g?.id||'';form.classList.add('is-open');actions.classList.add('is-open');document.getElementById('r748GoalName').value=g?.name||'';document.getElementById('r748GoalTarget').value=g?.target||'';document.getElementById('r748GoalSaved').value=g?.saved||'';document.getElementById('r748GoalMonthly').value=g?.monthly||'';document.getElementById('r748GoalDeadline').value=g?.deadline||'';requestAnimationFrame(()=>{name.focus();try{name.setSelectionRange(name.value.length,name.value.length)}catch(_){}})}
+    function renderGrid(){
+      const list=(state().goals||[]),grid=document.getElementById('r748GoalGrid');
+      if(!list.length){grid.innerHTML='<div class="finora-r748-empty">Nenhuma meta cadastrada. Clique em <strong>+ Adicionar meta</strong> para criar a primeira.</div>';return}
+      grid.innerHTML=list.map(g=>{const p=pct(g),remain=Math.max(0,Number(g.target||0)-Number(g.saved||0));return '<article class="finora-r748-goal-card"><div class="finora-r748-goal-card-head"><div><h4>'+esc(g.name)+'</h4><small>'+(g.deadline?'Prazo '+new Date(g.deadline+'T12:00:00').toLocaleDateString('pt-BR'):'Sem prazo definido')+'</small></div><strong>'+p.toFixed(0)+'%</strong></div><div class="finora-r748-goal-progress"><i style="width:'+p+'%"></i></div><div class="finora-r748-goal-stats"><span>Meta<b>'+money(g.target)+'</b></span><span>Acumulado<b>'+money(g.saved)+'</b></span><span>Restante<b>'+money(remain)+'</b></span><span>Aporte/mês<b>'+money(g.monthly)+'</b></span></div><div class="finora-r748-goal-card-actions"><button type="button" data-r748-edit="'+esc(g.id)+'">Editar</button><button type="button" class="danger" data-r748-del="'+esc(g.id)+'">Excluir</button></div></article>'}).join('');
+      grid.querySelectorAll('[data-r748-edit]').forEach(b=>b.onclick=()=>{const g=(state().goals||[]).find(x=>String(x.id)===String(b.dataset.r748Edit));if(g)openForm(g)});
+      grid.querySelectorAll('[data-r748-del]').forEach(b=>b.onclick=()=>{if(!confirm('Excluir esta meta?'))return;const s=state();s.goals=(s.goals||[]).filter(x=>String(x.id)!==String(b.dataset.r748Del));s.updatedAt=new Date().toISOString();save(s);renderGrid();syncGoalSelect();notify('Meta excluída.')});
+    }
+    document.getElementById('r748GoalAdd').onclick=()=>openForm(null);
+    document.getElementById('r748GoalCancel').onclick=closeForm;
+    document.getElementById('r748GoalSave').onclick=()=>{const nm=name.value.trim(),target=num(document.getElementById('r748GoalTarget').value);if(!nm)return notify('Digite o nome da meta.');if(target<=0)return notify('Informe um valor-alvo maior que zero.');const s=state();s.goals=Array.isArray(s.goals)?s.goals:[];const payload={name:nm,target,saved:num(document.getElementById('r748GoalSaved').value),monthly:num(document.getElementById('r748GoalMonthly').value),deadline:document.getElementById('r748GoalDeadline').value||'',updatedAt:new Date().toISOString()};if(editId){const g=s.goals.find(x=>String(x.id)===String(editId));if(g)Object.assign(g,payload)}else{s.goals.push({id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),...payload,createdAt:new Date().toISOString()})}s.updatedAt=new Date().toISOString();save(s);closeForm();renderGrid();syncGoalSelect();notify(editId?'Meta atualizada com sucesso.':'Meta cadastrada com sucesso.');};
+    renderGrid();
+  }
+  const oldOpen=window.openFinoraUtilityPanel;
+  if(typeof oldOpen==='function'){
+    window.openFinoraUtilityPanel=function(type){const r=oldOpen.apply(this,arguments);if(type==='goals')setTimeout(mountGoals,0);return r};
+  }
+  document.addEventListener('click',e=>{const t=e.target.closest?.('[onclick*="openFinoraUtilityPanel(\\\'goals\\\')"]');if(t)setTimeout(mountGoals,40)},true);
+  setTimeout(()=>{if(document.getElementById('finoraUtilityTitle')?.textContent.trim()==='Metas' && document.getElementById('finoraUtilityPanel')?.classList.contains('section-modal-active'))mountGoals()},0);
 })();
 </script>
 </body>
