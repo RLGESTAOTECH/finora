@@ -24836,6 +24836,11 @@ function isMoneyInput(el){
     el.parentElement?.querySelector('label')?.textContent || ''
   );
 
+  // Campos textuais com palavras financeiras no ID/rótulo não recebem máscara monetária.
+  // "Nome da meta" precisa aceitar texto livre.
+  if(el.dataset.finoraNoMoney==='1')return false;
+  if(/goalname|metaname|nome.*meta|meta.*nome/.test(id+' '+name) || /nome da meta/.test(label))return false;
+
   if(el.dataset.currency==='brl')return true;
   if(/valor|amount|preco|price|limite|anuidade|saldo|meta|orcamento|economia|renda/.test(id+' '+name))return true;
   if(/valor|limite|anuidade|saldo|meta|orcamento|economia|renda/.test(label))return true;
@@ -26178,7 +26183,7 @@ body.finora-v84-dark .finora-r748-goal-card-actions button.danger{color:#ffb8b2!
       '<div class="finora-v90-feature-intro"><strong>Transforme objetivos em números.</strong> Crie uma meta com qualquer nome, acompanhe o progresso e vincule entradas ou despesas a ela.</div>'+
       '<div class="finora-r748-goal-toolbar"><button type="button" class="finora-v90-primary" id="r748GoalAdd">+ Adicionar meta</button></div>'+
       '<div class="finora-r748-goal-form" id="r748GoalForm">'+
-        '<div><label>Nome da meta</label><input type="text" id="r748GoalName" autocomplete="off" placeholder="Ex.: Comprar minha moto"></div>'+
+        '<div><label>Nome da meta</label><input type="text" id="r748GoalName" data-finora-no-money="1" autocomplete="off" placeholder="Ex.: Comprar minha moto"></div>'+
         '<div><label>Valor-alvo</label><input type="text" id="r748GoalTarget" inputmode="decimal" placeholder="R$ 0,00"></div>'+
         '<div><label>Já acumulado</label><input type="text" id="r748GoalSaved" inputmode="decimal" placeholder="R$ 0,00"></div>'+
         '<div><label>Aporte mensal</label><input type="text" id="r748GoalMonthly" inputmode="decimal" placeholder="R$ 0,00"></div>'+
@@ -26209,6 +26214,62 @@ body.finora-v84-dark .finora-r748-goal-card-actions button.danger{color:#ffb8b2!
   }
   document.addEventListener('click',e=>{const t=e.target.closest?.('[onclick*="openFinoraUtilityPanel(\\\'goals\\\')"]');if(t)setTimeout(mountGoals,40)},true);
   setTimeout(()=>{if(document.getElementById('finoraUtilityTitle')?.textContent.trim()==='Metas' && document.getElementById('finoraUtilityPanel')?.classList.contains('section-modal-active'))mountGoals()},0);
+})();
+</script>
+
+<!-- FINORA R7.47 / 1.0.22 — Nome da Meta texto livre + cabeçalhos verdes no tema claro -->
+<style id="finora-r747-v1022-light-green-headers">
+body:not(.finora-v84-dark):not(.dark) :is(
+  .popup-only-panel.section-modal-active > .panel-head,
+  .popup-only-panel.section-modal-active > .profile-modal-head,
+  .section-modal-active > .finora-modal-head,
+  .section-modal-active > .finora-sheet-head,
+  .section-modal-active > .finora-family-head,
+  .section-modal-active > .finora-cards-head,
+  .profile-modal > .profile-modal-head
+){background:#0b5f42!important;color:#fff!important;border-color:#0b5f42!important}
+body:not(.finora-v84-dark):not(.dark) :is(
+  .popup-only-panel.section-modal-active > .panel-head,
+  .popup-only-panel.section-modal-active > .profile-modal-head,
+  .section-modal-active > .finora-modal-head,
+  .section-modal-active > .finora-sheet-head,
+  .section-modal-active > .finora-family-head,
+  .section-modal-active > .finora-cards-head,
+  .profile-modal > .profile-modal-head
+) :is(h1,h2,h3,p,span,small,strong,label){color:#fff!important}
+body:not(.finora-v84-dark):not(.dark) :is(
+  .popup-only-panel.section-modal-active > .panel-head,
+  .popup-only-panel.section-modal-active > .profile-modal-head,
+  .section-modal-active > .finora-modal-head,
+  .section-modal-active > .finora-sheet-head,
+  .section-modal-active > .finora-family-head,
+  .section-modal-active > .finora-cards-head,
+  .profile-modal > .profile-modal-head
+) :is(.finora-modal-close,.popup-close,.iconbtn,button[aria-label="Fechar"]){color:#fff!important;border-color:rgba(255,255,255,.42)!important;background:rgba(255,255,255,.10)!important}
+body:not(.finora-v84-dark):not(.dark) :is(
+  .popup-only-panel.section-modal-active > .panel-head,
+  .popup-only-panel.section-modal-active > .profile-modal-head,
+  .section-modal-active > .finora-modal-head,
+  .section-modal-active > .finora-sheet-head,
+  .section-modal-active > .finora-family-head,
+  .section-modal-active > .finora-cards-head,
+  .profile-modal > .profile-modal-head
+) :is(.finora-modal-close,.popup-close,.iconbtn,button[aria-label="Fechar"]):hover{background:rgba(255,255,255,.18)!important}
+#r748GoalName{pointer-events:auto!important;user-select:text!important;-webkit-user-select:text!important}
+</style>
+<script id="finora-r747-v1022-runtime">
+(function(){
+  'use strict';
+  window.FINORA_RELEASE='1.0.22'; window.FINORA_BUILD='R7.47';
+  function protectGoalName(){
+    const el=document.getElementById('r748GoalName');
+    if(!el)return;
+    el.type='text'; el.inputMode='text'; el.dataset.finoraNoMoney='1';
+    ['pattern','min','max','step'].forEach(a=>el.removeAttribute(a));
+  }
+  document.addEventListener('focusin',e=>{if(e.target?.id==='r748GoalName')protectGoalName()},true);
+  new MutationObserver(protectGoalName).observe(document.body,{childList:true,subtree:true});
+  protectGoalName();
 })();
 </script>
 </body>
