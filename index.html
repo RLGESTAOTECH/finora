@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.42-login-storage-alert-sort">
+<meta name="finora-release" content="R7.43-alert-sort-stable">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.13"><meta name="finora-build" content="R7.19">
+<meta name="finora-version" content="1.0.14"><meta name="finora-build" content="R7.19">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -9791,21 +9791,36 @@ function renderAlerts(){
     return;
   }
 
+  // R7.43 — a apresentação não pode desfazer a ordenação escolhida.
+  // Antes, o agrupamento por categoria juntava todos os itens da primeira
+  // categoria e fazia, por exemplo, 12 dias aparecer antes de 4 dias.
+  // Agora cada mês mantém a sequência exata de `upcoming`; os cabeçalhos de
+  // categoria são criados em blocos contíguos e podem se repetir quando
+  // necessário para preservar a ordem real.
   const grouped={};
   upcoming.forEach(x=>{
-    const m=x._month,c=x.categoria||'Sem categoria';
-    grouped[m]??={};grouped[m][c]??=[];grouped[m][c].push(x);
+    const m=x._month;
+    grouped[m]??=[];
+    grouped[m].push(x);
   });
 
-  $('alertsBox').innerHTML=Object.keys(grouped).sort().map(m=>{
+  const monthKeys=[...new Set(upcoming.map(x=>x._month))];
+  $('alertsBox').innerHTML=monthKeys.map(m=>{
     const [y,mo]=m.split('-');
-    const monthItems=Object.values(grouped[m]).flat();
+    const monthItems=grouped[m]||[];
     const monthExpense=monthItems.filter(x=>x.tipo==='saida'&&hasKnownValue(x)).reduce((s,x)=>s+Number(x.valor||0),0);
     const monthIncome=monthItems.filter(x=>x.tipo==='entrada'&&hasKnownValue(x)).reduce((s,x)=>s+Number(x.valor||0),0);
 
-    const categories=Object.keys(grouped[m]).map(c=>{
-      const items=grouped[m][c];
-      // A ordem de `upcoming` já respeita o filtro de ordenação R7.38.
+    const runs=[];
+    monthItems.forEach(x=>{
+      const c=x.categoria||'Sem categoria';
+      const last=runs[runs.length-1];
+      if(last&&last.category===c)last.items.push(x);
+      else runs.push({category:c,items:[x]});
+    });
+
+    const categories=runs.map(run=>{
+      const c=run.category,items=run.items;
       const catTotal=items.filter(x=>hasKnownValue(x)).reduce((s,x)=>s+Number(x.valor||0),0);
       return `<div class="alert-category">
         <div class="alert-category-head"><div class="alert-category-name">${esc(c)}</div><div class="alert-category-total">${money(catTotal)}</div></div>
@@ -20118,25 +20133,25 @@ window.FINORA_RELEASE='1.0.13';
 #simpleAlertsPanel .alert-item.finora-r740-standard :is(.meta,strong,.amount,span,div){color:#173d24!important}
 @media(max-width:720px){#simpleAlertsPanel .finora-r740-alert-legend{grid-template-columns:1fr 1fr!important;gap:8px!important}#simpleAlertsPanel .finora-r740-alert-legend span{padding:7px 8px!important;font-size:10px!important}}
 </style>
-<script id="finora-r742-alert-sort-bind">
+<script id="finora-r743-alert-sort-bind">
 (function(){
-  window.FINORA_RELEASE='1.0.13';
-  window.FINORA_BUILD='R7.42';
+  window.FINORA_RELEASE='1.0.14';
+  window.FINORA_BUILD='R7.43';
   function applyAlertOrder(){
     try{
       if(typeof window.renderAlerts==='function') window.renderAlerts();
       else if(typeof renderAlerts==='function') renderAlerts();
-    }catch(e){console.warn('FINORA R7.42 — ordenação de alertas',e);}
+    }catch(e){console.warn('FINORA R7.43 — ordenação de alertas',e);}
   }
   function bind(){
     ['alertYearFilter','alertMonthFilter','alertCategoryFilter','alertTypeFilter','alertSortField','alertSortDirection'].forEach(function(id){
-      var el=document.getElementById(id); if(!el || el.dataset.r742Bound==='1') return;
-      el.dataset.r742Bound='1';
+      var el=document.getElementById(id); if(!el || el.dataset.r743Bound==='1') return;
+      el.dataset.r743Bound='1';
       el.addEventListener('change',applyAlertOrder,{passive:true});
       el.addEventListener('input',applyAlertOrder,{passive:true});
     });
     var q=document.getElementById('alertSearchFilter');
-    if(q && q.dataset.r742Bound!=='1'){q.dataset.r742Bound='1';q.addEventListener('input',applyAlertOrder,{passive:true});q.addEventListener('change',applyAlertOrder,{passive:true});}
+    if(q && q.dataset.r743Bound!=='1'){q.dataset.r743Bound='1';q.addEventListener('input',applyAlertOrder,{passive:true});q.addEventListener('change',applyAlertOrder,{passive:true});}
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
   setTimeout(bind,300); setTimeout(bind,1200); setTimeout(bind,3000);
