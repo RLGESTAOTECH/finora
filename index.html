@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.39-consolidado-login-alertas">
+<meta name="finora-release" content="R7.40-login-logo3d-alertas-visuais">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.10"><meta name="finora-build" content="R7.19">
+<meta name="finora-version" content="1.0.11"><meta name="finora-build" content="R7.19">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -7669,6 +7669,185 @@ body.dark #finoraSyncIndicatorR726{
 }
 </style>
 
+
+<style id="finora-r740-approved-login-alerts">
+/* FINORA R7.40 — login e alertas aprovados em 03/09/2026 */
+
+/* LOGIN: mantém o formulário funcional e transforma a área institucional em uma marca única, sem textos extras. */
+#authScreen.auth-screen{
+  background:
+    radial-gradient(circle at 77% 18%,rgba(47,128,91,.12),transparent 28rem),
+    linear-gradient(135deg,#063a2b 0 49%,#eef4ef 49%)!important;
+  padding:20px!important;
+}
+#authScreen .auth-card{
+  width:min(1180px,calc(100vw - 40px))!important;
+  min-height:610px!important;
+  grid-template-columns:1.03fr .97fr!important;
+  border-radius:30px!important;
+  overflow:hidden!important;
+  border:1px solid rgba(226,196,114,.74)!important;
+  box-shadow:0 34px 95px rgba(3,31,23,.26)!important;
+  background:#fff!important;
+}
+#authScreen .auth-brand{
+  position:relative!important;
+  padding:54px 58px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  background:
+    radial-gradient(circle at 22% 14%,rgba(224,198,96,.18),transparent 22rem),
+    radial-gradient(circle at 44% 48%,rgba(42,183,91,.13),transparent 18rem),
+    linear-gradient(155deg,#073e2f 0%,#043327 56%,#02291f 100%)!important;
+  overflow:hidden!important;
+}
+#authScreen .auth-brand:before{
+  content:'';position:absolute;inset:0;pointer-events:none;opacity:.36;
+  background:repeating-linear-gradient(115deg,rgba(255,255,255,.022) 0 1px,transparent 1px 5px);
+}
+#authScreen .auth-brand:after{
+  content:'';position:absolute;width:360px;height:150px;left:11%;top:23%;
+  background:radial-gradient(ellipse,rgba(237,206,99,.19),transparent 68%);
+  filter:blur(10px);transform:rotate(-12deg);pointer-events:none;
+}
+#authScreen .finora-login-brand{position:relative;z-index:2;width:min(520px,100%);transform:translateY(-2px)}
+#authScreen .finora-login-logo{display:flex;align-items:flex-end;justify-content:center;gap:28px;perspective:900px}
+#authScreen .finora-growth-mark{
+  width:118px;height:108px;display:flex;align-items:flex-end;gap:7px;
+  filter:drop-shadow(0 15px 13px rgba(0,0,0,.42));transform:rotateY(-3deg);
+}
+#authScreen .finora-growth-mark i{
+  display:block;width:23px;border-radius:7px 7px 3px 3px;
+  background:linear-gradient(90deg,#08733d 0%,#28c967 35%,#65ec8c 56%,#0d964d 100%);
+  border-top:1px solid rgba(255,244,183,.92);
+  box-shadow:
+    inset 3px 0 4px rgba(255,255,255,.38),
+    inset -5px 0 7px rgba(0,48,27,.48),
+    7px 9px 0 rgba(0,0,0,.12),
+    0 10px 15px rgba(0,0,0,.26);
+  transform:skewY(-8deg) translateZ(8px);
+}
+#authScreen .finora-growth-mark i:nth-child(1){height:43px}
+#authScreen .finora-growth-mark i:nth-child(2){height:64px}
+#authScreen .finora-growth-mark i:nth-child(3){height:86px}
+#authScreen .finora-growth-mark i:nth-child(4){height:108px}
+#authScreen .finora-wordmark{
+  color:#f4ead0!important;
+  font-family:Georgia,"Times New Roman",serif!important;
+  font-size:68px!important;font-weight:700!important;letter-spacing:7px!important;line-height:.9!important;
+  -webkit-text-stroke:.5px rgba(102,68,11,.55);
+  text-shadow:
+    0 1px 0 #fff7dc,
+    0 2px 0 #d4b466,
+    0 4px 0 #997530,
+    0 7px 11px rgba(0,0,0,.55),
+    12px 15px 20px rgba(0,0,0,.32);
+}
+#authScreen .finora-gold-rule{
+  height:3px!important;margin:22px 0 12px 147px!important;max-width:410px!important;
+  background:linear-gradient(90deg,#a87922,#f4d66c 45%,#c4912e 84%,rgba(212,169,65,0))!important;
+  border-radius:999px!important;box-shadow:0 2px 7px rgba(226,186,64,.22)!important;
+}
+#authScreen .finora-login-tagline{
+  margin:0 0 0 147px!important;color:#d6b24f!important;
+  font:17px/1.35 Georgia,"Times New Roman",serif!important;
+  text-shadow:0 2px 8px rgba(0,0,0,.28);
+}
+#authScreen .finora-login-promise{display:none!important}
+#authScreen .auth-panel{padding:54px 62px!important;background:linear-gradient(180deg,#fff,#fbfcfb)!important;align-items:center!important}
+#authScreen .auth-inner{width:100%!important;max-width:485px!important;margin:auto!important}
+#authScreen .auth-tabs{padding:5px!important;border-radius:15px!important;background:#edf3ef!important}
+#authScreen .auth-tabs button{min-height:44px!important;border-radius:11px!important;color:#153e30!important}
+#authScreen .auth-tabs button.active{background:linear-gradient(180deg,#087247,#075b3b)!important;color:white!important;box-shadow:0 7px 18px rgba(7,72,47,.2)!important}
+#authScreen #loginPane h2,#authScreen #registerPane h2{color:#123f2e!important;font-size:27px!important;margin-bottom:8px!important}
+#authScreen .auth-field label{color:#285644!important;font-weight:700!important}
+#authScreen .auth-field input,#authScreen .auth-field select{min-height:50px!important;border-radius:14px!important;background:#f7faf8!important;border-color:#d6e2db!important}
+#authScreen .auth-submit{min-height:50px!important;border-radius:13px!important;background:linear-gradient(180deg,#08754a,#075c3c)!important;box-shadow:0 8px 18px rgba(5,72,46,.16)!important}
+
+/* ALERTAS: legenda visual elegante e regra de cores aprovada. */
+#simpleAlertsPanel .finora-r740-alert-legend{
+  display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important;
+  padding:14px 18px!important;border-bottom:1px solid #e0e7e3!important;background:#fff!important;
+}
+#simpleAlertsPanel .finora-r740-alert-legend span{
+  min-height:40px;display:flex;align-items:center;justify-content:center;gap:9px;
+  border-radius:9px;padding:8px 12px;font:11px Verdana,sans-serif;border:1px solid #dde5e0;
+  box-shadow:0 3px 9px rgba(20,55,40,.035);
+}
+#simpleAlertsPanel .finora-r740-alert-legend span i{width:13px;height:13px;border-radius:4px;display:block;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+#simpleAlertsPanel .finora-r740-alert-legend .overdue{background:#fde7e7;border-color:#ef8c91;color:#8d171e}
+#simpleAlertsPanel .finora-r740-alert-legend .overdue i{background:#d71920}
+#simpleAlertsPanel .finora-r740-alert-legend .today{background:#fff1a9;border-color:#e4c643;color:#4c3b08}
+#simpleAlertsPanel .finora-r740-alert-legend .today i{background:#f5c518}
+#simpleAlertsPanel .finora-r740-alert-legend .soon{background:#ffe0c4;border-color:#f39a4c;color:#5d310a}
+#simpleAlertsPanel .finora-r740-alert-legend .soon i{background:#f58a2a}
+#simpleAlertsPanel .finora-r740-alert-legend .standard{background:#f7faf8;border-color:#dce5e0;color:#315447}
+#simpleAlertsPanel .finora-r740-alert-legend .standard i{background:#eef3f0;border:1px solid #bfcfc6}
+
+#simpleAlertsPanel .alert-item{border-radius:10px!important;transition:transform .12s ease,box-shadow .12s ease!important}
+#simpleAlertsPanel .alert-item:hover{transform:translateY(-1px);box-shadow:0 6px 13px rgba(14,48,34,.08)}
+#simpleAlertsPanel .alert-item.finora-r740-overdue{
+  background:linear-gradient(100deg,#d9141d,#ef3037)!important;border-color:#c70d15!important;color:#fff!important;
+  box-shadow:0 5px 12px rgba(205,19,27,.14)!important;
+}
+#simpleAlertsPanel .alert-item.finora-r740-overdue :is(.meta,strong,.amount,span,div){color:#fff!important}
+#simpleAlertsPanel .alert-item.finora-r740-overdue .finora-v109-alert-paid{background:#fff!important;color:#9f171c!important;border-color:#fff!important}
+#simpleAlertsPanel .alert-item.finora-r740-today{
+  background:linear-gradient(100deg,#ffe274,#fff0aa)!important;border-color:#e5bd22!important;color:#161616!important;
+}
+#simpleAlertsPanel .alert-item.finora-r740-today :is(.meta,strong,.amount,span,div){color:#161616!important}
+#simpleAlertsPanel .alert-item.finora-r740-soon{
+  background:linear-gradient(100deg,#ffd1aa,#ffe3cc)!important;border-color:#f08b36!important;color:#1d1d1d!important;
+}
+#simpleAlertsPanel .alert-item.finora-r740-soon :is(.meta,strong,.amount,span,div){color:#1d1d1d!important}
+#simpleAlertsPanel .alert-item.finora-r740-standard{
+  background:#fbf4e8!important;border-color:#ead8b8!important;color:inherit!important;
+}
+
+/* Mantém os totais e filtros limpos, conforme o layout aprovado. */
+#simpleAlertsPanel .panel-head{padding:18px 20px!important}
+#simpleAlertsPanel .alert-summary-row{gap:14px!important;padding:14px 18px!important}
+#simpleAlertsPanel .alert-summary-card{border-radius:11px!important;min-height:64px!important}
+#simpleAlertsPanel .finora-r731-alert-toolbar{grid-template-columns:140px 180px 1fr 190px minmax(220px,1fr)!important;gap:10px!important}
+#simpleAlertsPanel #alertSortField{grid-column:1/2}
+#simpleAlertsPanel #alertSortDirection{grid-column:2/3}
+
+@media(max-width:1050px){
+  #simpleAlertsPanel .finora-r731-alert-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #simpleAlertsPanel .finora-r731-alert-toolbar #alertSearchFilter{grid-column:1/-1}
+  #simpleAlertsPanel .finora-r740-alert-legend{grid-template-columns:1fr 1fr!important}
+}
+@media(max-width:900px){
+  #authScreen .auth-card{grid-template-columns:1fr!important;min-height:auto!important}
+  #authScreen .auth-brand{display:flex!important;min-height:245px!important;padding:34px 30px!important}
+  #authScreen .finora-login-brand{width:min(470px,92%)}
+  #authScreen .finora-growth-mark{width:82px;height:76px;gap:5px}
+  #authScreen .finora-growth-mark i{width:16px}
+  #authScreen .finora-growth-mark i:nth-child(1){height:30px}#authScreen .finora-growth-mark i:nth-child(2){height:45px}#authScreen .finora-growth-mark i:nth-child(3){height:60px}#authScreen .finora-growth-mark i:nth-child(4){height:76px}
+  #authScreen .finora-wordmark{font-size:49px!important;letter-spacing:5px!important}
+  #authScreen .finora-gold-rule{margin-left:105px!important}
+  #authScreen .finora-login-tagline{margin-left:105px!important;font-size:15px!important}
+  #authScreen .auth-panel{padding:34px 30px!important}
+}
+@media(max-width:560px){
+  #authScreen.auth-screen{padding:0!important;align-items:flex-start!important;overflow:auto!important;background:#eef4ef!important}
+  #authScreen .auth-card{width:100%!important;border-radius:0 0 24px 24px!important;border:0!important}
+  #authScreen .auth-brand{min-height:185px!important;padding:27px 20px!important}
+  #authScreen .finora-login-logo{gap:13px!important}
+  #authScreen .finora-growth-mark{width:57px;height:53px;gap:3px}
+  #authScreen .finora-growth-mark i{width:11px;border-radius:4px 4px 2px 2px}
+  #authScreen .finora-growth-mark i:nth-child(1){height:21px}#authScreen .finora-growth-mark i:nth-child(2){height:32px}#authScreen .finora-growth-mark i:nth-child(3){height:43px}#authScreen .finora-growth-mark i:nth-child(4){height:53px}
+  #authScreen .finora-wordmark{font-size:34px!important;letter-spacing:3px!important}
+  #authScreen .finora-gold-rule{margin:14px 0 8px 70px!important;height:2px!important}
+  #authScreen .finora-login-tagline{margin-left:70px!important;font-size:12px!important}
+  #authScreen .auth-panel{padding:28px 20px 34px!important}
+  #simpleAlertsPanel .finora-r731-alert-toolbar{grid-template-columns:1fr!important}
+  #simpleAlertsPanel .finora-r731-alert-toolbar #alertSearchFilter{grid-column:auto!important}
+  #simpleAlertsPanel #alertSortField,#simpleAlertsPanel #alertSortDirection{grid-column:auto!important}
+  #simpleAlertsPanel .finora-r740-alert-legend{grid-template-columns:1fr!important;padding:12px!important}
+}
+</style>
 </head>
 <body>
 
@@ -7739,14 +7918,6 @@ body.dark #finoraSyncIndicatorR726{
       </div>
       <div class="finora-gold-rule"></div>
       <p class="finora-login-tagline">Suas finanças, com clareza e controle.</p>
-    </div>
-    <div class="finora-login-promise">
-      <h2>Controle suas finanças.<br>Mantenha seus dados <span>em controle.</span></h2>
-      <div class="finora-mini-rule"></div>
-      <div class="finora-benefit"><div class="finora-benefit-icon">▣</div><div><strong>Gestão financeira completa</strong><p>Organize receitas, despesas, cartões e contas em um só lugar.</p></div></div>
-      <div class="finora-benefit"><div class="finora-benefit-icon">▥</div><div><strong>Relatórios e análises inteligentes</strong><p>Tenha clareza sobre sua vida financeira com gráficos e indicadores.</p></div></div>
-      <div class="finora-benefit"><div class="finora-benefit-icon">♙</div><div><strong>Segurança e privacidade</strong><p>Seu ambiente financeiro permanece organizado e protegido.</p></div></div>
-      <div class="finora-benefit"><div class="finora-benefit-icon">♧</div><div><strong>Compartilhe com sua família</strong><p>Convide integrantes e acompanhe o controle financeiro em conjunto.</p></div></div>
     </div>
   </div>
   <div class="auth-panel"><div class="auth-inner">
@@ -8259,11 +8430,11 @@ body.dark #finoraSyncIndicatorR726{
       <option value="desc">Decrescente</option>
     </select>
   </div>
-  <div class="finora-r738-alert-legend" aria-label="Legenda de vencimentos">
-    <span><i class="standard"></i>Mais de 5 dias</span>
-    <span><i class="warning"></i>2 a 5 dias</span>
-    <span><i class="urgent"></i>1 dia para vencer</span>
-    <span><i class="overdue"></i>Vence hoje ou atrasado</span>
+  <div class="finora-r740-alert-legend" aria-label="Legenda visual dos alertas">
+    <span class="overdue"><i></i><b>Atrasado</b></span>
+    <span class="today"><i></i><b>Vence hoje</b></span>
+    <span class="soon"><i></i><b>Vence em 1 a 5 dias</b></span>
+    <span class="standard"><i></i><b>Acima de 5 dias</b></span>
   </div>
   <div class="alert-summary-row">
     <div class="alert-summary-card"><span>Gastos alertados</span><strong id="alertExpenseTotal">R$ 0,00</strong></div>
@@ -9590,13 +9761,13 @@ function renderAlerts(){
                 ? `<button type="button" class="finora-v109-alert-paid" onclick="finoraV109MarkInvoicePaid('${esc(String(resolvedCard.id))}','${esc(String(x._date||''))}')">Registrar paga</button>`
                 : ''))
             : '';
-          const deadlineClass=x._days<=0
-            ? 'finora-r738-overdue'
-            : x._days===1
-              ? 'finora-r738-urgent'
+          const deadlineClass=x._days<0
+            ? 'finora-r740-overdue'
+            : x._days===0
+              ? 'finora-r740-today'
               : x._days<=5
-                ? 'finora-r738-warning'
-                : 'finora-r738-standard';
+                ? 'finora-r740-soon'
+                : 'finora-r740-standard';
           return `<div class="alert-item ${isIncome?'income':'expense'} ${deadlineClass}">
             <div><div class="meta">${isIncome?'Recebimento':'Gasto'} · ${when} · ${dateBR(x._date)}</div><strong>${esc(x.descricao)}</strong> · ${esc(x.pessoa)}</div>
             <div class="finora-v109-alert-actions"><div class="amount">${amount}</div>${payAction}</div>
@@ -15525,7 +15696,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
     const footer=document.createElement('footer');
     footer.className='finora-v84-footer';
-    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.10</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
+    footer.innerHTML='<span><strong>FINORA</strong> · Versão 1.0.11</span><span>Desenvolvido por <strong>RL Soluções em Gestão e Tecnologia</strong></span>';
     home.appendChild(footer);
 
     // quick launch controls
@@ -18461,7 +18632,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
 
 <script id="finora-v107-release-marker">
-window.FINORA_RELEASE='1.0.10';
+window.FINORA_RELEASE='1.0.11';
 </script>
 
 
@@ -19863,7 +20034,7 @@ window.FINORA_RELEASE='1.0.10';
         ${specific?`<h2>${esc110(title)}</h2><div class="specific">${specific}</div>`:''}
         <h2>Detalhamento dos registros (${rows.length})</h2>
         ${printRowsTable(rows)}
-        <footer>FINORA · Versão 1.0.10 · Relatório gerado em ${new Date().toLocaleString('pt-BR')}</footer>
+        <footer>FINORA · Versão 1.0.11 · Relatório gerado em ${new Date().toLocaleString('pt-BR')}</footer>
         <script>window.addEventListener('load',()=>{setTimeout(()=>window.print(),120)});<\/script>
         </body></html>`);
       w.document.close();
@@ -20795,7 +20966,7 @@ window.FINORA_RELEASE='1.0.10';
           <div class="kpi"><span>Saldo</span><strong>${moneyR2(credits-debits)}</strong></div>
         </div>
         ${content}
-        <footer>FINORA · Versão 1.0.10 · ${new Date().toLocaleString('pt-BR')}</footer>
+        <footer>FINORA · Versão 1.0.11 · ${new Date().toLocaleString('pt-BR')}</footer>
         <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),120));<\/script>
         </body></html>`);
       w.document.close();
@@ -21440,7 +21611,7 @@ window.FINORA_RELEASE='1.0.10';
         <div class="meta">${esc4(workspace)}<br>${esc4(period)}</div></header>
         <div class="summary">Total de despesas no período: <strong>${money4(total)}</strong></div>
         ${personPrintHTML(rows)}
-        <footer>FINORA · Versão 1.0.10 · ${new Date().toLocaleString('pt-BR')}</footer>
+        <footer>FINORA · Versão 1.0.11 · ${new Date().toLocaleString('pt-BR')}</footer>
         <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),120));<\/script>
         </body></html>`);
       w.document.close();
@@ -21833,7 +22004,7 @@ window.FINORA_RELEASE='1.0.10';
       <div class="meta">${esc5(workspace)}<br>${esc5(period)}</div></header>
       <div class="summary">Total associado a cartões: <strong>${money5(total)}</strong></div>
       ${bars}
-      <footer>FINORA · Versão 1.0.10 · ${new Date().toLocaleString('pt-BR')}</footer>
+      <footer>FINORA · Versão 1.0.11 · ${new Date().toLocaleString('pt-BR')}</footer>
       <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),120));<\/script>
       </body></html>`);
     w.document.close();
@@ -25144,7 +25315,7 @@ window.finoraR737Diagnostics=function(){
 <script id="finora-r739-diagnostics">
 window.finoraR739Diagnostics=function(){
   return {
-    release:'R7.39-consolidado-login-alertas',
+    release:'R7.40-login-logo3d-alertas-visuais',
     loginInstitucional:!!document.querySelector('.finora-growth-mark'),
     alertLegend:!!document.querySelector('.finora-r738-alert-legend'),
     alertSortField:document.getElementById('alertSortField')?.value||null,
