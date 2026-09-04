@@ -23883,8 +23883,30 @@ async function commit(){
       status:'pago',updatedAt:now
     });
 
-    // Persistência durável ANTES da UI e da nuvem.
-    localStorage.setItem(typeof KEY!=='undefined'?KEY:'controleFinanceiroFamiliar_v1',JSON.stringify(data));
+    // R7.49: pagamento não pode falhar só porque o cache local atingiu a cota.
+    // A nuvem continua sendo a fonte autoritativa; o cache é best-effort e compacto.
+    let finoraLocalPaymentCacheOkR749=true;
+    try{
+      if(typeof finoraSafeStoreTransactionsR741==='function'){
+        finoraLocalPaymentCacheOkR749=finoraSafeStoreTransactionsR741(data)!==false;
+      }else{
+        try{
+          localStorage.setItem(typeof KEY!=='undefined'?KEY:'controleFinanceiroFamiliar_v1',JSON.stringify(data));
+        }catch(storageErr){
+          if(storageErr?.name==='QuotaExceededError'||/quota/i.test(String(storageErr?.message||''))){
+            finoraLocalPaymentCacheOkR749=false;
+            console.warn('FINORA R7.49: cache local cheio durante pagamento; seguindo com persistência em nuvem.',storageErr);
+          }else{
+            throw storageErr;
+          }
+        }
+      }
+    }catch(storageErr){
+      finoraLocalPaymentCacheOkR749=false;
+      console.warn('FINORA R7.49: cache local indisponível durante pagamento; seguindo com persistência em nuvem.',storageErr);
+    }
+
+    // Marca explicitamente a transação como pendente de sincronização, independentemente do cache local.
     try{if(typeof finoraRememberPendingTxV79==='function')finoraRememberPendingTxV79([row],currentWorkspaceId)}catch(e){}
 
     try{
@@ -26498,13 +26520,13 @@ body:not(.finora-v84-dark):not(.dark) #simpleImportPanel>.finora-modal-head{padd
   window.FINORA_RELEASE='1.0.24'; window.FINORA_BUILD='R7.47';
 })();</script>
 
-<!-- FINORA R7.48 / 1.0.25 — otimização de egress / sync por revisão -->
-<script id="finora-r748-v1025-egress-optimization">
+<!-- FINORA R7.49 / 1.0.26 — hotfix pagamento + cache local quota-safe -->
+<script id="finora-r749-v1026-payment-quota-fix">
 (function(){
   'use strict';
-  window.FINORA_RELEASE='1.0.25';
-  window.FINORA_BUILD='R7.48';
-  console.info('[FINORA] R7.48 / 1.0.25 — sincronização otimizada ativa. Diagnóstico: finoraSyncDiagnostics()');
+  window.FINORA_RELEASE='1.0.26';
+  window.FINORA_BUILD='R7.49';
+  console.info('[FINORA] R7.49 / 1.0.26 — sync otimizado + pagamento quota-safe ativo. Diagnóstico: finoraSyncDiagnostics()');
 })();
 </script>
 </body>
