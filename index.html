@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.21"><meta name="finora-build" content="R7.19">
+\g<1>1.0.25\2>\g<1>R7.48\2>
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -12404,8 +12404,8 @@ updateTypeLabels();
 
 let finoraCloudPollTimer=null;
 
-const FINORA_R726_SYNC_COOLDOWN_MS=120000;
-const FINORA_R726_POLL_MS=300000;
+const FINORA_R726_SYNC_COOLDOWN_MS=45000;
+const FINORA_R726_POLL_MS=60000;
 let finoraR726LastAutoSyncAt=0;
 
 function finoraSyncIndicatorR726(state='idle',message=''){
@@ -12465,6 +12465,103 @@ let finoraCloudBusy=false;
 let finoraCloudDirty=false;
 let finoraCloudPushPending=false;
 let finoraCloudMutationRevision=0;
+
+/* FINORA R7.48 / 1.0.25 — proteção de egress e observabilidade local.
+   Não envia telemetria para servidor: métricas ficam somente no navegador. */
+const FINORA_R748_METRICS_KEY='finora_sync_metrics_r748_v1';
+const FINORA_R748_REMOTE_REV_KEY='finora_remote_revision_r748_v1';
+const FINORA_R748_REMOTE_MISSING='__missing__';
+
+function finoraR748LoadMetrics(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(FINORA_R748_METRICS_KEY)||'{}');
+    return {
+      startedAt:raw.startedAt||new Date().toISOString(),
+      metaChecks:Number(raw.metaChecks||0),
+      fullPulls:Number(raw.fullPulls||0),
+      mergeReads:Number(raw.mergeReads||0),
+      pushes:Number(raw.pushes||0),
+      pushSkippedClean:Number(raw.pushSkippedClean||0),
+      pullSkippedSameRevision:Number(raw.pullSkippedSameRevision||0),
+      bytesStateSent:Number(raw.bytesStateSent||0),
+      bytesStateReceived:Number(raw.bytesStateReceived||0),
+      errors:Number(raw.errors||0),
+      lastActivityAt:raw.lastActivityAt||null
+    };
+  }catch(e){
+    return {startedAt:new Date().toISOString(),metaChecks:0,fullPulls:0,mergeReads:0,pushes:0,pushSkippedClean:0,pullSkippedSameRevision:0,bytesStateSent:0,bytesStateReceived:0,errors:0,lastActivityAt:null};
+  }
+}
+let finoraR748Metrics=finoraR748LoadMetrics();
+
+function finoraR748Metric(field,amount=1){
+  if(!(field in finoraR748Metrics))finoraR748Metrics[field]=0;
+  finoraR748Metrics[field]=Number(finoraR748Metrics[field]||0)+Number(amount||0);
+  finoraR748Metrics.lastActivityAt=new Date().toISOString();
+  try{localStorage.setItem(FINORA_R748_METRICS_KEY,JSON.stringify(finoraR748Metrics))}catch(e){}
+}
+
+function finoraR748Bytes(value){
+  try{return new TextEncoder().encode(JSON.stringify(value??null)).length}catch(e){return 0}
+}
+
+function finoraR748RevisionMap(){
+  try{return JSON.parse(sessionStorage.getItem(FINORA_R748_REMOTE_REV_KEY)||'{}')||{}}catch(e){return {}}
+}
+function finoraR748GetRemoteRevision(){
+  const map=finoraR748RevisionMap();
+  return currentWorkspaceId ? (map[String(currentWorkspaceId)]||'') : '';
+}
+function finoraR748SetRemoteRevision(value){
+  if(!currentWorkspaceId)return;
+  const map=finoraR748RevisionMap();
+  map[String(currentWorkspaceId)]=value||FINORA_R748_REMOTE_MISSING;
+  try{sessionStorage.setItem(FINORA_R748_REMOTE_REV_KEY,JSON.stringify(map))}catch(e){}
+}
+
+async function finoraR748RemoteChanged(){
+  if(!currentWorkspaceId || !cloudConfigured())return true;
+  const client=getCloudClient(); if(!client)return true;
+  const known=finoraR748GetRemoteRevision();
+  try{
+    finoraR748Metric('metaChecks');
+    const {data:meta,error}=await client
+      .from('finora_workspace_state')
+      .select('updated_at')
+      .eq('workspace_id',currentWorkspaceId)
+      .maybeSingle();
+    if(error)throw error;
+    const remote=meta?.updated_at||FINORA_R748_REMOTE_MISSING;
+    if(known && known===remote){
+      finoraR748Metric('pullSkippedSameRevision');
+      return false;
+    }
+    return true;
+  }catch(e){
+    finoraR748Metric('errors');
+    console.warn('FINORA R7.48 revisão remota indisponível',e);
+    return true; // falha segura: deixa o fluxo normal decidir.
+  }
+}
+
+window.finoraSyncDiagnostics=function(){
+  const m={...finoraR748Metrics};
+  const mb=n=>Math.round((Number(n||0)/1048576)*1000)/1000;
+  return {
+    release:'R7.48 / 1.0.25',
+    workspaceId:currentWorkspaceId||null,
+    hydrated:typeof finoraWorkspaceHydrated==='function'?finoraWorkspaceHydrated():null,
+    remoteRevision:finoraR748GetRemoteRevision()||null,
+    metrics:m,
+    estimatedMB:{sent:mb(m.bytesStateSent),received:mb(m.bytesStateReceived)},
+    note:'Estimativa do JSON de estado movimentado pelo FINORA. Não inclui overhead HTTP/TLS/Auth.'
+  };
+};
+window.finoraResetSyncDiagnostics=function(){
+  try{localStorage.removeItem(FINORA_R748_METRICS_KEY)}catch(e){}
+  finoraR748Metrics=finoraR748LoadMetrics();
+  return window.finoraSyncDiagnostics();
+};
 
 function finoraMarkCloudDirty(){
   finoraCloudDirty=true;
@@ -13487,6 +13584,17 @@ async function finoraR727CloudSession(){
 async function pushCloudState(showToast=false){
   if(!cloudConfigured())return false;
 
+  // R7.48: timers e wrappers históricos podem pedir o mesmo push mais de uma vez.
+  // Se não há mutação/fila pendente, não toca no Supabase.
+  const pendingNowR748=typeof finoraPendingTxForWorkspaceV79==='function'
+    ? finoraPendingTxForWorkspaceV79(currentWorkspaceId):[];
+  const hardNowR748=typeof finoraHardDeleteIdsR736==='function'
+    ? [...finoraHardDeleteIdsR736(currentWorkspaceId)]:[];
+  if(!showToast && finoraWorkspaceHydrated() && !finoraCloudDirty && !finoraCloudPushPending && pendingNowR748.length===0 && hardNowR748.length===0){
+    finoraR748Metric('pushSkippedClean');
+    return false;
+  }
+
   // R7.27: após 401/403, não martela o Supabase.
   if(Date.now()<finoraR727CloudAuthBackoffUntil){
     finoraCloudDirty=true;
@@ -13524,14 +13632,32 @@ async function pushCloudState(showToast=false){
   try{
     let payload=cloudStatePayload(); payload.transactions=finoraOverlayPendingTxV79(payload.transactions||[],currentWorkspaceId);
 
-    const {data:remoteRow,error:readError}=await client
+    // R7.48: primeiro consulta somente updated_at (resposta mínima).
+    // Só baixa o JSON completo se outro cliente realmente alterou a nuvem.
+    finoraR748Metric('metaChecks');
+    const {data:remoteMeta,error:metaError}=await client
       .from('finora_workspace_state')
-      .select('state')
+      .select('updated_at')
       .eq('workspace_id',currentWorkspaceId)
       .maybeSingle();
-    if(readError)throw readError;
+    if(metaError)throw metaError;
 
-    const remoteState=remoteRow?.state||{};
+    const knownRevisionR748=finoraR748GetRemoteRevision();
+    const remoteRevisionR748=remoteMeta?.updated_at||FINORA_R748_REMOTE_MISSING;
+    let remoteState={};
+
+    if(remoteMeta && (!knownRevisionR748 || knownRevisionR748!==remoteRevisionR748)){
+      const {data:remoteRow,error:readError}=await client
+        .from('finora_workspace_state')
+        .select('state,updated_at')
+        .eq('workspace_id',currentWorkspaceId)
+        .maybeSingle();
+      if(readError)throw readError;
+      remoteState=remoteRow?.state||{};
+      finoraR748Metric('mergeReads');
+      finoraR748Metric('bytesStateReceived',finoraR748Bytes(remoteState));
+      finoraR748SetRemoteRevision(remoteRow?.updated_at||remoteRevisionR748);
+    }
 
     // FINORA v90: configurações de categorias, formas, metas e planejamento
     // viajam no mesmo JSON do ambiente, sem nova tabela/SQL.
@@ -13573,8 +13699,11 @@ async function pushCloudState(showToast=false){
       state:payload,
       updated_at:new Date().toISOString()
     };
+    finoraR748Metric('pushes');
+    finoraR748Metric('bytesStateSent',finoraR748Bytes(payload));
     const {error}=await client.from('finora_workspace_state').upsert(row,{onConflict:'workspace_id'});
     if(error)throw error;
+    finoraR748SetRemoteRevision(row.updated_at);
 
     // R7.26: upsert bem-sucedido já confirma persistência.
     // Evita baixar o JSON inteiro uma segunda vez só para confirmar o que acabou de gravar.
@@ -13635,6 +13764,7 @@ async function pushCloudState(showToast=false){
   }catch(e){
     const status=finoraR727ErrorStatus(e);
     console.error('FINORA cloud push',e);
+    try{finoraR748Metric('errors')}catch(_){}
 
     finoraCloudDirty=true;
     finoraCloudPushPending=true;
@@ -13692,7 +13822,11 @@ async function pullCloudState(showToast=false){
       .eq('workspace_id',currentWorkspaceId)
       .maybeSingle();
     if(error)throw error;
+    finoraR748Metric('fullPulls');
+    if(row?.state)finoraR748Metric('bytesStateReceived',finoraR748Bytes(row.state));
+    if(row?.updated_at)finoraR748SetRemoteRevision(row.updated_at);
     if(!row?.state){
+      finoraR748SetRemoteRevision(FINORA_R748_REMOTE_MISSING);
       // Workspace válido, porém ainda sem estado financeiro.
       // Preserva o conteúdo local e registra uma linha de base.
       // O primeiro salvamento posterior poderá criar o state no Supabase.
@@ -13841,6 +13975,7 @@ async function pullCloudState(showToast=false){
     return true;
   }catch(e){
     console.error('FINORA cloud pull',e);
+    try{finoraR748Metric('errors')}catch(_){}
     finoraSyncIndicatorR726('error','Nuvem lenta — trabalhando com dados locais');
     updateCloudUI('error');
     if(showToast)toast('Falha ao baixar dados da nuvem.');
@@ -13873,8 +14008,21 @@ function scheduleFinoraCloudPush(delay=700){
 
 async function finoraAutoPull(){
   if(!currentWorkspaceId || !cloudConfigured() || finoraAutoSyncApplying)return false;
+
+  // Primeira hidratação continua sendo integral para preservar a fonte de verdade.
+  if(!finoraWorkspaceHydrated())return pullCloudState(false);
+
+  // Nunca puxa por cima de alterações locais pendentes.
+  if(finoraCloudDirty || finoraCloudPushPending){
+    scheduleCloudPush();
+    return false;
+  }
+
   finoraAutoSyncApplying=true;
   try{
+    const changed=await finoraR748RemoteChanged();
+    if(!changed)return false;
+
     const ok=await pullCloudState(false);
     if(ok){
       reconcileAcceptedFamilyInvites();
@@ -13887,30 +14035,18 @@ async function finoraAutoPull(){
 }
 
 function startFinoraRealtimeSync(){
+  // R7.48: deliberadamente não assina postgres_changes da linha de state.
+  // O payload de Realtime pode carregar o JSONB inteiro em cada UPDATE e,
+  // em seguida, o código antigo ainda fazia outro GET completo.
+  // Mantemos sincronização entre dispositivos com checagem leve de updated_at
+  // por foco/online e polling de 60 s; o state só é baixado quando mudou.
   try{
     const realtimeClient=getCloudClient();
-
     if(finoraRealtimeChannel && realtimeClient?.removeChannel){
       realtimeClient.removeChannel(finoraRealtimeChannel);
-      finoraRealtimeChannel=null;
     }
-
-    if(!cloudConfigured() || !realtimeClient || !currentWorkspaceId)return;
-
-    finoraRealtimeChannel=realtimeClient
-      .channel('finora-workspace-'+currentWorkspaceId)
-      .on('postgres_changes',{
-        event:'*',
-        schema:'public',
-        table:'finora_workspace_state',
-        filter:'workspace_id=eq.'+currentWorkspaceId
-      },()=>{
-        if(finoraR726CanAutoSync(false))finoraAutoPull();
-      })
-      .subscribe();
-  }catch(e){
-    console.warn('FINORA R7.27 realtime indisponível; usando atualização por foco.',e);
-  }
+    finoraRealtimeChannel=null;
+  }catch(e){}
 }
 
 window.addEventListener('focus',()=>{
@@ -24142,36 +24278,27 @@ let reconciling=false,lastRun=0;
 
 async function reconcile(reason){
   const now=Date.now();
-  if(reconciling||now-lastRun<350)return;
+  // R7.48: focus/pageshow/visibility podem disparar juntos. Uma única rodada basta.
+  if(reconciling||now-lastRun<45000)return;
   lastRun=now;
 
   if(typeof cloudConfigured!=='function'||!cloudConfigured()||!currentWorkspaceId)return;
 
   reconciling=true;
   try{
-    try{
-      const client=typeof getAuthClient==='function'?getAuthClient():null;
-      if(client){
-        const {data,error}=await client.auth.getSession();
-        if(error)throw error;
-        if(!data?.session?.user?.id){
-          try{await client.auth.refreshSession()}catch(e){}
-        }
-      }
-    }catch(e){
-      console.warn('FINORA R7.19 auth reconcile',reason,e);
-    }
-
     const pending=typeof finoraPendingTxForWorkspaceV79==='function'
       ? finoraPendingTxForWorkspaceV79(currentWorkspaceId):[];
 
-    if(pending.length){
+    if(pending.length || finoraCloudDirty || finoraCloudPushPending){
       if(typeof finoraWorkspaceHydrated==='function'&&!finoraWorkspaceHydrated()){
         try{await pullCloudState(false)}catch(e){}
       }
       try{await pushCloudState(false)}catch(e){}
     }else{
-      try{await pullCloudState(false)}catch(e){}
+      try{
+        if(typeof finoraAutoPull==='function')await finoraAutoPull();
+        else await pullCloudState(false);
+      }catch(e){}
     }
   }finally{
     reconciling=false;
@@ -26370,5 +26497,15 @@ body:not(.finora-v84-dark):not(.dark) #simpleImportPanel>.finora-modal-head{padd
   'use strict';
   window.FINORA_RELEASE='1.0.24'; window.FINORA_BUILD='R7.47';
 })();</script>
+
+<!-- FINORA R7.48 / 1.0.25 — otimização de egress / sync por revisão -->
+<script id="finora-r748-v1025-egress-optimization">
+(function(){
+  'use strict';
+  window.FINORA_RELEASE='1.0.25';
+  window.FINORA_BUILD='R7.48';
+  console.info('[FINORA] R7.48 / 1.0.25 — sincronização otimizada ativa. Diagnóstico: finoraSyncDiagnostics()');
+})();
+</script>
 </body>
 </html>
