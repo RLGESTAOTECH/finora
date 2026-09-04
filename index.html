@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.29"><meta name="finora-build" content="R7.52">
+<meta name="finora-version" content="1.0.30"><meta name="finora-build" content="R7.53">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -12606,7 +12606,12 @@ function finoraReleaseCloudBusy(){
   finoraCloudBusy=false;
   if(finoraCloudPushPending || finoraCloudDirty){
     clearTimeout(finoraCloudPushTimer);
-    finoraCloudPushTimer=setTimeout(()=>pushCloudState(false),1200);
+    const retryWait=Math.max(
+      1800,
+      finoraR727CloudAuthBackoffUntil>Date.now()?finoraR727CloudAuthBackoffUntil-Date.now():0,
+      finoraR753CloudRetryAt>Date.now()?finoraR753CloudRetryAt-Date.now():0
+    );
+    finoraCloudPushTimer=setTimeout(()=>pushCloudState(false),retryWait);
   }
 }
 // FINORA 1.0.4: impede que cache local antigo seja enviado antes de o
@@ -13581,6 +13586,21 @@ async function saveCloudConfiguration(){
 
 let finoraR727CloudAuthBackoffUntil=0;
 
+// R7.53 — proteção contra tempestade de retries em falhas 5xx/CORS/rede.
+let finoraR753CloudRetryAt=0;
+let finoraR753CloudFailureCount=0;
+function finoraR753RegisterCloudFailure(){
+  finoraR753CloudFailureCount=Math.min(finoraR753CloudFailureCount+1,6);
+  const delay=Math.min(10*60*1000, 30000*Math.pow(2,finoraR753CloudFailureCount-1));
+  finoraR753CloudRetryAt=Date.now()+delay;
+  return delay;
+}
+function finoraR753ResetCloudFailure(){
+  finoraR753CloudFailureCount=0;
+  finoraR753CloudRetryAt=0;
+}
+
+
 function finoraR727ErrorStatus(err){
   return Number(
     err?.status ||
@@ -13616,6 +13636,34 @@ async function finoraR727CloudSession(){
 
 async function pushCloudState(showToast=false){
   if(!cloudConfigured())return false;
+
+  // R7.53: em falha transitória de API/DB, não repete chamadas em cascata.
+  if(!showToast && finoraR753CloudRetryAt>Date.now()){
+    finoraCloudDirty=true;
+    finoraCloudPushPending=true;
+    scheduleCloudPush();
+    return false;
+  }
+
+  // R7.53: remove da fila pendente IDs que já não existem no estado canônico local.
+  // Isso evita loop eterno quando uma duplicidade antiga foi reconciliada.
+  try{
+    if(finoraWorkspaceHydrated() && typeof finoraLoadPendingTxV79==='function'){
+      const ws=String(currentWorkspaceId||'');
+      const store=finoraLoadPendingTxV79();
+      const pending=Array.isArray(store[ws])?store[ws]:[];
+      if(pending.length){
+        const activeIds=new Set((Array.isArray(data)?data:[])
+          .filter(x=>String(x?.workspaceId||'')===ws || (typeof sameWorkspace==='function'&&sameWorkspace(x)))
+          .map(x=>String(x?.id||'')).filter(Boolean));
+        const next=pending.filter(x=>activeIds.has(String(x?.id||'')));
+        if(next.length!==pending.length){
+          if(next.length)store[ws]=next; else delete store[ws];
+          finoraSavePendingTxV79(store);
+        }
+      }
+    }
+  }catch(e){}
 
   // R7.48: timers e wrappers históricos podem pedir o mesmo push mais de uma vez.
   // Se não há mutação/fila pendente, não toca no Supabase.
@@ -13737,6 +13785,7 @@ async function pushCloudState(showToast=false){
     const {error}=await client.from('finora_workspace_state').upsert(row,{onConflict:'workspace_id'});
     if(error)throw error;
     finoraR748SetRemoteRevision(row.updated_at);
+    finoraR753ResetCloudFailure();
 
     // R7.26: upsert bem-sucedido já confirma persistência.
     // Evita baixar o JSON inteiro uma segunda vez só para confirmar o que acabou de gravar.
@@ -13806,7 +13855,9 @@ async function pushCloudState(showToast=false){
       finoraR727CloudAuthBackoffUntil=Date.now()+120000;
       finoraSyncIndicatorR726('error','Salvo localmente — aguardando sessão da nuvem');
     }else{
-      finoraSyncIndicatorR726('error','Salvo localmente — sincronização pendente');
+      const delay=finoraR753RegisterCloudFailure();
+      const secs=Math.ceil(delay/1000);
+      finoraSyncIndicatorR726('error',`Salvo localmente — nuvem indisponível; nova tentativa em ~${secs}s`);
     }
 
     updateCloudUI('error');
@@ -13826,6 +13877,9 @@ function scheduleCloudPush(){
     1800,
     finoraR727CloudAuthBackoffUntil>Date.now()
       ? finoraR727CloudAuthBackoffUntil-Date.now()
+      : 0,
+    finoraR753CloudRetryAt>Date.now()
+      ? finoraR753CloudRetryAt-Date.now()
       : 0
   );
 
@@ -26571,24 +26625,24 @@ body:not(.finora-v84-dark):not(.dark) #simpleImportPanel>.finora-modal-head{padd
   window.FINORA_RELEASE='1.0.24'; window.FINORA_BUILD='R7.47';
 })();</script>
 
-<!-- FINORA R7.52 / 1.0.29 — hotfix pagamento + cache local quota-safe -->
+<!-- FINORA R7.53 / 1.0.30 — hotfix pagamento + cache local quota-safe -->
 <script id="finora-r751-v1028-alert-card-dedup-base">
 (function(){
   'use strict';
   window.FINORA_RELEASE='1.0.26';
   window.FINORA_BUILD='R7.49';
-  console.info('[FINORA] R7.52 / 1.0.29 — sync otimizado + pagamento quota-safe + integridade de ocorrências ativa. Diagnóstico: finoraSyncDiagnostics()');
+  console.info('[FINORA] R7.53 / 1.0.30 — sync otimizado + pagamento quota-safe + integridade de ocorrências ativa. Diagnóstico: finoraSyncDiagnostics()');
 })();
 </script>
 
-<!-- FINORA R7.52 / 1.0.29 — identidade de ocorrência, antirrecursão e exclusão terminal -->
+<!-- FINORA R7.53 / 1.0.30 — identidade de ocorrência, antirrecursão e exclusão terminal -->
 <script id="finora-r751-v1028-occurrence-integrity">
 (function(){
 'use strict';
 if(window.__FINORA_R751_OCCURRENCE_INTEGRITY__)return;
 window.__FINORA_R751_OCCURRENCE_INTEGRITY__=true;
 
-const RELEASE='R7.52 / 1.0.29';
+const RELEASE='R7.53 / 1.0.30';
 
 function refDateR751(x){
   try{
@@ -26819,11 +26873,11 @@ window.finoraR751Diagnostics=function(){
 
 window.FINORA_RELEASE='1.0.28';
 window.FINORA_BUILD='R7.51';
-console.info('[FINORA] R7.52 / 1.0.29 — integridade de ocorrências e exclusão terminal ativa.');
+console.info('[FINORA] R7.53 / 1.0.30 — integridade de ocorrências e exclusão terminal ativa.');
 })();
 </script>
 
-<!-- FINORA R7.52 / 1.0.29 — integridade mensal + exclusão estável -->
+<!-- FINORA R7.53 / 1.0.30 — integridade mensal + exclusão estável -->
 <script id="finora-r752-v1029-integrity-runtime">
 (function(){
 'use strict';
@@ -26896,12 +26950,67 @@ if(typeof baseDelete==='function'&&!baseDelete.__r752){
 window.finoraR752Diagnostics=function(){
   const rows=Array.isArray(data)?data:[];
   const c=window.finoraCanonicalTransactions?window.finoraCanonicalTransactions(rows):rows;
-  return {release:'R7.52 / 1.0.29',transactions:rows.length,canonicalTransactions:c.length,
+  return {release:'R7.53 / 1.0.30',transactions:rows.length,canonicalTransactions:c.length,
     structuralDuplicates:Math.max(0,rows.length-c.length),
     sync:typeof finoraSyncDiagnostics==='function'?finoraSyncDiagnostics():null};
 };
 window.FINORA_RELEASE='1.0.29';window.FINORA_BUILD='R7.52';
-console.info('[FINORA] R7.52 / 1.0.29 — integridade mensal, exclusão estável e baixo consumo ativos.');
+console.info('[FINORA] R7.53 / 1.0.30 — integridade mensal, exclusão estável e baixo consumo ativos.');
+})();
+</script>
+
+<!-- FINORA R7.53 / 1.0.30 — save local-first + cloud circuit breaker -->
+<script id="finora-r753-v1030-save-resilience">
+(function(){
+'use strict';
+if(window.__FINORA_R753_SAVE_RESILIENCE__)return;
+window.__FINORA_R753_SAVE_RESILIENCE__=true;
+
+function releaseEntrySaveUI(){
+  const form=document.getElementById('entryForm');
+  if(!form)return;
+  const btn=form.querySelector('button[type="submit"],input[type="submit"]');
+  if(!btn)return;
+  btn.disabled=false;
+  btn.classList.remove('finora-r745-saving');
+  if(btn.dataset.r745OldHtml!==undefined){
+    btn.innerHTML=btn.dataset.r745OldHtml;
+    delete btn.dataset.r745OldHtml;
+  }else if(btn.tagName==='BUTTON'){
+    btn.textContent='Salvar lançamento';
+  }
+}
+
+// O lançamento é salvo localmente pelo handler principal.
+// Este guard garante que falha de nuvem nunca deixe o formulário travado.
+const form=document.getElementById('entryForm');
+if(form && !form.dataset.r753UiGuard){
+  form.dataset.r753UiGuard='1';
+  form.addEventListener('submit',()=>{
+    setTimeout(releaseEntrySaveUI,900);
+    setTimeout(releaseEntrySaveUI,2500);
+  },false);
+}
+
+// Indicador de diagnóstico sem rede.
+window.finoraR753Diagnostics=function(){
+  const base=typeof finoraSyncDiagnostics==='function'?finoraSyncDiagnostics():null;
+  return {
+    release:'R7.53 / 1.0.30',
+    cloudFailureCount:typeof finoraR753CloudFailureCount!=='undefined'?finoraR753CloudFailureCount:null,
+    retryAt:typeof finoraR753CloudRetryAt!=='undefined'&&finoraR753CloudRetryAt
+      ? new Date(finoraR753CloudRetryAt).toISOString():null,
+    pendingTransactions:typeof finoraPendingTxForWorkspaceV79==='function'
+      ? finoraPendingTxForWorkspaceV79(currentWorkspaceId).length:null,
+    dirty:typeof finoraCloudDirty!=='undefined'?finoraCloudDirty:null,
+    pushPending:typeof finoraCloudPushPending!=='undefined'?finoraCloudPushPending:null,
+    sync:base
+  };
+};
+
+window.FINORA_RELEASE='1.0.30';
+window.FINORA_BUILD='R7.53';
+console.info('[FINORA] R7.53 / 1.0.30 — save local-first + circuit breaker de nuvem ativo.');
 })();
 </script>
 </body>
