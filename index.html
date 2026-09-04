@@ -9681,7 +9681,34 @@ function renderAlerts(){
         const desc=norm(r?.descricao||'');
         if(!desc.startsWith('fatura '))return false;
         const invoiceName=clean(desc);
-        return !!invoiceName && wanted.has(invoiceName);
+        if(!invoiceName)return false;
+
+        // Correspondência exata continua sendo a regra principal.
+        if(wanted.has(invoiceName))return true;
+
+        // R7.50 — compatibilidade com descrições antigas abreviadas.
+        // Ex.: lançamento real "FATURA TENDA" e cartão cadastrado
+        // "TENDA ATACADO". Só aceita correspondência parcial quando ela
+        // identifica UM ÚNICO cartão de crédito no cadastro, evitando
+        // suprimir indevidamente cartões de um mesmo banco/emitente.
+        const tokenMatch=(a,b)=>{
+          a=clean(a); b=clean(b);
+          if(!a||!b||a.length<4||b.length<4)return false;
+          return a===b || a.startsWith(b+' ') || b.startsWith(a+' ');
+        };
+
+        const registeredCreditCards=accountCards().filter(cc=>{
+          const tt=String(cc?.cardType||cc?.type||'').toLowerCase();
+          return tt!=='debito' && Number(cc?.dueDay)>=1;
+        });
+
+        const partialMatches=registeredCreditCards.filter(cc=>{
+          const names=[clean(cc?.name||''),clean(cc?.issuer||'')].filter(Boolean);
+          return names.some(n=>tokenMatch(invoiceName,n));
+        });
+
+        if(partialMatches.length!==1)return false;
+        return String(partialMatches[0]?.id||'')===cardId;
       });
     }catch(e){
       return false;
@@ -26520,13 +26547,13 @@ body:not(.finora-v84-dark):not(.dark) #simpleImportPanel>.finora-modal-head{padd
   window.FINORA_RELEASE='1.0.24'; window.FINORA_BUILD='R7.47';
 })();</script>
 
-<!-- FINORA R7.49 / 1.0.26 — hotfix pagamento + cache local quota-safe -->
-<script id="finora-r749-v1026-payment-quota-fix">
+<!-- FINORA R7.50 / 1.0.27 — hotfix pagamento + cache local quota-safe -->
+<script id="finora-r750-v1027-alert-card-dedup-fix">
 (function(){
   'use strict';
   window.FINORA_RELEASE='1.0.26';
   window.FINORA_BUILD='R7.49';
-  console.info('[FINORA] R7.49 / 1.0.26 — sync otimizado + pagamento quota-safe ativo. Diagnóstico: finoraSyncDiagnostics()');
+  console.info('[FINORA] R7.50 / 1.0.27 — sync otimizado + pagamento quota-safe + deduplicação de alertas ativa. Diagnóstico: finoraSyncDiagnostics()');
 })();
 </script>
 </body>
