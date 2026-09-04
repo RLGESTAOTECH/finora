@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-\g<1>1.0.25\2>\g<1>R7.48\2>
+<meta name="finora-version" content="1.0.29"><meta name="finora-build" content="R7.52">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -9599,7 +9599,8 @@ function renderAlerts(){
     sameWorkspace(x) &&
     x.recorrente==='mensal' &&
     !x.generatedReminder &&
-    !x.materializedOccurrence
+    !x.materializedOccurrence &&
+    !x.parentRecurringId
   );
 
   const projectionYears=selectedYear?[selectedYear]:years;
@@ -9749,7 +9750,10 @@ function renderAlerts(){
     });
   });
 
-  const actual=(Array.isArray(data)?data:[]).filter(x=>
+  const actualSource=(typeof window.finoraCanonicalTransactions==='function')
+    ? window.finoraCanonicalTransactions(Array.isArray(data)?data:[])
+    : (Array.isArray(data)?data:[]);
+  const actual=actualSource.filter(x=>
     sameWorkspace(x) && effectiveStatus(x)!=='pago'
   );
 
@@ -26567,24 +26571,24 @@ body:not(.finora-v84-dark):not(.dark) #simpleImportPanel>.finora-modal-head{padd
   window.FINORA_RELEASE='1.0.24'; window.FINORA_BUILD='R7.47';
 })();</script>
 
-<!-- FINORA R7.51 / 1.0.28 — hotfix pagamento + cache local quota-safe -->
+<!-- FINORA R7.52 / 1.0.29 — hotfix pagamento + cache local quota-safe -->
 <script id="finora-r751-v1028-alert-card-dedup-base">
 (function(){
   'use strict';
   window.FINORA_RELEASE='1.0.26';
   window.FINORA_BUILD='R7.49';
-  console.info('[FINORA] R7.51 / 1.0.28 — sync otimizado + pagamento quota-safe + integridade de ocorrências ativa. Diagnóstico: finoraSyncDiagnostics()');
+  console.info('[FINORA] R7.52 / 1.0.29 — sync otimizado + pagamento quota-safe + integridade de ocorrências ativa. Diagnóstico: finoraSyncDiagnostics()');
 })();
 </script>
 
-<!-- FINORA R7.51 / 1.0.28 — identidade de ocorrência, antirrecursão e exclusão terminal -->
+<!-- FINORA R7.52 / 1.0.29 — identidade de ocorrência, antirrecursão e exclusão terminal -->
 <script id="finora-r751-v1028-occurrence-integrity">
 (function(){
 'use strict';
 if(window.__FINORA_R751_OCCURRENCE_INTEGRITY__)return;
 window.__FINORA_R751_OCCURRENCE_INTEGRITY__=true;
 
-const RELEASE='R7.51 / 1.0.28';
+const RELEASE='R7.52 / 1.0.29';
 
 function refDateR751(x){
   try{
@@ -26603,14 +26607,22 @@ function occurrenceKeyR751(row){
   const month=monthR751(row);
   if(!month)return '';
 
-  // Recorrência mensal: uma única obrigação por série + competência.
-  const series=String(row.seriesRootId||'').trim();
+  // R7.52 — uma única obrigação recorrente de negócio por competência.
+  const series=String(row.seriesRootId||row.parentRecurringId||'').trim();
   const recurring=!!(
-    series &&
-    (row.recorrente==='mensal' || row.generatedReminder ||
-     row.materializedOccurrence || row.parentRecurringId)
+    row.recorrente==='mensal' || row.generatedReminder ||
+    row.materializedOccurrence || row.parentRecurringId || series
   );
-  if(recurring)return `rec|${series}|${month}`;
+  if(recurring){
+    const normKey=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .toLowerCase().replace(/\s+/g,' ').trim();
+    const desc=normKey(row.descricao);
+    const owner=normKey(row.expenseOwner||row.pessoa);
+    const type=normKey(row.tipo);
+    const cat=normKey(row.categoria);
+    if(desc && type)return `recbiz|${desc}|${owner}|${type}|${cat}|${month}`;
+    if(series)return `rec|${series}|${month}`;
+  }
 
   // Fatura de cartão materializada: uma única fatura por cartão + competência.
   const card=String(row.cardId||'').trim();
@@ -26630,6 +26642,7 @@ window.finoraOccurrenceKeyR751=occurrenceKeyR751;
 function scoreR751(x){
   let n=0;
   if(x?.status==='pago'||x?.dataPagamento)n+=1000;
+  if(!x?.parentRecurringId && !x?.generatedReminder)n+=800;
   if(x?.materializedOccurrence)n+=500;
   if(!x?.generatedReminder)n+=250;
   if(!x?.valorPendente)n+=100;
@@ -26806,7 +26819,89 @@ window.finoraR751Diagnostics=function(){
 
 window.FINORA_RELEASE='1.0.28';
 window.FINORA_BUILD='R7.51';
-console.info('[FINORA] R7.51 / 1.0.28 — integridade de ocorrências e exclusão terminal ativa.');
+console.info('[FINORA] R7.52 / 1.0.29 — integridade de ocorrências e exclusão terminal ativa.');
+})();
+</script>
+
+<!-- FINORA R7.52 / 1.0.29 — integridade mensal + exclusão estável -->
+<script id="finora-r752-v1029-integrity-runtime">
+(function(){
+'use strict';
+if(window.__FINORA_R752_INTEGRITY__)return;
+window.__FINORA_R752_INTEGRITY__=true;
+let timer=null,reconciling=false,lastSig='';
+
+function sig(rows){return (Array.isArray(rows)?rows:[]).map(x=>String(x?.id||'')).sort().join('|')}
+
+function reconcile(){
+  if(reconciling||!Array.isArray(data)||!data.length)return 0;
+  reconciling=true;
+  try{
+    const before=[...data];
+    const next=typeof window.finoraCanonicalTransactions==='function'
+      ? window.finoraCanonicalTransactions(before):before;
+    const nowSig=sig(before);
+    if(nowSig===lastSig&&next.length===before.length)return 0;
+    lastSig=nowSig;
+    if(next.length>=before.length)return 0;
+
+    const keep=new Set(next.map(x=>String(x?.id||'')).filter(Boolean));
+    const removed=before.filter(x=>x?.id&&!keep.has(String(x.id)));
+    removed.forEach(x=>{
+      try{recordTransactionDeletion?.(String(x.id))}catch(e){}
+      try{finoraQueueHardDeleteR736?.(String(x.id),currentWorkspaceId)}catch(e){}
+      try{finoraRemovePendingTxR729?.(String(x.id),currentWorkspaceId)}catch(e){}
+    });
+    data=next;
+    try{finoraSafeStoreTransactionsR741?.(data)}catch(e){}
+    if(removed.length){
+      try{finoraMarkCloudDirty?.()}catch(e){}
+      try{scheduleCloudPush?.()}catch(e){}
+      console.info(`[FINORA R7.52] ${removed.length} duplicidade(s) estrutural(is) reconciliada(s).`);
+    }
+    return removed.length;
+  }catch(e){console.warn('FINORA R7.52 reconciliação',e);return 0}
+  finally{reconciling=false}
+}
+function schedule(){clearTimeout(timer);timer=setTimeout(reconcile,120)}
+
+const baseRender=window.render;
+if(typeof baseRender==='function'&&!baseRender.__r752){
+  const w=function(){const r=baseRender.apply(this,arguments);schedule();return r};
+  w.__r752=true;window.render=w;
+}
+const baseAlerts=window.renderAlerts;
+if(typeof baseAlerts==='function'&&!baseAlerts.__r752){
+  const w=function(){
+    try{if(Array.isArray(data)&&window.finoraCanonicalTransactions)data=window.finoraCanonicalTransactions(data)}catch(e){}
+    const r=baseAlerts.apply(this,arguments);schedule();return r;
+  };
+  w.__r752=true;window.renderAlerts=w;
+}
+const baseDelete=window.deleteRow;
+if(typeof baseDelete==='function'&&!baseDelete.__r752){
+  const w=async function(id){
+    const r=await baseDelete.apply(this,arguments);
+    if(r===true){
+      try{
+        if(window.finoraCanonicalTransactions)data=window.finoraCanonicalTransactions(data);
+        finoraSafeStoreTransactionsR741?.(data);
+        render?.();renderAlerts?.();
+      }catch(e){console.warn('FINORA R7.52 pós-exclusão',e)}
+    }
+    return r;
+  };
+  w.__r752=true;window.deleteRow=w;
+}
+window.finoraR752Diagnostics=function(){
+  const rows=Array.isArray(data)?data:[];
+  const c=window.finoraCanonicalTransactions?window.finoraCanonicalTransactions(rows):rows;
+  return {release:'R7.52 / 1.0.29',transactions:rows.length,canonicalTransactions:c.length,
+    structuralDuplicates:Math.max(0,rows.length-c.length),
+    sync:typeof finoraSyncDiagnostics==='function'?finoraSyncDiagnostics():null};
+};
+window.FINORA_RELEASE='1.0.29';window.FINORA_BUILD='R7.52';
+console.info('[FINORA] R7.52 / 1.0.29 — integridade mensal, exclusão estável e baixo consumo ativos.');
 })();
 </script>
 </body>
