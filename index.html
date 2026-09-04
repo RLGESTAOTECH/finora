@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.30"><meta name="finora-build" content="R7.53">
+<meta name="finora-version" content="1.0.31"><meta name="finora-build" content="R7.54">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -26125,6 +26125,13 @@ body.finora-v84-dark .finora-r745-control-start button{background:#17382b;color:
   document.addEventListener('click',e=>{
     const btn=e.target.closest?.('button,input[type="submit"]');if(!btn||btn.disabled)return;
     const label=(btn.textContent||btn.value||'').trim();if(!saveWords.test(label)||/excluir|remover|cancelar/i.test(label))return;
+
+    // R7.54: NUNCA desabilitar o submit principal do lançamento durante o clique.
+    // O feedback global R7.45 usava queueMicrotask() para desabilitar o botão.
+    // Em alguns navegadores isso ocorre antes da ação nativa de submit do formulário,
+    // deixando "Salvando…" visível sem que o handler de #entryForm seja executado.
+    if(btn.closest?.('#entryForm'))return;
+
     const old=btn.innerHTML;queueMicrotask(()=>{if(!btn.isConnected)return;btn.dataset.r745OldHtml=old;btn.classList.add('finora-r745-saving');btn.disabled=true;if(btn.tagName==='BUTTON')btn.textContent='Salvando…';setTimeout(()=>{if(btn.isConnected){btn.disabled=false;btn.classList.remove('finora-r745-saving');if(btn.dataset.r745OldHtml!==undefined){btn.innerHTML=btn.dataset.r745OldHtml;delete btn.dataset.r745OldHtml}}},2200)});
   },true);
   // Enriquecimento do toast legado e liberação imediata dos botões em sucesso/erro.
@@ -27011,6 +27018,45 @@ window.finoraR753Diagnostics=function(){
 window.FINORA_RELEASE='1.0.30';
 window.FINORA_BUILD='R7.53';
 console.info('[FINORA] R7.53 / 1.0.30 — save local-first + circuit breaker de nuvem ativo.');
+})();
+</script>
+
+<!-- FINORA R7.54 / 1.0.31 — correção definitiva do submit de lançamentos -->
+<script id="finora-r754-v1031-entry-submit-fix">
+(function(){
+'use strict';
+if(window.__FINORA_R754_ENTRY_SUBMIT_FIX__)return;
+window.__FINORA_R754_ENTRY_SUBMIT_FIX__=true;
+
+const form=document.getElementById('entryForm');
+if(form && !form.dataset.r754SubmitFix){
+  form.dataset.r754SubmitFix='1';
+
+  // O evento de submit já foi disparado; portanto este feedback não pode impedir
+  // a ação principal de salvar. Não desabilitamos o botão.
+  form.addEventListener('submit',()=>{
+    const btn=form.querySelector('button[type="submit"],input[type="submit"]');
+    if(!btn)return;
+    const original=btn.tagName==='BUTTON' ? btn.textContent : btn.value;
+    btn.dataset.r754OriginalText=original||'Salvar lançamento';
+    btn.classList.add('finora-r745-saving');
+    if(btn.tagName==='BUTTON')btn.textContent='Salvando...';
+    else btn.value='Salvando...';
+
+    setTimeout(()=>{
+      if(!btn.isConnected)return;
+      btn.classList.remove('finora-r745-saving');
+      const txt=btn.dataset.r754OriginalText||'Salvar lançamento';
+      if(btn.tagName==='BUTTON')btn.textContent=txt;
+      else btn.value=txt;
+      delete btn.dataset.r754OriginalText;
+    },1800);
+  },false);
+}
+
+window.FINORA_RELEASE='1.0.31';
+window.FINORA_BUILD='R7.54';
+console.info('[FINORA] R7.54 / 1.0.31 — submit de lançamentos corrigido; feedback não bloqueia mais o formulário.');
 })();
 </script>
 </body>
