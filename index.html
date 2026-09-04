@@ -9615,6 +9615,8 @@ function renderAlerts(){
         if(y<by || (y===by&&mo<bm))continue;
 
         const date=safeDateForDay(y,mo,bd);
+        if(typeof window.finoraIsOccurrenceDeletedR751==='function' &&
+           window.finoraIsOccurrenceDeletedR751(rootId,date,'recurring'))continue;
         const controlStart=(typeof window.finoraControlStartDate==='function'?window.finoraControlStartDate():'2026-08-01');
         if(date<controlStart)continue;
         const exists=(Array.isArray(data)?data:[]).some(r=>{
@@ -21679,7 +21681,12 @@ window.FINORA_RELEASE='1.0.13';
 
   window.ensureRecurringNextMonths=function(){
     const rows=Array.isArray(data)?data:[];
-    const roots=rows.filter(x=>(x.recorrente==='mensal'||x.parcelado==='sim')&&!x.generatedReminder);
+    const roots=rows.filter(x=>
+      (x.recorrente==='mensal'||x.parcelado==='sim') &&
+      !x.generatedReminder &&
+      !x.materializedOccurrence &&
+      !x.parentRecurringId
+    );
     const nowMonth=typeof currentMonth==='function'?currentMonth():new Date().toISOString().slice(0,7);
     let changed=false;
 
@@ -21701,6 +21708,13 @@ window.FINORA_RELEASE='1.0.13';
         if(parcel===null)continue; // série parcelada terminou
         const nextDate=recurringDate(root,offset);
         if(!nextDate)continue;
+
+        // R7.51: exclusão de uma ocorrência mensal é terminal por competência,
+        // não apenas pelo UUID aleatório do registro gerado.
+        if(typeof window.finoraIsOccurrenceDeletedR751==='function' &&
+           window.finoraIsOccurrenceDeletedR751(rootId,nextDate,'recurring')){
+          continue;
+        }
 
         let existing=rows.find(r=>{
           const sameSeries=String(r.seriesRootId||'')===String(rootId) ||
@@ -21784,7 +21798,13 @@ window.FINORA_RELEASE='1.0.13';
         try{
           const desc=String(document.getElementById('descricao')?.value||'').trim();
           const date=document.getElementById('dataLancamento')?.value||'';
-          const candidates=data.filter(x=>!x.generatedReminder&&x.recorrente==='mensal'&&x.descricao===desc);
+          const candidates=data.filter(x=>
+            !x.generatedReminder &&
+            !x.materializedOccurrence &&
+            !x.parentRecurringId &&
+            x.recorrente==='mensal' &&
+            x.descricao===desc
+          );
           candidates.sort((a,b)=>(Date.parse(b.updatedAt||0)||0)-(Date.parse(a.updatedAt||0)||0));
           const root=candidates[0];
           if(!root)return;
@@ -26547,13 +26567,246 @@ body:not(.finora-v84-dark):not(.dark) #simpleImportPanel>.finora-modal-head{padd
   window.FINORA_RELEASE='1.0.24'; window.FINORA_BUILD='R7.47';
 })();</script>
 
-<!-- FINORA R7.50 / 1.0.27 — hotfix pagamento + cache local quota-safe -->
-<script id="finora-r750-v1027-alert-card-dedup-fix">
+<!-- FINORA R7.51 / 1.0.28 — hotfix pagamento + cache local quota-safe -->
+<script id="finora-r751-v1028-alert-card-dedup-base">
 (function(){
   'use strict';
   window.FINORA_RELEASE='1.0.26';
   window.FINORA_BUILD='R7.49';
-  console.info('[FINORA] R7.50 / 1.0.27 — sync otimizado + pagamento quota-safe + deduplicação de alertas ativa. Diagnóstico: finoraSyncDiagnostics()');
+  console.info('[FINORA] R7.51 / 1.0.28 — sync otimizado + pagamento quota-safe + integridade de ocorrências ativa. Diagnóstico: finoraSyncDiagnostics()');
+})();
+</script>
+
+<!-- FINORA R7.51 / 1.0.28 — identidade de ocorrência, antirrecursão e exclusão terminal -->
+<script id="finora-r751-v1028-occurrence-integrity">
+(function(){
+'use strict';
+if(window.__FINORA_R751_OCCURRENCE_INTEGRITY__)return;
+window.__FINORA_R751_OCCURRENCE_INTEGRITY__=true;
+
+const RELEASE='R7.51 / 1.0.28';
+
+function refDateR751(x){
+  try{
+    return (typeof referenceDate==='function'?referenceDate(x):'') ||
+      x?.vencimento || x?.dataLancamento || '';
+  }catch(e){
+    return x?.vencimento || x?.dataLancamento || '';
+  }
+}
+function monthR751(xOrDate){
+  const raw=typeof xOrDate==='string'?xOrDate:refDateR751(xOrDate);
+  return String(raw||'').slice(0,7);
+}
+function occurrenceKeyR751(row){
+  if(!row)return '';
+  const month=monthR751(row);
+  if(!month)return '';
+
+  // Recorrência mensal: uma única obrigação por série + competência.
+  const series=String(row.seriesRootId||'').trim();
+  const recurring=!!(
+    series &&
+    (row.recorrente==='mensal' || row.generatedReminder ||
+     row.materializedOccurrence || row.parentRecurringId)
+  );
+  if(recurring)return `rec|${series}|${month}`;
+
+  // Fatura de cartão materializada: uma única fatura por cartão + competência.
+  const card=String(row.cardId||'').trim();
+  const cardInvoice=!!(
+    card &&
+    (
+      String(row.source||'')==='card-invoice-alert' ||
+      /^fatura\b/i.test(String(row.descricao||''))
+    )
+  );
+  if(cardInvoice)return `card|${card}|${month}`;
+
+  return '';
+}
+window.finoraOccurrenceKeyR751=occurrenceKeyR751;
+
+function scoreR751(x){
+  let n=0;
+  if(x?.status==='pago'||x?.dataPagamento)n+=1000;
+  if(x?.materializedOccurrence)n+=500;
+  if(!x?.generatedReminder)n+=250;
+  if(!x?.valorPendente)n+=100;
+  if(Number(x?.valor||0)!==0)n+=50;
+  if(x?.beneficiario)n+=5;
+  if(x?.categoria)n+=2;
+  n+=(Date.parse(x?.updatedAt||x?.createdAt||0)||0)/1e15;
+  return n;
+}
+
+function dedupeOccurrencesR751(rows){
+  const byId=new Map(), noId=[];
+  (Array.isArray(rows)?rows:[]).forEach(x=>{
+    if(!x)return;
+    const id=String(x.id||'').trim();
+    if(!id){noId.push(x);return;}
+    const prev=byId.get(id);
+    if(!prev || (Date.parse(x.updatedAt||x.createdAt||0)||0)>=(Date.parse(prev.updatedAt||prev.createdAt||0)||0)){
+      byId.set(id,x);
+    }
+  });
+
+  const byOcc=new Map(), passthrough=[];
+  [...byId.values()].forEach(x=>{
+    const key=occurrenceKeyR751(x);
+    if(!key){passthrough.push(x);return;}
+    const prev=byOcc.get(key);
+    if(!prev || scoreR751(x)>scoreR751(prev))byOcc.set(key,x);
+  });
+  return [...passthrough,...byOcc.values(),...noId];
+}
+window.finoraDedupeOccurrencesR751=dedupeOccurrencesR751;
+
+// Amplia a canonicalização existente sem usar nome/valor como critério universal.
+const originalCanonicalR751=window.finoraCanonicalTransactions;
+window.finoraCanonicalTransactions=function(rows){
+  const base=typeof originalCanonicalR751==='function'
+    ? originalCanonicalR751.call(this,rows)
+    : (Array.isArray(rows)?rows:[]);
+  return dedupeOccurrencesR751(base);
+};
+
+function occurrenceDeleteStoreR751(){
+  try{
+    const st=typeof loadFinoraFeatureState==='function'
+      ? (loadFinoraFeatureState()||{})
+      : {};
+    return st.deletedOccurrenceKeys && typeof st.deletedOccurrenceKeys==='object'
+      ? {...st.deletedOccurrenceKeys}
+      : {};
+  }catch(e){return {}}
+}
+function saveOccurrenceDeleteR751(key){
+  if(!key)return false;
+  try{
+    if(typeof loadFinoraFeatureState!=='function'||
+       typeof saveFinoraFeatureState!=='function')return false;
+
+    const st=loadFinoraFeatureState()||{};
+    const deleted={...(st.deletedOccurrenceKeys||{})};
+    deleted[key]=new Date().toISOString();
+    const next={...st,deletedOccurrenceKeys:deleted,updatedAt:new Date().toISOString()};
+
+    try{
+      saveFinoraFeatureState(next,{skipCloud:true});
+    }catch(storageErr){
+      // O cache de transações é regenerável a partir do Supabase.
+      if(storageErr?.name==='QuotaExceededError'||/quota/i.test(String(storageErr?.message||''))){
+        try{
+          if(typeof KEY!=='undefined')localStorage.removeItem(KEY);
+          else localStorage.removeItem('controleFinanceiroFamiliar_v1');
+        }catch(_){}
+        saveFinoraFeatureState(next,{skipCloud:true});
+      }else throw storageErr;
+    }
+    return true;
+  }catch(e){
+    console.warn('FINORA R7.51 ocorrência excluída não pôde ser persistida localmente',e);
+    return false;
+  }
+}
+window.finoraIsOccurrenceDeletedR751=function(seriesOrCard,date,kind='recurring'){
+  const id=String(seriesOrCard||'').trim(), month=String(date||'').slice(0,7);
+  if(!id||!month)return false;
+  const key=(kind==='card'?`card|${id}|${month}`:`rec|${id}|${month}`);
+  return !!occurrenceDeleteStoreR751()[key];
+};
+
+// Exclusão: além do UUID, registra a competência para o motor não recriar
+// o mesmo lembrete com outro UUID no próximo render/sync.
+const originalDeleteR751=window.deleteRow;
+if(typeof originalDeleteR751==='function'){
+  window.deleteRow=async function(id){
+    const row=(Array.isArray(data)?data:[]).find(x=>String(x?.id||'')===String(id));
+    const key=occurrenceKeyR751(row);
+
+    // O confirm continua pertencendo à função original; só marcamos após o clique
+    // iniciar a exclusão e revertê-lo não é necessário porque original retorna false
+    // antes de qualquer mutação quando o usuário cancela. Para evitar pré-marcação,
+    // fazemos a exclusão original primeiro e só persistimos a chave se o ID sumiu.
+    const result=await originalDeleteR751.apply(this,arguments);
+    const stillExists=(Array.isArray(data)?data:[]).some(x=>String(x?.id||'')===String(id));
+
+    if(result!==false && !stillExists && key){
+      saveOccurrenceDeleteR751(key);
+      try{
+        data=window.finoraCanonicalTransactions(data);
+        if(typeof finoraSafeStoreTransactionsR741==='function')finoraSafeStoreTransactionsR741(data);
+        if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
+        if(typeof scheduleCloudPush==='function')scheduleCloudPush();
+      }catch(e){}
+    }
+    return result;
+  };
+}
+
+// Boot conservador: remove apenas duplicidades estruturais da MESMA série/cartão
+// e MESMA competência. Não compara lançamentos independentes por nome ou valor.
+function reconcileNowR751(){
+  try{
+    if(!Array.isArray(data))return 0;
+    const before=data.length;
+    const next=window.finoraCanonicalTransactions(data);
+    if(next.length===before)return 0;
+
+    const keepIds=new Set(next.map(x=>String(x?.id||'')).filter(Boolean));
+    const removed=data.filter(x=>x?.id && !keepIds.has(String(x.id)));
+
+    removed.forEach(x=>{
+      try{
+        if(typeof recordTransactionDeletion==='function')recordTransactionDeletion(String(x.id));
+        if(typeof finoraQueueHardDeleteR736==='function')finoraQueueHardDeleteR736(String(x.id),currentWorkspaceId);
+        if(typeof finoraRemovePendingTxR729==='function')finoraRemovePendingTxR729(String(x.id),currentWorkspaceId);
+      }catch(e){}
+    });
+
+    data=next;
+    try{if(typeof finoraSafeStoreTransactionsR741==='function')finoraSafeStoreTransactionsR741(data)}catch(e){}
+    try{
+      if(typeof finoraMarkCloudDirty==='function')finoraMarkCloudDirty();
+      if(typeof scheduleCloudPush==='function')scheduleCloudPush();
+    }catch(e){}
+    try{render()}catch(e){}
+    return removed.length;
+  }catch(e){
+    console.warn('FINORA R7.51 reconciliação de ocorrências',e);
+    return 0;
+  }
+}
+window.finoraReconcileOccurrencesR751=reconcileNowR751;
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(reconcileNowR751,50),{once:true});
+}else{
+  setTimeout(reconcileNowR751,50);
+}
+
+window.finoraR751Diagnostics=function(){
+  const rows=Array.isArray(data)?data:[];
+  const keys=new Map();
+  rows.forEach(x=>{
+    const k=occurrenceKeyR751(x);
+    if(!k)return;
+    keys.set(k,(keys.get(k)||0)+1);
+  });
+  return {
+    release:RELEASE,
+    transactions:rows.length,
+    duplicatedOccurrenceKeys:[...keys.entries()].filter(([,n])=>n>1),
+    deletedOccurrenceKeys:Object.keys(occurrenceDeleteStoreR751()).length,
+    sync:typeof finoraSyncDiagnostics==='function'?finoraSyncDiagnostics():null
+  };
+};
+
+window.FINORA_RELEASE='1.0.28';
+window.FINORA_BUILD='R7.51';
+console.info('[FINORA] R7.51 / 1.0.28 — integridade de ocorrências e exclusão terminal ativa.');
 })();
 </script>
 </body>
