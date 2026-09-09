@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.56-alert-delete-consistency">
+<meta name="finora-release" content="R7.57-boleto-debito-origem">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.32"><meta name="finora-build" content="R7.56">
+<meta name="finora-version" content="1.0.32"><meta name="finora-build" content="R7.57">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -20585,6 +20585,48 @@ window.finoraR756Diagnostics=function(){
 window.FINORA_RELEASE='1.0.32';
 window.FINORA_BUILD='R7.56';
 console.info('[FINORA] R7.56 / 1.0.32 — exclusões sincronizadas entre lançamentos e alertas.');
+})();
+</script>
+
+
+<script id="finora-r757-boleto-debito-origem">
+(()=>{'use strict';
+ const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+ const qualifies=v=>{v=norm(v);return v.includes('boleto')||v.includes('debito');};
+ function originWrap(){
+   const l=[...document.querySelectorAll('label')].find(x=>{const t=norm(x.textContent);return t.includes('conta')&&t.includes('origem')&&t.includes('pagamento');});
+   if(!l)return null;
+   return l.closest('.field,.form-group,.input-group,[data-field],.finora-field')||l.parentElement;
+ }
+ function paySelects(){
+   return [...document.querySelectorAll('select')].filter(s=>{
+     const key=norm((s.id||'')+' '+(s.name||'')+' '+(s.getAttribute('aria-label')||''));
+     const w=s.closest('.field,.form-group,.input-group,[data-field],.finora-field')||s.parentElement;
+     const txt=norm(w?.textContent||'');
+     return key.includes('pagamento')||key.includes('payment')||txt.includes('forma de pagamento')||txt.includes('meio de pagamento');
+   });
+ }
+ function apply(){
+   const w=originWrap(); if(!w)return;
+   const show=paySelects().some(s=>qualifies(s.value));
+   w.hidden=!show; w.style.display=show?'':'none'; w.setAttribute('aria-hidden',show?'false':'true');
+   const c=w.querySelector('input,select,textarea'); if(c)c.disabled=false;
+ }
+ function bind(){
+   paySelects().forEach(s=>{
+     if(s.dataset.finoraOriginR757)return;
+     s.dataset.finoraOriginR757='1';
+     s.addEventListener('change',()=>{apply();requestAnimationFrame(apply)},true);
+     s.addEventListener('input',apply,true);
+   });
+   apply();
+ }
+ document.addEventListener('DOMContentLoaded',bind);
+ document.addEventListener('change',e=>{if(e.target?.matches?.('select'))queueMicrotask(bind)},true);
+ let tm; const ob=new MutationObserver(()=>{clearTimeout(tm);tm=setTimeout(bind,35)});
+ const start=()=>ob.observe(document.body,{childList:true,subtree:true});
+ if(document.body)start();else document.addEventListener('DOMContentLoaded',start,{once:true});
+ window.finoraApplyPaymentOriginRuleR757=apply;
 })();
 </script>
 
