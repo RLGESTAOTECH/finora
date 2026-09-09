@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.31"><meta name="finora-build" content="R7.54">
+<meta name="finora-version" content="1.0.31"><meta name="finora-build" content="R7.55">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -27059,5 +27059,174 @@ window.FINORA_BUILD='R7.54';
 console.info('[FINORA] R7.54 / 1.0.31 — submit de lançamentos corrigido; feedback não bloqueia mais o formulário.');
 })();
 </script>
+
+<!-- FINORA R7.55 — compartilhamento de lançamento: pré-visualização + cópia robusta -->
+<style id="finora-r755-share-image-fix">
+#finoraR755ImagePreviewWrap{
+  margin:12px 0 2px;padding:10px;border:1px solid #dbe7e0;border-radius:14px;
+  background:linear-gradient(180deg,#f7fbf8,#eef6f1);
+}
+#finoraR755ImagePreviewHead{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;
+  font:700 10px Verdana,sans-serif;color:#315548;
+}
+#finoraR755ImagePreviewHead span:last-child{font-weight:400;color:#718078}
+#finoraR755ImagePreview{
+  display:block;width:100%;max-height:430px;object-fit:contain;border-radius:10px;
+  background:#fff;border:1px solid #e1e9e4;
+}
+#finoraR755ImagePreviewStatus{
+  min-height:120px;display:grid;place-items:center;text-align:center;padding:18px;
+  color:#718078;font:10px/1.5 Verdana,sans-serif;background:#fff;border-radius:10px;
+  border:1px dashed #d8e4dd;
+}
+#finoraR755ImagePreviewStatus[hidden],#finoraR755ImagePreview[hidden]{display:none!important}
+html.dark #finoraR755ImagePreviewWrap,body.dark #finoraR755ImagePreviewWrap{
+  background:#043327;border-color:rgba(255,255,255,.14)
+}
+html.dark #finoraR755ImagePreview,body.dark #finoraR755ImagePreview{
+  border-color:rgba(255,255,255,.14)
+}
+@media(max-width:820px){#finoraR755ImagePreview{max-height:360px}}
+</style>
+<script id="finora-r755-share-image-fix-script">
+(function(){
+  'use strict';
+  let previewBlob=null, previewUrl='', previewId='', previewSeq=0;
+
+  function revokePreview(){
+    if(previewUrl){try{URL.revokeObjectURL(previewUrl)}catch(e){}}
+    previewUrl=''; previewBlob=null; previewId='';
+  }
+
+  function ensurePreviewUI(){
+    const card=document.getElementById('finoraR721PreviewCard');
+    if(!card)return null;
+    let wrap=document.getElementById('finoraR755ImagePreviewWrap');
+    if(wrap)return wrap;
+    wrap=document.createElement('div');
+    wrap.id='finoraR755ImagePreviewWrap';
+    wrap.innerHTML=
+      '<div id="finoraR755ImagePreviewHead"><span>Pré-visualização da imagem</span><span>PNG em alta resolução</span></div>'+
+      '<div id="finoraR755ImagePreviewStatus">Preparando a imagem do lançamento…</div>'+
+      '<img id="finoraR755ImagePreview" alt="Pré-visualização da imagem do lançamento FINORA" hidden>';
+    const note=card.querySelector('.finora-r721-share-note');
+    if(note)card.insertBefore(wrap,note); else card.appendChild(wrap);
+    return wrap;
+  }
+
+  async function refreshPreview(id){
+    ensurePreviewUI();
+    const status=document.getElementById('finoraR755ImagePreviewStatus');
+    const img=document.getElementById('finoraR755ImagePreview');
+    const seq=++previewSeq;
+    if(status){status.hidden=false;status.textContent='Preparando a imagem do lançamento…'}
+    if(img)img.hidden=true;
+    revokePreview();
+
+    try{
+      const x=(typeof rowById==='function')?rowById(id):null;
+      if(!x)throw new Error('Lançamento não encontrado');
+      const blob=await imageBlobFor(x);
+      if(seq!==previewSeq)return;
+      previewBlob=blob; previewId=String(id);
+      previewUrl=URL.createObjectURL(blob);
+      if(img){
+        img.onload=function(){ if(status)status.hidden=true; img.hidden=false; };
+        img.onerror=function(){ if(status){status.hidden=false;status.textContent='A imagem foi gerada, mas a prévia não pôde ser exibida.'} };
+        img.src=previewUrl;
+      }
+    }catch(err){
+      console.error('FINORA R7.55 preview:',err);
+      if(status){status.hidden=false;status.textContent='Não foi possível gerar a pré-visualização desta imagem.'}
+    }
+  }
+
+  async function getBlob(x){
+    if(previewBlob && previewId===String(x.id))return previewBlob;
+    const blob=await imageBlobFor(x);
+    previewBlob=blob; previewId=String(x.id);
+    return blob;
+  }
+
+  function safeFileName(x){
+    const base=String(x?.descricao||'lancamento')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    return 'finora-'+(base||'lancamento')+'.png';
+  }
+
+  function downloadBlob(blob,x){
+    const a=document.createElement('a');
+    const url=URL.createObjectURL(blob);
+    a.href=url;a.download=safeFileName(x);
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),2500);
+  }
+
+  async function copyImageRobust(x){
+    // Chrome/Edge: usar o blob já pré-gerado preserva a ativação do clique.
+    const blob=await getBlob(x);
+    if(window.isSecureContext && navigator.clipboard?.write && typeof ClipboardItem!=='undefined'){
+      try{
+        await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+        return 'copied';
+      }catch(err){
+        console.warn('FINORA R7.55 clipboard image fallback:',err);
+      }
+    }
+    downloadBlob(blob,x);
+    return 'downloaded';
+  }
+
+  function installCopyHandler(){
+    const old=document.getElementById('finoraR721CopyImage');
+    if(!old || old.dataset.r755==='1')return;
+    const btn=old.cloneNode(true); // remove o listener legado que falhava em alguns navegadores
+    btn.dataset.r755='1';
+    old.replaceWith(btn);
+    btn.addEventListener('click',async function(){
+      const x=(typeof rowById==='function')?rowById(activeId):null;
+      if(!x)return;
+      const label=btn.textContent;
+      btn.disabled=true;btn.textContent='Copiando imagem…';
+      try{
+        const result=await copyImageRobust(x);
+        if(typeof audit==='function')audit('COMPARTILHOU',x,{channel:result==='copied'?'clipboard-image-r755':'image-download-r755'});
+        if(typeof toast721==='function'){
+          toast721(result==='copied'
+            ? 'Imagem copiada. Agora você pode colar no WhatsApp, e-mail ou documento.'
+            : 'A cópia direta foi bloqueada pelo navegador. O PNG foi salvo para você compartilhar.');
+        }
+      }catch(err){
+        console.error('FINORA R7.55 copy image:',err);
+        if(typeof toast721==='function')toast721('Não foi possível gerar a imagem deste lançamento.');
+      }finally{btn.disabled=false;btn.textContent=label}
+    });
+  }
+
+  // Acrescenta a prévia sem mexer no fluxo existente do modal.
+  const originalOpen=window.finoraOpenTransactionShareR721;
+  if(typeof originalOpen==='function'){
+    window.finoraOpenTransactionShareR721=function(id){
+      const result=originalOpen.apply(this,arguments);
+      installCopyHandler();
+      setTimeout(()=>refreshPreview(id),0);
+      return result;
+    };
+  }
+
+  // Atualiza a prévia quando a mensagem opcional muda.
+  document.getElementById('finoraR721ShareMessage')?.addEventListener('input',function(){
+    const id=activeId;
+    clearTimeout(this._finoraR755Timer);
+    this._finoraR755Timer=setTimeout(()=>{if(id)refreshPreview(id)},280);
+  });
+
+  installCopyHandler();
+  ensurePreviewUI();
+})();
+</script>
+
 </body>
 </html>
