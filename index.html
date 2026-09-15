@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.61-nora-insights-fix">
+<meta name="finora-release" content="R7.62-nora-insights-real-data">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.36"><meta name="finora-build" content="R7.61">
+<meta name="finora-version" content="1.0.37"><meta name="finora-build" content="R7.62">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -27735,9 +27735,15 @@ const escN=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'
 const moneyN=v=>'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const monthName=m=>{if(!m)return '';const [y,mo]=m.split('-');return new Date(Number(y),Number(mo)-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});};
 const prevMonth=m=>{const [y,mo]=m.split('-').map(Number),d=new Date(y,mo-2,1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`};
-const rowDateN=x=>String(x?.vencimento||x?.dataLancamento||x?.data||x?.date||'').slice(0,10);
-const realRows=()=> (Array.isArray(window.data)?window.data:[]).filter(x=>x && !x.generatedReminder && !x.virtualCardAlert && String(x.source||'')!=='card-invoice-alert' && !x.valorPendente && Number.isFinite(Number(x.valor)));
-const rowsMonth=m=>realRows().filter(x=>rowDateN(x).slice(0,7)===m);
+const rowDateN=x=>String((typeof referenceDate==='function'?referenceDate(x):(x?.vencimento||x?.dataLancamento||x?.data||x?.date||''))||'').slice(0,10);
+// R7.62: NORA lê a mesma coleção lexical `data` usada pelas telas oficiais do FINORA.
+// `data` foi declarado com `let`, portanto não existe em window.data. Esse era o motivo dos totais zerados.
+const realRows=()=>{
+  const rows=(typeof data!=='undefined'&&Array.isArray(data))?data:[];
+  return rows.filter(x=>x && (typeof sameWorkspace!=='function'||sameWorkspace(x)) && !x.generatedReminder && !x.virtualCardAlert && String(x.source||'')!=='card-invoice-alert' && !x.valorPendente && (typeof simpleKnownValue!=='function'||simpleKnownValue(x)) && Number.isFinite(Number(x.valor)));
+};
+// Usa a mesma regra de competência mensal das telas/relatórios existentes.
+const rowsMonth=m=>realRows().filter(x=>(typeof recordMonth==='function'?recordMonth(x):rowDateN(x).slice(0,7))===m);
 function totals(m){const r=rowsMonth(m);const inc=r.filter(x=>x.tipo==='entrada').reduce((a,x)=>a+Number(x.valor||0),0);const out=r.filter(x=>x.tipo==='saida').reduce((a,x)=>a+Number(x.valor||0),0);return {rows:r,inc,out,bal:inc-out,avg:out/Math.max(1,new Date(Number(m.slice(0,4)),Number(m.slice(5,7)),0).getDate())};}
 function delta(cur,old,inverse=false){if(!old)return {n:null,html:'<span class="nora-delta nora-neutral">Sem base anterior</span>'};const n=(cur-old)/Math.abs(old)*100;const good=inverse?n<=0:n>=0;return {n,html:`<span class="nora-delta ${good?'nora-up':'nora-down'}">${n>=0?'↑':'↓'} ${Math.abs(n).toFixed(1).replace('.',',')}% vs. mês anterior</span>`};}
 function catMap(rows,type='saida'){const m={};rows.filter(x=>x.tipo===type).forEach(x=>{const k=String(x.categoria||'Outros').trim()||'Outros';m[k]=(m[k]||0)+Number(x.valor||0)});return Object.entries(m).sort((a,b)=>b[1]-a[1]);}
@@ -27760,7 +27766,7 @@ function render(){const input=document.getElementById('noraInsightsMonth');if(!i
 window.renderNoraInsights=render;
 window.setNoraInsightsTab=function(tab,btn){activeTab=tab;document.querySelectorAll('.nora-tabs button').forEach(b=>b.classList.toggle('active',b===btn));render();};
 window.openNoraInsights=function(){const inp=document.getElementById('noraInsightsMonth');if(inp&&!inp.value){try{inp.value=(typeof currentMonth==='string'&&/^\d{4}-\d{2}$/.test(currentMonth))?currentMonth:new Date().toISOString().slice(0,7)}catch(e){inp.value=new Date().toISOString().slice(0,7)}}render();openSectionModal('noraInsightsPanel');setTimeout(render,0);};
-console.info('[FINORA] R7.61 / 1.0.36 — NORA Insights ativo; features validadas da R7.59 preservadas.');
+console.info('[FINORA] R7.62 / 1.0.37 — NORA Insights conectado aos lançamentos reais; features validadas da R7.59 preservadas.');
 })();
 </script>
 </body>
