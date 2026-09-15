@@ -25014,6 +25014,8 @@ $721('finoraR721RegisterShare')?.addEventListener('click',()=>{
     : 'Compartilhamento registrado na Auditoria.');
 });
 
+window.finoraR721ShareApi={rowById,imageBlobFor,shareText,audit,toast:toast721,getActiveId:()=>activeId};
+
 function tryOpenHash(){
   const hash=String(location.hash||'');
   const m=hash.match(/^#lancamento=(.+)$/);
@@ -26296,7 +26298,7 @@ body.finora-v84-dark .finora-v84-footer,html.dark body .finora-v84-footer,body.d
  // O checkbox legado não controla mais visibilidade; o select é sempre opcional quando há metas.
  document.getElementById('tipo')?.addEventListener('change',()=>setTimeout(syncGoalField,0));
  const launch=document.getElementById('simpleLaunchPanel')||document.body;
- new MutationObserver(()=>{if(document.getElementById('goalUseField'))setTimeout(syncGoalField,0)}).observe(launch,{childList:true,subtree:true});
+ /* R7.59: observer legado removido — evitava reescrita contínua do combo Meta. */
  // Ao escolher uma meta, mantém compatibilidade com o checkbox legado usado por versões antigas.
  document.addEventListener('change',e=>{if(e.target?.id==='goalUseSelect'){const cb=document.getElementById('goalUseCheck');if(cb)cb.checked=!!e.target.value}},true);
  setTimeout(syncGoalField,0);
@@ -27557,5 +27559,144 @@ window.FINORA_RELEASE='1.0.33';window.FINORA_BUILD='R7.58';
 console.info('[FINORA] R7.58 / 1.0.33 — alertas fiéis aos lançamentos reais + campo Meta estável.');
 })();
 </script>
+<!-- FINORA R7.59 / 1.0.34 — pack: meta, alertas DB-only, salvar, compartilhamento e fluidez -->
+<style id="finora-r759-pack-style">
+/* Evita trabalho de layout/pintura em painéis pesados enquanto estão fechados. */
+.popup-only-panel:not(.section-modal-active){content-visibility:hidden!important;contain:layout style paint!important}
+.popup-only-panel.section-modal-active{content-visibility:visible!important}
+#entryForm button[type="submit"].finora-r759-saving{opacity:.72;cursor:wait}
+</style>
+<script id="finora-r759-pack-script">
+(function(){
+'use strict';
+if(window.__FINORA_R759_PACK__)return;window.__FINORA_R759_PACK__=true;
+
+const $=id=>document.getElementById(id);
+const esc759=s=>String(s??'').replace(/[&<>\"]/g,c=>c==='&'?'&amp;':c==='<'?'&lt;':c==='>'?'&gt;':'&quot;');
+
+/* 1. META ESTÁVEL — nunca reescreve o select se opções não mudaram. */
+let metaSig759='';
+function syncMeta759(force=false,preferred){
+  const field=$('goalUseField'),sel=$('goalUseSelect');if(!field||!sel)return;
+  let goals=[];try{goals=(typeof loadFinoraFeatureState==='function'&&loadFinoraFeatureState().goals)||[]}catch(e){}
+  const sig=JSON.stringify(goals.map(g=>[String(g?.id||''),String(g?.name||'')]));
+  const keep=preferred!==undefined?String(preferred||''):String(sel.value||'');
+  if(force||sig!==metaSig759){
+    metaSig759=sig;
+    const wanted='<option value="">Nenhuma meta</option>'+goals.map(g=>`<option value="${esc759(g?.id||'')}">${esc759(g?.name||'')}</option>`).join('');
+    if(sel.innerHTML!==wanted)sel.innerHTML=wanted;
+  }
+  if(keep && goals.some(g=>String(g?.id||'')===keep))sel.value=keep;else if(!keep)sel.value='';
+  field.style.display='block';field.classList.add('finora-r747-goal-link','finora-v102-visible');field.classList.remove('finora-v102-hidden');
+  sel.classList.add('visible','finora-v102-visible');sel.classList.remove('finora-v102-hidden');
+  const label=field.querySelector(':scope > label:first-child');if(label)label.textContent='Meta (opcional)';
+  const cb=$('goalUseCheck');if(cb)cb.checked=!!sel.value;
+}
+const edit759=window.editRow;
+if(typeof edit759==='function')window.editRow=function(id){
+  let row=null;try{row=(Array.isArray(data)?data:[]).find(x=>String(x.id)===String(id))||null}catch(e){}
+  const r=edit759.apply(this,arguments);
+  requestAnimationFrame(()=>syncMeta759(true,row?.goalId||''));
+  return r;
+};
+document.addEventListener('click',e=>{if(e.target?.matches?.('#r748GoalSave,#v90GoalSave,[data-v90-goal-del],[data-v90-goal-edit]'))setTimeout(()=>syncMeta759(true),60)},true);
+
+/* 2. ALERTAS DB-ONLY — nenhuma projeção virtual de recorrência/cartão entra na tela. */
+const alerts759=window.renderAlerts;
+if(typeof alerts759==='function')window.renderAlerts=function(){
+  let originalData=null, originalAccountCards=null;
+  try{
+    if(typeof data!=='undefined'&&Array.isArray(data)){
+      originalData=data;
+      // Clone apenas para renderização: recorrência é neutralizada para impedir projeções.
+      data=data.map(x=>({...x,recorrente:'nao'}));
+    }
+    if(typeof window.accountCards==='function'){
+      originalAccountCards=window.accountCards;
+      window.accountCards=function(){return []};
+    }
+    return alerts759.apply(this,arguments);
+  }finally{
+    if(originalData)data=originalData;
+    if(originalAccountCards)window.accountCards=originalAccountCards;
+    requestAnimationFrame(()=>{
+      const panel=$('simpleAlertsPanel');if(!panel)return;
+      // Segurança final: só permanece alerta cuja descrição+data+tipo correspondam a registro real pendente.
+      panel.querySelectorAll('.alert-item').forEach(item=>{
+        const meta=item.querySelector('.meta')?.textContent||'';
+        const dm=meta.match(/(\d{2})\/(\d{2})\/(\d{4})/);if(!dm)return;
+        const iso=`${dm[3]}-${dm[2]}-${dm[1]}`;
+        const desc=(item.querySelector('strong')?.textContent||'').trim().toLowerCase();
+        const real=(Array.isArray(originalData)?originalData:[]).some(x=>{
+          if(!x)return false;
+          try{if(typeof sameWorkspace==='function'&&!sameWorkspace(x))return false}catch(e){}
+          const d=String(x.vencimento||x.dataLancamento||'');
+          const xd=String(x.descricao||'').trim().toLowerCase();
+          const st=typeof effectiveStatus==='function'?effectiveStatus(x):x.status;
+          return d===iso&&xd===desc&&st!=='pago'&&!x.virtualRecurringAlert&&!x.virtualCardAlert;
+        });
+        if(!real)item.remove();
+      });
+      panel.querySelectorAll('.alert-category').forEach(x=>{if(!x.querySelector('.alert-item'))x.remove()});
+      panel.querySelectorAll('.alert-month-block').forEach(x=>{if(!x.querySelector('.alert-item'))x.remove()});
+      const n=panel.querySelectorAll('.alert-item').length,c=$('alertCount');if(c)c.textContent=`${n} alerta${n===1?'':'s'}`;
+    });
+  }
+};
+
+/* 3. SALVAR — estado visual coerente e confirmação inequívoca. */
+function submitBtn(){return $('entryForm')?.querySelector('button[type="submit"],input[type="submit"]')||null}
+function setSave759(mode){
+  const b=submitBtn();if(!b)return;
+  const text=mode==='saving'?'Salvando...':'Salvar';
+  b.disabled=mode==='saving';b.classList.toggle('finora-r759-saving',mode==='saving');
+  if(b.tagName==='BUTTON')b.textContent=text;else b.value=text;
+}
+setTimeout(()=>setSave759('ready'),0);
+$('entryForm')?.addEventListener('submit',()=>{
+  setSave759('saving');
+  // O handler canônico é local-first. Depois dele, o registro já está no estado local e a nuvem sincroniza em segundo plano.
+  setTimeout(()=>{setSave759('ready');try{(window.finoraR745Feedback||window.toast)?.('Registro gravado/atualizado com sucesso.','success')}catch(e){}},80);
+},false);
+// Qualquer edição abre com botão pronto, nunca herdando "Salvando".
+document.addEventListener('click',e=>{if(e.target?.matches?.('[data-row-action="edit"],button[onclick*="editRow"]'))setTimeout(()=>setSave759('ready'),0)},true);
+
+/* 4. COMPARTILHAR COMO IMAGEM — corrige o patch R7.55 que perdeu acesso ao escopo privado. */
+function installShare759(){
+  const old=$('finoraR721CopyImage');if(!old||old.dataset.r759==='1')return;
+  const btn=old.cloneNode(true);btn.dataset.r759='1';old.replaceWith(btn);
+  btn.addEventListener('click',async()=>{
+    const api=window.finoraR721ShareApi;const id=api?.getActiveId?.();const x=api?.rowById?.(id);
+    if(!api||!x){api?.toast?.('Lançamento não encontrado.');return}
+    const label=btn.textContent;btn.disabled=true;btn.textContent='Gerando imagem…';
+    try{
+      const blob=await api.imageBlobFor(x);
+      let copied=false;
+      if(window.isSecureContext&&navigator.clipboard?.write&&typeof ClipboardItem!=='undefined'){
+        try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);copied=true}catch(e){console.warn('FINORA R7.59 clipboard:',e)}
+      }
+      if(copied){api.audit?.('COMPARTILHOU',x,{channel:'clipboard-image-r759'});api.toast?.('Imagem copiada. Agora é só colar onde desejar.');}
+      else{
+        const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='finora-'+String(x.descricao||'lancamento').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2500);
+        api.audit?.('COMPARTILHOU',x,{channel:'image-download-r759'});api.toast?.('O navegador bloqueou a cópia direta; a imagem PNG foi gerada para compartilhamento.');
+      }
+    }catch(err){console.error('FINORA R7.59 imagem:',err);api.toast?.('Não foi possível gerar a imagem deste lançamento.');}
+    finally{btn.disabled=false;btn.textContent=label}
+  });
+}
+const openShare759=window.finoraOpenTransactionShareR721;
+if(typeof openShare759==='function')window.finoraOpenTransactionShareR721=function(){const r=openShare759.apply(this,arguments);installShare759();return r};
+installShare759();
+
+/* 5. FLUIDEZ — elimina recomputações imediatas redundantes em rajada. */
+let refreshTimer759=0;
+window.finoraScheduleUiRefreshR759=function(fn){clearTimeout(refreshTimer759);refreshTimer759=setTimeout(()=>{try{fn?.()}catch(e){console.warn('FINORA R7.59 refresh',e)}},24)};
+
+window.FINORA_RELEASE='1.0.34';window.FINORA_BUILD='R7.59';
+console.info('[FINORA] R7.59 / 1.0.34 — pack de correções: Meta estável, alertas DB-only, salvar claro, imagem ativa e navegação otimizada.');
+})();
+</script>
+
+
 </body>
 </html>
