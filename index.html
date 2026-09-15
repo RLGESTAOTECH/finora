@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta name="finora-release" content="R7.57-boleto-debito-origem">
+<meta name="finora-release" content="R7.58-alertas-meta-estavel">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.32"><meta name="finora-build" content="R7.57">
+<meta name="finora-version" content="1.0.33"><meta name="finora-build" content="R7.58">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -20424,212 +20424,6 @@ window.FINORA_RELEASE='1.0.13';
         <footer>FINORA · Versão 1.0.11 · Relatório gerado em ${new Date().toLocaleString('pt-BR')}</footer>
         <script>window.addEventListener('load',()=>{setTimeout(()=>window.print(),120)});<\/script>
 
-<!-- FINORA R7.56 / 1.0.32 — exclusão terminal também nos alertas -->
-<script id="finora-r756-alert-delete-consistency">
-(function(){
-'use strict';
-if(window.__FINORA_R756_ALERT_DELETE_CONSISTENCY__)return;
-window.__FINORA_R756_ALERT_DELETE_CONSISTENCY__=true;
-
-function monthOf(row){
-  return String(row?.vencimento||row?.dataLancamento||'').slice(0,7);
-}
-function saveDeletedOccurrenceKeys(keys){
-  keys=[...new Set((keys||[]).filter(Boolean))];
-  if(!keys.length)return false;
-  try{
-    if(typeof loadFinoraFeatureState!=='function' || typeof saveFinoraFeatureState!=='function')return false;
-    const st=loadFinoraFeatureState()||{};
-    const deleted={...(st.deletedOccurrenceKeys||{})};
-    const now=new Date().toISOString();
-    keys.forEach(k=>deleted[k]=now);
-    saveFinoraFeatureState(
-      {...st,deletedOccurrenceKeys:deleted,updatedAt:now},
-      {skipCloud:true}
-    );
-    try{finoraMarkCloudDirty?.()}catch(e){}
-    try{scheduleCloudPush?.()}catch(e){}
-    return true;
-  }catch(e){
-    console.warn('FINORA R7.56: não foi possível registrar exclusão da ocorrência',e);
-    return false;
-  }
-}
-function keysFor(row){
-  if(!row)return [];
-  const month=monthOf(row);
-  if(!month)return [];
-  const keys=[];
-
-  // Mantém compatibilidade com a chave de negócio já usada pela R7.51.
-  try{
-    const businessKey=window.finoraOccurrenceKeyR751?.(row);
-    if(businessKey)keys.push(businessKey);
-  }catch(e){}
-
-  // CRÍTICO: o gerador de alertas consulta rec|<seriesRootId>|<competência>.
-  // A R7.51 gravava apenas "recbiz|..." em vários casos, permitindo que
-  // o mesmo alerta virtual reaparecesse logo após excluir o lançamento.
-  const series=String(row.seriesRootId||row.parentRecurringId||'').trim();
-  const recurring=!!(
-    row.recorrente==='mensal' || row.generatedReminder ||
-    row.materializedOccurrence || row.parentRecurringId || series
-  );
-  if(recurring && series)keys.push(`rec|${series}|${month}`);
-
-  const card=String(row.cardId||'').trim();
-  const invoice=!!(
-    card && (
-      row.virtualCardAlert ||
-      String(row.source||'')==='card-invoice-alert' ||
-      /^fatura\b/i.test(String(row.descricao||''))
-    )
-  );
-  if(invoice)keys.push(`card|${card}|${month}`);
-
-  return keys;
-}
-
-const baseDelete=window.deleteRow;
-if(typeof baseDelete==='function' && !baseDelete.__r756){
-  const wrapped=async function(id){
-    // Captura antes da exclusão, pois depois o registro já não existe em data.
-    const before=(Array.isArray(data)?data:[]).find(x=>String(x?.id||'')===String(id));
-    const keys=keysFor(before);
-
-    const result=await baseDelete.apply(this,arguments);
-    const stillExists=(Array.isArray(data)?data:[]).some(x=>String(x?.id||'')===String(id));
-
-    if(result!==false && !stillExists){
-      saveDeletedOccurrenceKeys(keys);
-
-      // Remove qualquer sobra visual e recalcula os alertas somente depois
-      // de persistir a competência excluída, impedindo recriação virtual.
-      try{
-        if(typeof window.finoraCanonicalTransactions==='function'){
-          data=window.finoraCanonicalTransactions(data);
-        }
-        finoraSafeStoreTransactionsR741?.(data);
-      }catch(e){}
-      try{render?.()}catch(e){}
-      try{renderAlerts?.()}catch(e){}
-    }
-    return result;
-  };
-  wrapped.__r756=true;
-  window.deleteRow=wrapped;
-}
-
-// Compatibilidade adicional: se uma chave de negócio "recbiz" já tiver sido
-// gravada por versões anteriores, converte-a para a chave estrutural "rec"
-// assim que houver uma ocorrência correspondente em memória.
-function migrateLegacyDeletedOccurrences(){
-  try{
-    if(typeof loadFinoraFeatureState!=='function' || typeof saveFinoraFeatureState!=='function')return 0;
-    const st=loadFinoraFeatureState()||{};
-    const deleted={...(st.deletedOccurrenceKeys||{})};
-    const rows=Array.isArray(data)?data:[];
-    let changed=0;
-
-    rows.forEach(row=>{
-      const month=monthOf(row);
-      const series=String(row?.seriesRootId||row?.parentRecurringId||'').trim();
-      if(!month||!series)return;
-      let business='';
-      try{business=window.finoraOccurrenceKeyR751?.(row)||''}catch(e){}
-      if(business && deleted[business]){
-        const structural=`rec|${series}|${month}`;
-        if(!deleted[structural]){
-          deleted[structural]=deleted[business];
-          changed++;
-        }
-      }
-    });
-
-    if(changed){
-      saveFinoraFeatureState(
-        {...st,deletedOccurrenceKeys:deleted,updatedAt:new Date().toISOString()},
-        {skipCloud:true}
-      );
-      try{finoraMarkCloudDirty?.()}catch(e){}
-      try{scheduleCloudPush?.()}catch(e){}
-    }
-    return changed;
-  }catch(e){
-    console.warn('FINORA R7.56: migração de exclusões',e);
-    return 0;
-  }
-}
-
-const baseAlerts=window.renderAlerts;
-if(typeof baseAlerts==='function' && !baseAlerts.__r756){
-  const wrappedAlerts=function(){
-    migrateLegacyDeletedOccurrences();
-    return baseAlerts.apply(this,arguments);
-  };
-  wrappedAlerts.__r756=true;
-  window.renderAlerts=wrappedAlerts;
-}
-
-window.finoraR756Diagnostics=function(){
-  let deleted={};
-  try{deleted=loadFinoraFeatureState()?.deletedOccurrenceKeys||{}}catch(e){}
-  return {
-    release:'R7.56 / 1.0.32',
-    deletedOccurrenceKeys:Object.keys(deleted).length,
-    structuralRecurringKeys:Object.keys(deleted).filter(k=>k.startsWith('rec|')).length,
-    cardKeys:Object.keys(deleted).filter(k=>k.startsWith('card|')).length
-  };
-};
-
-window.FINORA_RELEASE='1.0.32';
-window.FINORA_BUILD='R7.56';
-console.info('[FINORA] R7.56 / 1.0.32 — exclusões sincronizadas entre lançamentos e alertas.');
-})();
-</script>
-
-
-<script id="finora-r757-boleto-debito-origem">
-(()=>{'use strict';
- const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
- const qualifies=v=>{v=norm(v);return v.includes('boleto')||v.includes('debito');};
- function originWrap(){
-   const l=[...document.querySelectorAll('label')].find(x=>{const t=norm(x.textContent);return t.includes('conta')&&t.includes('origem')&&t.includes('pagamento');});
-   if(!l)return null;
-   return l.closest('.field,.form-group,.input-group,[data-field],.finora-field')||l.parentElement;
- }
- function paySelects(){
-   return [...document.querySelectorAll('select')].filter(s=>{
-     const key=norm((s.id||'')+' '+(s.name||'')+' '+(s.getAttribute('aria-label')||''));
-     const w=s.closest('.field,.form-group,.input-group,[data-field],.finora-field')||s.parentElement;
-     const txt=norm(w?.textContent||'');
-     return key.includes('pagamento')||key.includes('payment')||txt.includes('forma de pagamento')||txt.includes('meio de pagamento');
-   });
- }
- function apply(){
-   const w=originWrap(); if(!w)return;
-   const show=paySelects().some(s=>qualifies(s.value));
-   w.hidden=!show; w.style.display=show?'':'none'; w.setAttribute('aria-hidden',show?'false':'true');
-   const c=w.querySelector('input,select,textarea'); if(c)c.disabled=false;
- }
- function bind(){
-   paySelects().forEach(s=>{
-     if(s.dataset.finoraOriginR757)return;
-     s.dataset.finoraOriginR757='1';
-     s.addEventListener('change',()=>{apply();requestAnimationFrame(apply)},true);
-     s.addEventListener('input',apply,true);
-   });
-   apply();
- }
- document.addEventListener('DOMContentLoaded',bind);
- document.addEventListener('change',e=>{if(e.target?.matches?.('select'))queueMicrotask(bind)},true);
- let tm; const ob=new MutationObserver(()=>{clearTimeout(tm);tm=setTimeout(bind,35)});
- const start=()=>ob.observe(document.body,{childList:true,subtree:true});
- if(document.body)start();else document.addEventListener('DOMContentLoaded',start,{once:true});
- window.finoraApplyPaymentOriginRuleR757=apply;
-})();
-</script>
-
 </body></html>`);
       w.document.close();
     }catch(err){
@@ -27435,5 +27229,333 @@ html.dark #finoraR755ImagePreview,body.dark #finoraR755ImagePreview{
 })();
 </script>
 
+
+<!-- FINORA R7.56 / 1.0.32 — exclusão terminal também nos alertas -->
+<script id="finora-r756-alert-delete-consistency">
+(function(){
+'use strict';
+if(window.__FINORA_R756_ALERT_DELETE_CONSISTENCY__)return;
+window.__FINORA_R756_ALERT_DELETE_CONSISTENCY__=true;
+
+function monthOf(row){
+  return String(row?.vencimento||row?.dataLancamento||'').slice(0,7);
+}
+function saveDeletedOccurrenceKeys(keys){
+  keys=[...new Set((keys||[]).filter(Boolean))];
+  if(!keys.length)return false;
+  try{
+    if(typeof loadFinoraFeatureState!=='function' || typeof saveFinoraFeatureState!=='function')return false;
+    const st=loadFinoraFeatureState()||{};
+    const deleted={...(st.deletedOccurrenceKeys||{})};
+    const now=new Date().toISOString();
+    keys.forEach(k=>deleted[k]=now);
+    saveFinoraFeatureState(
+      {...st,deletedOccurrenceKeys:deleted,updatedAt:now},
+      {skipCloud:true}
+    );
+    try{finoraMarkCloudDirty?.()}catch(e){}
+    try{scheduleCloudPush?.()}catch(e){}
+    return true;
+  }catch(e){
+    console.warn('FINORA R7.56: não foi possível registrar exclusão da ocorrência',e);
+    return false;
+  }
+}
+function keysFor(row){
+  if(!row)return [];
+  const month=monthOf(row);
+  if(!month)return [];
+  const keys=[];
+
+  // Mantém compatibilidade com a chave de negócio já usada pela R7.51.
+  try{
+    const businessKey=window.finoraOccurrenceKeyR751?.(row);
+    if(businessKey)keys.push(businessKey);
+  }catch(e){}
+
+  // CRÍTICO: o gerador de alertas consulta rec|<seriesRootId>|<competência>.
+  // A R7.51 gravava apenas "recbiz|..." em vários casos, permitindo que
+  // o mesmo alerta virtual reaparecesse logo após excluir o lançamento.
+  const series=String(row.seriesRootId||row.parentRecurringId||'').trim();
+  const recurring=!!(
+    row.recorrente==='mensal' || row.generatedReminder ||
+    row.materializedOccurrence || row.parentRecurringId || series
+  );
+  if(recurring && series)keys.push(`rec|${series}|${month}`);
+
+  const card=String(row.cardId||'').trim();
+  const invoice=!!(
+    card && (
+      row.virtualCardAlert ||
+      String(row.source||'')==='card-invoice-alert' ||
+      /^fatura\b/i.test(String(row.descricao||''))
+    )
+  );
+  if(invoice)keys.push(`card|${card}|${month}`);
+
+  return keys;
+}
+
+const baseDelete=window.deleteRow;
+if(typeof baseDelete==='function' && !baseDelete.__r756){
+  const wrapped=async function(id){
+    // Captura antes da exclusão, pois depois o registro já não existe em data.
+    const before=(Array.isArray(data)?data:[]).find(x=>String(x?.id||'')===String(id));
+    const keys=keysFor(before);
+
+    const result=await baseDelete.apply(this,arguments);
+    const stillExists=(Array.isArray(data)?data:[]).some(x=>String(x?.id||'')===String(id));
+
+    if(result!==false && !stillExists){
+      saveDeletedOccurrenceKeys(keys);
+
+      // Remove qualquer sobra visual e recalcula os alertas somente depois
+      // de persistir a competência excluída, impedindo recriação virtual.
+      try{
+        if(typeof window.finoraCanonicalTransactions==='function'){
+          data=window.finoraCanonicalTransactions(data);
+        }
+        finoraSafeStoreTransactionsR741?.(data);
+      }catch(e){}
+      try{render?.()}catch(e){}
+      try{renderAlerts?.()}catch(e){}
+    }
+    return result;
+  };
+  wrapped.__r756=true;
+  window.deleteRow=wrapped;
+}
+
+// Compatibilidade adicional: se uma chave de negócio "recbiz" já tiver sido
+// gravada por versões anteriores, converte-a para a chave estrutural "rec"
+// assim que houver uma ocorrência correspondente em memória.
+function migrateLegacyDeletedOccurrences(){
+  try{
+    if(typeof loadFinoraFeatureState!=='function' || typeof saveFinoraFeatureState!=='function')return 0;
+    const st=loadFinoraFeatureState()||{};
+    const deleted={...(st.deletedOccurrenceKeys||{})};
+    const rows=Array.isArray(data)?data:[];
+    let changed=0;
+
+    rows.forEach(row=>{
+      const month=monthOf(row);
+      const series=String(row?.seriesRootId||row?.parentRecurringId||'').trim();
+      if(!month||!series)return;
+      let business='';
+      try{business=window.finoraOccurrenceKeyR751?.(row)||''}catch(e){}
+      if(business && deleted[business]){
+        const structural=`rec|${series}|${month}`;
+        if(!deleted[structural]){
+          deleted[structural]=deleted[business];
+          changed++;
+        }
+      }
+    });
+
+    if(changed){
+      saveFinoraFeatureState(
+        {...st,deletedOccurrenceKeys:deleted,updatedAt:new Date().toISOString()},
+        {skipCloud:true}
+      );
+      try{finoraMarkCloudDirty?.()}catch(e){}
+      try{scheduleCloudPush?.()}catch(e){}
+    }
+    return changed;
+  }catch(e){
+    console.warn('FINORA R7.56: migração de exclusões',e);
+    return 0;
+  }
+}
+
+const baseAlerts=window.renderAlerts;
+if(typeof baseAlerts==='function' && !baseAlerts.__r756){
+  const wrappedAlerts=function(){
+    migrateLegacyDeletedOccurrences();
+    return baseAlerts.apply(this,arguments);
+  };
+  wrappedAlerts.__r756=true;
+  window.renderAlerts=wrappedAlerts;
+}
+
+window.finoraR756Diagnostics=function(){
+  let deleted={};
+  try{deleted=loadFinoraFeatureState()?.deletedOccurrenceKeys||{}}catch(e){}
+  return {
+    release:'R7.56 / 1.0.32',
+    deletedOccurrenceKeys:Object.keys(deleted).length,
+    structuralRecurringKeys:Object.keys(deleted).filter(k=>k.startsWith('rec|')).length,
+    cardKeys:Object.keys(deleted).filter(k=>k.startsWith('card|')).length
+  };
+};
+
+window.FINORA_RELEASE='1.0.32';
+window.FINORA_BUILD='R7.56';
+console.info('[FINORA] R7.56 / 1.0.32 — exclusões sincronizadas entre lançamentos e alertas.');
+})();
+</script>
+
+
+<script id="finora-r757-boleto-debito-origem">
+(()=>{'use strict';
+ const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+ const qualifies=v=>{v=norm(v);return v.includes('boleto')||v.includes('debito');};
+ function originWrap(){
+   const l=[...document.querySelectorAll('label')].find(x=>{const t=norm(x.textContent);return t.includes('conta')&&t.includes('origem')&&t.includes('pagamento');});
+   if(!l)return null;
+   return l.closest('.field,.form-group,.input-group,[data-field],.finora-field')||l.parentElement;
+ }
+ function paySelects(){
+   return [...document.querySelectorAll('select')].filter(s=>{
+     const key=norm((s.id||'')+' '+(s.name||'')+' '+(s.getAttribute('aria-label')||''));
+     const w=s.closest('.field,.form-group,.input-group,[data-field],.finora-field')||s.parentElement;
+     const txt=norm(w?.textContent||'');
+     return key.includes('pagamento')||key.includes('payment')||txt.includes('forma de pagamento')||txt.includes('meio de pagamento');
+   });
+ }
+ function apply(){
+   const w=originWrap(); if(!w)return;
+   const show=paySelects().some(s=>qualifies(s.value));
+   w.hidden=!show; w.style.display=show?'':'none'; w.setAttribute('aria-hidden',show?'false':'true');
+   const c=w.querySelector('input,select,textarea'); if(c)c.disabled=false;
+ }
+ function bind(){
+   paySelects().forEach(s=>{
+     if(s.dataset.finoraOriginR757)return;
+     s.dataset.finoraOriginR757='1';
+     s.addEventListener('change',()=>{apply();requestAnimationFrame(apply)},true);
+     s.addEventListener('input',apply,true);
+   });
+   apply();
+ }
+ document.addEventListener('DOMContentLoaded',bind);
+ document.addEventListener('change',e=>{if(e.target?.matches?.('select'))queueMicrotask(bind)},true);
+ let tm; const ob=new MutationObserver(()=>{clearTimeout(tm);tm=setTimeout(bind,35)});
+ const start=()=>ob.observe(document.body,{childList:true,subtree:true});
+ if(document.body)start();else document.addEventListener('DOMContentLoaded',start,{once:true});
+ window.finoraApplyPaymentOriginRuleR757=apply;
+})();
+</script>
+
+<!-- FINORA R7.58 / 1.0.33 — alertas fiéis + meta estável -->
+<script id="finora-r758-alert-goal-stability">
+(function(){
+'use strict';
+if(window.__FINORA_R758_ALERT_GOAL_STABILITY__)return;
+window.__FINORA_R758_ALERT_GOAL_STABILITY__=true;
+
+// 1) Alertas: ocorrência virtual recorrente é apenas previsão futura.
+// Pendências vencidas só podem vir de lançamentos reais existentes em `data`.
+const baseRenderAlertsR758=window.renderAlerts;
+if(typeof baseRenderAlertsR758==='function'){
+  window.renderAlerts=function(){
+    let originalData=null, filteredData=null;
+    try{
+      const arr=(typeof data!=='undefined'&&Array.isArray(data))?data:null;
+      if(arr){
+        originalData=arr;
+        const todayIso=(typeof today==='function'?today():new Date().toISOString().slice(0,10));
+        filteredData=arr.filter(x=>{
+          // Não remove lançamentos reais. A proteção abaixo elimina apenas roots técnicos
+          // recorrentes antigos já substituídos/materializados na mesma série.
+          if(!x || x.generatedReminder || x.virtualRecurringAlert)return true;
+          if(x.recorrente!=='mensal' || x.materializedOccurrence || x.parentRecurringId)return true;
+          const rootId=String(x.seriesRootId||x.id||'');
+          const ref=String((typeof referenceDate==='function'?referenceDate(x):(x.vencimento||x.dataLancamento||''))||'');
+          if(!rootId||!ref||ref>todayIso)return true;
+          const paidReplacement=arr.some(r=>r&&r!==x&&
+            (r.status==='pago'||r.dataPagamento)&&
+            String(r.seriesRootId||r.parentRecurringId||'')===rootId&&
+            String((typeof referenceDate==='function'?referenceDate(r):(r.vencimento||r.dataLancamento||''))||'').slice(0,7)===ref.slice(0,7));
+          return !paidReplacement;
+        });
+        if(filteredData!==arr)data=filteredData;
+      }
+      return baseRenderAlertsR758.apply(this,arguments);
+    }finally{
+      if(originalData)data=originalData;
+      requestAnimationFrame(()=>{
+        const now=(typeof today==='function'?today():new Date().toISOString().slice(0,10));
+        document.querySelectorAll('#alertsBox .alert-item').forEach(item=>{
+          const meta=item.querySelector('.meta')?.textContent||'';
+          const m=meta.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+          if(!m)return;
+          const iso=`${m[3]}-${m[2]}-${m[1]}`;
+          if(iso>=now)return;
+          // Um alerta vencido precisa corresponder a um lançamento REAL pendente nessa data.
+          const desc=(item.querySelector('strong')?.textContent||'').trim().toLowerCase();
+          const real=(Array.isArray(originalData)?originalData:[]).some(x=>{
+            const d=String(x?.vencimento||x?.dataLancamento||'');
+            const xd=String(x?.descricao||'').trim().toLowerCase();
+            const st=(typeof effectiveStatus==='function'?effectiveStatus(x):x?.status);
+            return d===iso && xd===desc && st!=='pago' && !x?.virtualRecurringAlert && !x?.virtualCardAlert;
+          });
+          if(!real)item.remove();
+        });
+        const panel=document.getElementById('simpleAlertsPanel');
+        panel?.querySelectorAll('.alert-category').forEach(c=>{if(!c.querySelector('.alert-item'))c.remove()});
+        panel?.querySelectorAll('.alert-month-block').forEach(b=>{if(!b.querySelector('.alert-item'))b.remove()});
+        const n=panel?.querySelectorAll('.alert-item').length||0;
+        const count=document.getElementById('alertCount');if(count)count.textContent=`${n} alerta${n===1?'':'s'}`;
+      });
+    }
+  };
+}
+
+// 2) Meta opcional: evita reescrever o <select> em todo MutationObserver/render.
+// Só atualiza as opções quando a lista de metas realmente mudou e preserva a seleção.
+let goalSigR758='';
+function stableGoalFieldR758(force=false){
+  const field=document.getElementById('goalUseField');
+  const sel=document.getElementById('goalUseSelect');
+  if(!field||!sel)return;
+  let goals=[];
+  try{goals=(typeof loadFinoraFeatureState==='function'&&loadFinoraFeatureState().goals)||[]}catch(e){}
+  const sig=JSON.stringify(goals.map(g=>[String(g?.id||''),String(g?.name||'')]));
+  const selected=sel.value;
+  if(force||sig!==goalSigR758){
+    goalSigR758=sig;
+    const html='<option value="">Nenhuma meta</option>'+goals.map(g=>
+      `<option value="${String(g?.id||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}">${String(g?.name||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</option>`
+    ).join('');
+    if(sel.innerHTML!==html)sel.innerHTML=html;
+    if(goals.some(g=>String(g?.id||'')===String(selected)))sel.value=selected;
+  }
+  field.style.display='block';
+  field.classList.add('finora-r747-goal-link','finora-v102-visible');
+  field.classList.remove('finora-v102-hidden');
+  sel.classList.add('finora-v102-visible','visible');
+  sel.classList.remove('finora-v102-hidden');
+  const label=field.querySelector(':scope > label:first-child');if(label)label.textContent='Meta (opcional)';
+  const cb=document.getElementById('goalUseCheck');if(cb)cb.checked=!!sel.value;
+}
+
+// Captura alterações reais de metas/abertura de edição, sem observar mutações do próprio select.
+document.addEventListener('click',e=>{
+  if(e.target?.matches?.('#r748GoalSave,#v90GoalSave,[data-v90-goal-del],[data-v90-goal-edit]'))setTimeout(()=>stableGoalFieldR758(true),80);
+},true);
+document.addEventListener('change',e=>{
+  if(e.target?.id==='goalUseSelect'){
+    const cb=document.getElementById('goalUseCheck');if(cb)cb.checked=!!e.target.value;
+  }
+},true);
+const baseEditRowR758=window.editRow;
+if(typeof baseEditRowR758==='function'){
+  window.editRow=function(id){
+    const x=(typeof rowById==='function'?rowById(id):null);
+    const result=baseEditRowR758.apply(this,arguments);
+    setTimeout(()=>{
+      stableGoalFieldR758(true);
+      const sel=document.getElementById('goalUseSelect');
+      if(sel&&x?.goalId)sel.value=String(x.goalId);
+      const cb=document.getElementById('goalUseCheck');if(cb)cb.checked=!!sel?.value;
+    },0);
+    return result;
+  };
+}
+setTimeout(()=>stableGoalFieldR758(true),0);
+window.FINORA_RELEASE='1.0.33';window.FINORA_BUILD='R7.58';
+console.info('[FINORA] R7.58 / 1.0.33 — alertas fiéis aos lançamentos reais + campo Meta estável.');
+})();
+</script>
 </body>
 </html>
