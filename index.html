@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.40"><meta name="finora-build" content="R7.65">
+<meta name="finora-version" content="1.0.41"><meta name="finora-build" content="R7.66">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -12279,6 +12279,7 @@ $('cancelEdit').onclick=()=>{
   const mode=currentLaunchMode==='entrada'?'entrada':currentLaunchMode==='saida'?'saida':$('tipo').value;
   resetForm();
   applyLaunchMode(mode,{keepForm:true});
+  try{toast('Alterações canceladas.')}catch(e){}
 };
 $('clearAccount').onclick=async()=>{
   if(!isAdmin())return toast('Somente o administrador pode limpar este ambiente.');
@@ -16118,7 +16119,7 @@ setTimeout(renderHomeCategoryDonut,0);
 
       if(!desc||!Number.isFinite(value)||value<=0||!category||!date){
         if(typeof toast==='function')toast('Preencha descrição, valor, categoria e data.');
-        else alert('Preencha descrição, valor, categoria e data.');
+        else toast('Preencha descrição, valor, categoria e data.');
         return;
       }
 
@@ -16215,7 +16216,7 @@ setTimeout(renderHomeCategoryDonut,0);
       }catch(e){
         console.error('FINORA v85 quick launch',e);
         if(typeof toast==='function')toast('Não foi possível salvar o lançamento rápido.');
-        else alert('Não foi possível salvar o lançamento rápido.');
+        else toast('Não foi possível salvar o lançamento rápido.');
       }finally{
         saveBtn.disabled=false;
         delete saveBtn.dataset.busy;
@@ -26173,7 +26174,8 @@ body.finora-v84-dark .finora-r745-control-start button{background:#17382b;color:
 })();
 </script>
 
-\n<style id="finora-r746-style">
+
+<style id="finora-r746-style">
 /* FINORA R7.46 — correções homologação: metas + dark + status */
 /* Metas: camada de interação acima de qualquer decoração/overlay legado. */
 #finoraUtilityPanel.section-modal-active #finoraUtilityBody,
@@ -27674,7 +27676,7 @@ setTimeout(()=>setSave759('ready'),0);
 $('entryForm')?.addEventListener('submit',()=>{
   setSave759('saving');
   // O handler canônico é local-first. Depois dele, o registro já está no estado local e a nuvem sincroniza em segundo plano.
-  setTimeout(()=>{setSave759('ready');try{(window.finoraR745Feedback||window.toast)?.('Registro gravado/atualizado com sucesso.','success')}catch(e){}},80);
+  setTimeout(()=>{setSave759('ready');try{(window.finoraR745Feedback||window.toast)?.('Alterações salvas com sucesso.','success')}catch(e){}},80);
 },false);
 // Qualquer edição abre com botão pronto, nunca herdando "Salvando".
 document.addEventListener('click',e=>{if(e.target?.matches?.('[data-row-action="edit"],button[onclick*="editRow"]'))setTimeout(()=>setSave759('ready'),0)},true);
@@ -27812,6 +27814,122 @@ console.info('[FINORA] R7.64 / 1.0.39 — data de criação visível em Metas + 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',cleanMachineText,{once:true});else cleanMachineText();
   setTimeout(cleanMachineText,600);
   console.info('[FINORA] R7.65 / 1.0.40 — NORA Insights adaptado ao mobile e artefato textual do rodapé tratado; features validadas preservadas.');
+})();
+</script>
+
+<style id="finora-r766-ux-style">
+/* R7.66 — camada exclusivamente de UX/UI. Não altera persistência, autenticação ou regras financeiras. */
+#toast.finora-r766-toast{
+  position:fixed!important;right:22px!important;bottom:24px!important;left:auto!important;
+  z-index:2147483647!important;max-width:min(420px,calc(100vw - 32px))!important;
+  padding:13px 16px 13px 44px!important;border-radius:14px!important;
+  box-shadow:0 14px 38px rgba(0,0,0,.20)!important;background:#0b5f3e!important;color:#fff!important;
+  font:700 11px/1.45 Verdana,sans-serif!important;letter-spacing:.01em!important;
+}
+#toast.finora-r766-toast::before{content:'✓';position:absolute;left:15px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.18);font-weight:900}
+#toast.finora-r766-toast.finora-r766-error{background:#a72d31!important}
+#toast.finora-r766-toast.finora-r766-error::before{content:'!'}
+#toast.finora-r766-toast.finora-r766-neutral{background:#42534d!important}
+#toast.finora-r766-toast.finora-r766-neutral::before{content:'•'}
+@media(max-width:768px){
+  #toast.finora-r766-toast{left:14px!important;right:14px!important;bottom:calc(78px + env(safe-area-inset-bottom))!important;max-width:none!important}
+}
+</style>
+<script id="finora-r766-ux-layer">
+(()=>{
+  'use strict';
+  const $=id=>document.getElementById(id);
+
+  /* Traduz somente mensagens destinadas à interface. Detalhes técnicos continuam no console. */
+  function friendly(raw){
+    const t=String(raw||'').trim();
+    if(!t)return 'Operação concluída.';
+    if(/registro(s)?\s+(gravado|gravados)|commit|committed|database|banco de dados|jsonb|table\s|tabela\s|uuid|payload/i.test(t)){
+      if(/erro|falha|não foi possível|rejeitad|401|403|409|500/i.test(t)) return 'Não foi possível concluir a ação. Tente novamente.';
+      return 'Salvo com sucesso.';
+    }
+    if(/supabase/i.test(t)){
+      if(/conex|configura|url|chave|projeto/i.test(t)) return 'Não foi possível conectar ao serviço online. Verifique a conexão e tente novamente.';
+      return /erro|falha|não foi possível|indisponível|rejeitad/i.test(t)?'Não foi possível concluir a ação. Tente novamente.':'Sincronização concluída.';
+    }
+    return t;
+  }
+  function kind(text){
+    if(/cancelad|interrompid/i.test(text))return 'neutral';
+    if(/não foi possível|erro|falha|inválid|obrigatóri|informe|bloqueou|indisponível/i.test(text))return 'error';
+    return 'success';
+  }
+  function decorate(text,type){
+    const el=$('toast');if(!el)return;
+    el.classList.add('finora-r766-toast');
+    el.classList.toggle('finora-r766-error',type==='error');
+    el.classList.toggle('finora-r766-neutral',type==='neutral');
+    el.setAttribute('role',type==='error'?'alert':'status');
+    el.setAttribute('aria-live',type==='error'?'assertive':'polite');
+    el.textContent=text;
+  }
+
+  const previousToast=window.toast;
+  if(typeof previousToast==='function'){
+    window.toast=function(message,type){
+      const text=friendly(message), k=type||kind(text);
+      const result=previousToast.call(this,text);
+      decorate(text,k);
+      return result;
+    };
+  }
+  window.FinoraFeedback={
+    show:(m,t)=>window.toast?.(friendly(m),t||kind(friendly(m))),
+    saved:()=>window.toast?.('Salvo com sucesso.','success'),
+    updated:()=>window.toast?.('Alterações salvas com sucesso.','success'),
+    deleted:()=>window.toast?.('Excluído com sucesso.','success'),
+    cancelled:()=>window.toast?.('Alterações canceladas.','neutral'),
+    error:()=>window.toast?.('Não foi possível concluir a ação. Tente novamente.','error')
+  };
+
+  /* Histórico leve de painéis: preserva a tela anterior sem alterar rotas/regras existentes. */
+  const nav={stack:[],restoring:false};
+  const originalOpen=window.openSectionModal;
+  const originalClose=window.closeSectionModal;
+  if(typeof originalOpen==='function'&&typeof originalClose==='function'){
+    window.openSectionModal=function(id){
+      try{
+        const current=window.activeSectionModalId||'';
+        if(!nav.restoring&&current&&current!==id){
+          nav.stack.push({id:current,scroll:$(current)?.scrollTop||0});
+          if(nav.stack.length>12)nav.stack.shift();
+        }
+      }catch(e){}
+      return originalOpen.call(this,id);
+    };
+    window.closeSectionModal=function(options){
+      const explicitHome=options&&options.home===true;
+      const result=originalClose.call(this);
+      if(explicitHome){nav.stack.length=0;return result;}
+      const prev=nav.stack.pop();
+      if(prev?.id){
+        nav.restoring=true;
+        try{originalOpen.call(this,prev.id);requestAnimationFrame(()=>{const p=$(prev.id);if(p)p.scrollTop=prev.scroll||0})}finally{nav.restoring=false}
+      }
+      return result;
+    };
+    window.FinoraNavigation={
+      back:()=>window.closeSectionModal(),
+      clear:()=>{nav.stack.length=0},
+      state:()=>nav.stack.slice()
+    };
+  }
+
+  /* Evita qualquer texto técnico residual renderizado como escape literal no rodapé. */
+  function cleanTechnicalText(root=document.body){
+    if(!root)return;
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+    nodes.forEach(n=>{if(/^\\n\s*$/.test(n.nodeValue||''))n.nodeValue='';});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>cleanTechnicalText(),{once:true});else cleanTechnicalText();
+
+  console.info('[FINORA] R7.66 / 1.0.41 — UX fluida: feedback amigável, mensagens técnicas abstraídas e histórico leve de navegação; regras de negócio preservadas.');
 })();
 </script>
 </body>
