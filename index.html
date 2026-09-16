@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FINORA — Controle Financeiro Pessoal & Familiar</title>
-<meta name="finora-version" content="1.0.41"><meta name="finora-build" content="R7.66">
+<meta name="finora-version" content="1.0.43"><meta name="finora-build" content="R7.68">
 <style>
 :root{
   --bg:#f4f7f2;--paper:#ffffff;--ink:#22302a;--muted:#6b7871;
@@ -18101,7 +18101,7 @@ setTimeout(renderHomeCategoryDonut,0);
     const category=v94GoalCategory(g);
     return (data||[]).filter(x=>{
       if(!sameWorkspace(x)||!hasKnownValue(x))return false;
-      if(x.tipo==='entrada'&&String(x.goalId||'')===String(g.id))return true;
+      if(String(x.goalId||'')===String(g.id))return true;
       if(x.tipo==='saida'&&x.categoria===category)return true;
       return false;
     }).reduce((s,x)=>s+Number(x.valor||0),0);
@@ -26474,7 +26474,18 @@ body.finora-v84-dark .finora-r748-goal-card-actions button.danger{color:#ffb8b2!
   const state=()=>{try{return typeof loadFinoraFeatureState==='function'?loadFinoraFeatureState():{goals:[]}}catch(_){return {goals:[]}}};
   const save=s=>{if(typeof saveFinoraFeatureState==='function')saveFinoraFeatureState(s)};
   const notify=m=>{try{if(typeof toast==='function')toast(m)}catch(_){}};
-  function pct(g){const t=Number(g.target||0),a=Number(g.saved||0);return t>0?Math.max(0,Math.min(100,a/t*100)):0}
+  function goalLinkedMovement(g){
+    const gid=String(g?.id||'');
+    const category='Meta: '+String(g?.name||'');
+    return (Array.isArray(data)?data:[]).filter(x=>{
+      if(typeof sameWorkspace==='function'&&!sameWorkspace(x))return false;
+      if(typeof hasKnownValue==='function'&&!hasKnownValue(x))return false;
+      if(gid && String(x?.goalId||'')===gid)return true;
+      return x?.tipo==='saida' && String(x?.categoria||'')===category;
+    }).reduce((sum,x)=>sum+Number(x?.valor||0),0);
+  }
+  function goalAccumulated(g){return Number(g?.saved||0)+goalLinkedMovement(g)}
+  function pct(g){const t=Number(g.target||0),a=goalAccumulated(g);return t>0?Math.max(0,Math.min(100,a/t*100)):0}
   function syncGoalSelect(){
     const sel=document.getElementById('goalUseSelect'); if(!sel)return;
     const list=(state().goals||[]),old=sel.value;
@@ -26505,7 +26516,7 @@ body.finora-v84-dark .finora-r748-goal-card-actions button.danger{color:#ffb8b2!
     function renderGrid(){
       const list=(state().goals||[]),grid=document.getElementById('r748GoalGrid');
       if(!list.length){grid.innerHTML='<div class="finora-r748-empty">Nenhuma meta cadastrada. Clique em <strong>+ Adicionar meta</strong> para criar a primeira.</div>';return}
-      grid.innerHTML=list.map(g=>{const p=pct(g),remain=Math.max(0,Number(g.target||0)-Number(g.saved||0));return '<article class="finora-r748-goal-card"><div class="finora-r748-goal-card-head"><div><h4>'+esc(g.name)+'</h4><small>'+(g.createdAt?'Criada em '+new Date(g.createdAt).toLocaleDateString('pt-BR')+' · ':'Data de criação não registrada · ')+(g.deadline?'Prazo '+new Date(g.deadline+'T12:00:00').toLocaleDateString('pt-BR'):'Sem prazo definido')+'</small></div><strong>'+p.toFixed(0)+'%</strong></div><div class="finora-r748-goal-progress"><i style="width:'+p+'%"></i></div><div class="finora-r748-goal-stats"><span>Meta<b>'+money(g.target)+'</b></span><span>Acumulado<b>'+money(g.saved)+'</b></span><span>Restante<b>'+money(remain)+'</b></span><span>Aporte/mês<b>'+money(g.monthly)+'</b></span></div><div class="finora-r748-goal-card-actions"><button type="button" data-r748-edit="'+esc(g.id)+'">Editar</button><button type="button" class="danger" data-r748-del="'+esc(g.id)+'">Excluir</button></div></article>'}).join('');
+      grid.innerHTML=list.map(g=>{const accumulated=goalAccumulated(g),p=pct(g),remain=Math.max(0,Number(g.target||0)-accumulated);return '<article class="finora-r748-goal-card"><div class="finora-r748-goal-card-head"><div><h4>'+esc(g.name)+'</h4><small>'+(g.createdAt?'Criada em '+new Date(g.createdAt).toLocaleDateString('pt-BR')+' · ':'Data de criação não registrada · ')+(g.deadline?'Prazo '+new Date(g.deadline+'T12:00:00').toLocaleDateString('pt-BR'):'Sem prazo definido')+'</small></div><strong>'+p.toFixed(0)+'%</strong></div><div class="finora-r748-goal-progress"><i style="width:'+p+'%"></i></div><div class="finora-r748-goal-stats"><span>Meta<b>'+money(g.target)+'</b></span><span>Acumulado<b>'+money(accumulated)+'</b></span><span>Restante<b>'+money(remain)+'</b></span><span>Aporte/mês<b>'+money(g.monthly)+'</b></span></div><div class="finora-r748-goal-card-actions"><button type="button" data-r748-edit="'+esc(g.id)+'">Editar</button><button type="button" class="danger" data-r748-del="'+esc(g.id)+'">Excluir</button></div></article>'}).join('');
       grid.querySelectorAll('[data-r748-edit]').forEach(b=>b.onclick=()=>{const g=(state().goals||[]).find(x=>String(x.id)===String(b.dataset.r748Edit));if(g)openForm(g)});
       grid.querySelectorAll('[data-r748-del]').forEach(b=>b.onclick=()=>{if(!confirm('Excluir esta meta?'))return;const s=state();s.goals=(s.goals||[]).filter(x=>String(x.id)!==String(b.dataset.r748Del));s.updatedAt=new Date().toISOString();save(s);renderGrid();syncGoalSelect();notify('Meta excluída.')});
     }
@@ -27785,8 +27796,10 @@ function render(){const input=document.getElementById('noraInsightsMonth');if(!i
   const gm=v=>Number(v||0);
   const gmoney=v=>(typeof money==='function'?money(gm(v)):gm(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}));
   const gdate=v=>{if(!v)return 'Não registrada';try{return new Date(String(v).length===10?v+'T12:00:00':v).toLocaleDateString('pt-BR')}catch(e){return 'Não registrada'}};
-  const totalTarget=goals.reduce((a,g)=>a+gm(g.target),0),totalSaved=goals.reduce((a,g)=>a+gm(g.saved),0),overall=totalTarget>0?Math.min(100,totalSaved/totalTarget*100):0;
-  const cards=goals.map(g=>{const target=gm(g.target),saved=gm(g.saved),remain=Math.max(0,target-saved),pct=target>0?Math.min(100,saved/target*100):0;let insight='';if(target>0){insight=pct>=100?'Meta alcançada.':`Você já alcançou ${pct.toFixed(0)}% desta meta. Faltam ${gmoney(remain)} para concluir.`}return `<article class="nora-card nora-goal-card"><div class="nora-goal-head"><div><small>Meta financeira</small><h3>${esc(g.name||'Meta')}</h3></div><strong>${pct.toFixed(0)}%</strong></div><div class="nora-goal-dates"><span><b>Criada em</b>${gdate(g.createdAt)}</span><span><b>Prazo</b>${g.deadline?gdate(g.deadline):'Sem prazo'}</span></div><div class="nora-goal-progress"><i style="width:${pct}%"></i></div><div class="nora-goal-stats"><span>Meta<b>${gmoney(target)}</b></span><span>Acumulado<b>${gmoney(saved)}</b></span><span>Falta<b>${gmoney(remain)}</b></span><span>Aporte/mês<b>${gmoney(g.monthly)}</b></span></div><div class="nora-highlight"><b>Insight da NORA:</b> ${insight}</div></article>`}).join('');
+  const goalMovement=g=>{const gid=String(g?.id||''),cat='Meta: '+String(g?.name||'');return realRows().filter(x=>(gid&&String(x?.goalId||'')===gid)||(x?.tipo==='saida'&&String(x?.categoria||'')===cat)).reduce((a,x)=>a+gm(x?.valor),0)};
+  const goalSaved=g=>gm(g?.saved)+goalMovement(g);
+  const totalTarget=goals.reduce((a,g)=>a+gm(g.target),0),totalSaved=goals.reduce((a,g)=>a+goalSaved(g),0),overall=totalTarget>0?Math.min(100,totalSaved/totalTarget*100):0;
+  const cards=goals.map(g=>{const target=gm(g.target),saved=goalSaved(g),remain=Math.max(0,target-saved),pct=target>0?Math.min(100,saved/target*100):0;let insight='';if(target>0){insight=pct>=100?'Meta alcançada.':`Você já alcançou ${pct.toFixed(0)}% desta meta. Faltam ${gmoney(remain)} para concluir.`}return `<article class="nora-card nora-goal-card"><div class="nora-goal-head"><div><small>Meta financeira</small><h3>${esc(g.name||'Meta')}</h3></div><strong>${pct.toFixed(0)}%</strong></div><div class="nora-goal-dates"><span><b>Criada em</b>${gdate(g.createdAt)}</span><span><b>Prazo</b>${g.deadline?gdate(g.deadline):'Sem prazo'}</span></div><div class="nora-goal-progress"><i style="width:${pct}%"></i></div><div class="nora-goal-stats"><span>Meta<b>${gmoney(target)}</b></span><span>Acumulado<b>${gmoney(saved)}</b></span><span>Falta<b>${gmoney(remain)}</b></span><span>Aporte/mês<b>${gmoney(g.monthly)}</b></span></div><div class="nora-highlight"><b>Insight da NORA:</b> ${insight}</div></article>`}).join('');
   c.innerHTML=`<div class="nora-kpis"><div class="nora-card nora-kpi"><small>Metas ativas</small><strong>${goals.length}</strong></div><div class="nora-card nora-kpi"><small>Valor dos objetivos</small><strong>${gmoney(totalTarget)}</strong></div><div class="nora-card nora-kpi"><small>Total acumulado</small><strong>${gmoney(totalSaved)}</strong></div><div class="nora-card nora-kpi"><small>Progresso geral</small><strong>${overall.toFixed(0)}%</strong></div></div><div style="height:12px"></div>${goals.length?`<div class="nora-goals-grid">${cards}</div>`:`<div class="nora-card"><h3>Metas</h3><div class="nora-empty">Nenhuma meta cadastrada no FINORA. Cadastre uma meta no menu Metas para acompanhar sua evolução aqui.</div></div>`}`;
 }
 }
@@ -27930,6 +27943,119 @@ console.info('[FINORA] R7.64 / 1.0.39 — data de criação visível em Metas + 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>cleanTechnicalText(),{once:true});else cleanTechnicalText();
 
   console.info('[FINORA] R7.66 / 1.0.41 — UX fluida: feedback amigável, mensagens técnicas abstraídas e histórico leve de navegação; regras de negócio preservadas.');
+})();
+</script>
+<style id="finora-r768-journey-style">
+/* R7.68 — UX de jornada. O status técnico de sincronização não é feedback de usuário. */
+#finoraSyncIndicatorR726{display:none!important;visibility:hidden!important;pointer-events:none!important}
+#toast.finora-r766-toast{right:22px!important;bottom:24px!important}
+@media(max-width:768px){#toast.finora-r766-toast{left:14px!important;right:14px!important;bottom:calc(82px + env(safe-area-inset-bottom))!important}}
+</style>
+<script id="finora-r768-journey-layer">
+(()=>{
+ 'use strict';
+ const $=id=>document.getElementById(id);
+ const J={stack:[],pending:null,restoring:false};
+ function launchMode(){
+   const p=$('simpleLaunchPanel');
+   if(!p)return '';
+   if(p.classList.contains('launch-entry-mode'))return 'entrada';
+   if(p.classList.contains('launch-expense-mode'))return 'saida';
+   return 'list';
+ }
+ function snapshot(){
+   const active=String(window.activeSectionModalId||'');
+   return {
+     section:active,
+     sectionScroll:active?($(active)?.scrollTop||0):0,
+     launchMode:active==='simpleLaunchPanel'?launchMode():'',
+     mobileMore:!!$('mobileMoreBackdrop')?.classList.contains('open'),
+     importOpen:!!$('importModalBackdrop')?.classList.contains('open'),
+     profileOpen:!!$('profileModalBackdrop')?.classList.contains('open'),
+     cloudOpen:!!$('cloudModalBackdrop')?.classList.contains('open'),
+     workspaceOpen:!!$('workspaceModalBackdrop')?.classList.contains('open'),
+     pageScroll:window.scrollY||0
+   };
+ }
+ function meaningful(s){return !!(s.section||s.mobileMore||s.importOpen||s.profileOpen||s.cloudOpen||s.workspaceOpen||s.pageScroll>20)}
+ function same(a,b){return a&&b&&a.section===b.section&&a.launchMode===b.launchMode&&a.mobileMore===b.mobileMore&&a.importOpen===b.importOpen&&a.profileOpen===b.profileOpen&&a.cloudOpen===b.cloudOpen&&a.workspaceOpen===b.workspaceOpen}
+ function push(s){
+   if(!s)return;
+   const last=J.stack[J.stack.length-1];
+   if(!same(last,s)){J.stack.push(s);if(J.stack.length>30)J.stack.shift()}
+ }
+ function hideAll(){
+   try{document.querySelectorAll('.popup-only-panel.section-modal-active').forEach(x=>x.classList.remove('section-modal-active'))}catch(e){}
+   try{$('sectionModalBackdrop')?.classList.remove('open')}catch(e){}
+   try{['mobileMoreBackdrop','importModalBackdrop','profileModalBackdrop','cloudModalBackdrop','workspaceModalBackdrop'].forEach(id=>$(id)?.classList.remove('open'))}catch(e){}
+   document.body.classList.remove('section-modal-open','finora-modal-open');
+   window.activeSectionModalId='';
+ }
+ function restore(s){
+   if(!s)return false;
+   J.restoring=true;
+   try{
+     hideAll();
+     if(s.section && $(s.section)){
+       // abre diretamente para não criar nova entrada no histórico
+       const el=$(s.section);window.activeSectionModalId=s.section;
+       try{window.ensurePopupCloseButton?.(el)}catch(e){}
+       el.classList.add('section-modal-active');$('sectionModalBackdrop')?.classList.add('open');document.body.classList.add('section-modal-open');
+       if(s.section==='simpleLaunchPanel'&&s.launchMode){try{window.applyLaunchMode?.(s.launchMode,true)}catch(e){try{applyLaunchMode(s.launchMode,true)}catch(_){}}}
+       requestAnimationFrame(()=>{el.scrollTop=s.sectionScroll||0});
+     }else if(s.mobileMore){$('mobileMoreBackdrop')?.classList.add('open')}
+     else if(s.importOpen){$('importModalBackdrop')?.classList.add('open');document.body.classList.add('finora-modal-open')}
+     else if(s.profileOpen){$('profileModalBackdrop')?.classList.add('open')}
+     else if(s.cloudOpen){$('cloudModalBackdrop')?.classList.add('open')}
+     else if(s.workspaceOpen){$('workspaceModalBackdrop')?.classList.add('open')}
+     else requestAnimationFrame(()=>window.scrollTo(0,s.pageScroll||0));
+     return true;
+   }finally{setTimeout(()=>{J.restoring=false},0)}
+ }
+ // Captura a tela real antes do clique. Resolve inclusive Mais -> item, pois o onclick fecha "Mais" antes de abrir o destino.
+ document.addEventListener('click',e=>{
+   const el=e.target?.closest?.('button,a,[onclick]'); if(!el)return;
+   const code=String(el.getAttribute('onclick')||'');
+   if(/openSectionModal|openLaunchModal|openFinoraUtilityPanel|openNoraInsights|openReportsPanel|openFinoraAuditPanel|openProfileModal|openCloudModal|openWorkspaceModal|openImportModal|openSimplePanel/.test(code)) J.pending=snapshot();
+ },true);
+ const baseOpen=window.openSectionModal, baseClose=window.closeSectionModal;
+ if(typeof baseOpen==='function'&&typeof baseClose==='function'){
+   window.openSectionModal=function(id){
+     if(!J.restoring){const before=J.pending||snapshot();J.pending=null;if(before.section!==id||before.launchMode!==launchMode())push(before)}
+     return baseOpen.call(this,id);
+   };
+   window.closeSectionModal=function(options){
+     if(J.restoring)return baseClose.call(this,options);
+     baseClose.call(this,options);
+     const prev=J.stack.pop();
+     if(prev)return restore(prev);
+     return true;
+   };
+ }
+ // Cancelar/fechar também usa a tela anterior quando o fluxo é modal.
+ window.FinoraNavigation={back:()=>window.closeSectionModal?.(),clear:()=>{J.stack.length=0;J.pending=null},state:()=>J.stack.slice()};
+
+ // Feedback: somente ações do usuário. Sincronização continua funcionando, mas fica silenciosa na interface.
+ const baseToast=window.toast;
+ if(typeof baseToast==='function'){
+   window.toast=function(message,type){
+     const t=String(message||'');
+     if(/sincroniz|sincronizado|sincronizando|nuvem|dados enviados|consolidados na nuvem|salvo localmente/i.test(t) && !/exclu|alter|salv[oa]|cadastrad|registrad|cancelad/i.test(t)) return;
+     // Remove complemento técnico sem perder o resultado da ação.
+     let clean=t.replace(/\s*[.·-]*\s*(sincronizando|e sincronizado|sincronizado)(\.\.\.|\.)?\s*$/i,'.').trim();
+     if(/cartão (atualizado|cadastrado).*sincron/i.test(t)) clean=/atualizado/i.test(t)?'Cartão alterado com sucesso.':'Cartão salvo com sucesso.';
+     if(/lançamento excluído.*sincron/i.test(t)) clean='Lançamento excluído com sucesso.';
+     return baseToast.call(this,clean,type);
+   };
+ }
+ // Indicador técnico nunca deve aparecer como mensagem persistente ao usuário.
+ const baseIndicator=window.finoraSyncIndicatorR726;
+ if(typeof baseIndicator==='function'){
+   window.finoraSyncIndicatorR726=function(state,message){
+     try{return baseIndicator.call(this,'idle','')}catch(e){return}
+   };
+ }
+ console.info('[FINORA] R7.68 / 1.0.43 — jornada: retorno à tela anterior em Web/Mobile e feedback apenas por ações; sincronização técnica silenciosa; regras de negócio preservadas.');
 })();
 </script>
 </body>
