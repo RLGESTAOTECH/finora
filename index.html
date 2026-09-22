@@ -9330,7 +9330,7 @@ function ensureRecurringNextMonths(){
   };
 
   roots.forEach(root=>{
-    const base=referenceDate(root);
+    const base=root.vencimento||referenceDate(root);
     if(!base) return;
     const rootId=root.id;
     if(root.seriesRootId!==rootId){root.seriesRootId=rootId;changed=true;}
@@ -9342,7 +9342,7 @@ function ensureRecurringNextMonths(){
     const endOffset=Math.max(3,distance+3);
 
     for(let offset=startOffset;offset<=endOffset;offset++){
-      const nextDate=recurringDateAtOffset(root,offset);
+      const nextDate=recurringDateAtOffset({...root,dataLancamento:base,vencimento:base},offset);
       if(!nextDate) continue;
 
       const exists=data.some(r=>{
@@ -9351,7 +9351,7 @@ function ensureRecurringNextMonths(){
           r.pessoa===root.pessoa &&
           r.tipo===root.tipo &&
           r.descricao===root.descricao;
-        return (sameSeries||legacyMatch) && referenceDate(r)===nextDate;
+        return (sameSeries||legacyMatch) && (r.vencimento||referenceDate(r))===nextDate;
       });
       if(exists) continue;
 
@@ -21803,10 +21803,15 @@ window.FINORA_RELEASE='1.0.13';
     let changed=false;
 
     roots.forEach(root=>{
-      const base=refDate4(root);
+      const base=root.vencimento||refDate4(root);
       if(!base)return;
-      const rootId=root.seriesRootId||root.id;
-      root.seriesRootId=rootId;
+      // Raiz recuperada: UUID antigo não existe mais. Usar ID REAL como chave
+      // estável e preservar o vínculo anterior somente para reconhecer filhos.
+      const legacySeries=String(root.seriesRootId||'');
+      const rootId=String(root.id||'');
+      if(!rootId)return;
+      if(root.seriesRootId!==rootId){root.seriesRootId=rootId;changed=true;}
+      if(root.parentRecurringId){root.parentRecurringId='';changed=true;}
       const tpl=recurrenceTemplate(root);
       root.recurrenceTemplate={...tpl};
       root.installmentStart=root.installmentStart||tpl.parcelasBase||root.parcelas||'';
@@ -21818,7 +21823,7 @@ window.FINORA_RELEASE='1.0.13';
       for(let offset=start;offset<=end;offset++){
         const parcel=installmentAt(root.installmentStart,offset);
         if(parcel===null)continue; // série parcelada terminou
-        const nextDate=recurringDate(root,offset);
+        const nextDate=recurringDate({...root,dataLancamento:base,vencimento:base},offset);
         if(!nextDate)continue;
 
         // R7.51: exclusão de uma ocorrência mensal é terminal por competência,
@@ -21829,9 +21834,14 @@ window.FINORA_RELEASE='1.0.13';
         }
 
         let existing=rows.find(r=>{
-          const sameSeries=String(r.seriesRootId||'')===String(rootId) ||
-            String(r.parentRecurringId||'')===String(root.id);
-          return sameSeries && refDate4(r)===nextDate;
+          const sameSeries=String(r.seriesRootId||'')===rootId ||
+            String(r.parentRecurringId||'')===rootId ||
+            (legacySeries && String(r.seriesRootId||'')===legacySeries);
+          // Um pagamento lançado separadamente também ocupa a competência.
+          const samePayment=String(r.descricao||'').trim().toLowerCase()===String(root.descricao||'').trim().toLowerCase() &&
+            String(r.pessoa||'')===String(root.pessoa||'') && String(r.tipo||'')===String(root.tipo||'') &&
+            String(r.account||'')===String(root.account||'');
+          return (sameSeries||samePayment) && (r.vencimento||refDate4(r))===nextDate;
         });
 
         if(existing){
@@ -21886,6 +21896,8 @@ window.FINORA_RELEASE='1.0.13';
           vencimento:nextDate,
           attachment:null,
           generatedReminder:true,
+          materializedOccurrence:false,
+          materializedAt:'',
           recorrente:'mensal',
           createdAt:new Date().toISOString(),
           updatedAt:new Date().toISOString()
