@@ -9315,7 +9315,11 @@ function recurringDateAtOffset(x, offset){
 }
 
 function ensureRecurringNextMonths(){
-  const roots=data.filter(x=>x.recorrente==='mensal' && !x.generatedReminder && !x.parentRecurringId && !x.seriesRootId /* legacy roots */ || x.recorrente==='mensal' && !x.generatedReminder && !x.parentRecurringId && String(x.seriesRootId||'')===String(x.id||''));
+  const roots=data.filter(x=>x.recorrente==='mensal' && !x.generatedReminder &&
+    (!x.parentRecurringId || String(x.parentRecurringId)===String(x.id) ||
+      !data.some(r=>r!==x && String(r.id||'')===String(x.parentRecurringId))) &&
+    (!x.seriesRootId || String(x.seriesRootId)===String(x.id) ||
+      !data.some(r=>r!==x && String(r.id||'')===String(x.seriesRootId))));
   const nowMonth=currentMonth();
   let changed=false;
 
@@ -9328,8 +9332,8 @@ function ensureRecurringNextMonths(){
   roots.forEach(root=>{
     const base=referenceDate(root);
     if(!base) return;
-    const rootId=root.seriesRootId||root.id;
-    root.seriesRootId=rootId;
+    const rootId=root.id;
+    if(root.seriesRootId!==rootId){root.seriesRootId=rootId;changed=true;}
 
     const distance=monthDistance(base,nowMonth);
     // Mantém um mês anterior, o mês atual e três meses futuros,
@@ -9352,8 +9356,12 @@ function ensureRecurringNextMonths(){
       if(exists) continue;
 
       const variableAmount=root.valorRecorrente==='variavel';
+      const safeTemplate=(root.recurrenceTemplate &&
+        String(root.recurrenceTemplate.descricao||'').trim().toLowerCase()===String(root.descricao||'').trim().toLowerCase())
+        ? root.recurrenceTemplate : null;
       data.push({
         ...root,
+        recurrenceTemplate:safeTemplate,
         id:crypto.randomUUID(),
         seriesRootId:rootId,
         parentRecurringId:root.id,
@@ -9624,7 +9632,7 @@ function renderAlerts(){
     const base=referenceDate(root);
     if(!base)return;
     const [by,bm,bd]=base.split('-').map(Number);
-    const rootId=String(root.seriesRootId||root.id||'');
+    const rootId=String(root.id||'');
     if(!rootId)return;
 
     projectionYears.forEach(y=>{
@@ -9779,7 +9787,7 @@ function renderAlerts(){
     if(!name || !norm(x.descricao).startsWith('fatura '))return false;
     const due=referenceDate(x);
     return paidRows.some(p=>{
-      if(p.tipo!==x.tipo || referenceDate(p)!==due || norm(p.pessoa)!==norm(x.pessoa))return false;
+      if(p.tipo!==x.tipo || referenceDate(p)!==due)return false;
       const other=invoiceKey(p);
       // Diferença histórica de digitação: RECARGAY / RECARGAPAY.
       return name===other || (name==='recargay' && other==='recargapay') ||
