@@ -9613,10 +9613,10 @@ function renderAlerts(){
     sameWorkspace(x) &&
     x.recorrente==='mensal' &&
     !x.generatedReminder &&
-    (!x.parentRecurringId || String(x.parentRecurringId)===String(x.id)) &&
+    (!x.parentRecurringId || String(x.parentRecurringId)===String(x.id) ||
+      !(Array.isArray(data)?data:[]).some(r=>r!==x && String(r.id||'')===String(x.parentRecurringId))) &&
     (!x.seriesRootId || String(x.seriesRootId)===String(x.id) ||
-      (String(x.parentRecurringId)===String(x.id) &&
-       !(Array.isArray(data)?data:[]).some(r=>r!==x && String(r.id||'')===String(x.seriesRootId))))
+      !(Array.isArray(data)?data:[]).some(r=>r!==x && String(r.id||'')===String(x.seriesRootId)))
   );
 
   const projectionYears=selectedYear?[selectedYear]:years;
@@ -9769,8 +9769,25 @@ function renderAlerts(){
   const actualSource=(typeof window.finoraCanonicalTransactions==='function')
     ? window.finoraCanonicalTransactions(Array.isArray(data)?data:[])
     : (Array.isArray(data)?data:[]);
+  // R7.69: uma baixa real no mesmo vencimento prevalece sobre lembrete
+  // legado de valor indefinido. Não altera o histórico nem marca pagamento.
+  const paidRows=actualSource.filter(x=>sameWorkspace(x) && effectiveStatus(x)==='pago');
+  const invoiceKey=x=>norm(x?.descricao||'').replace(/^fatura\s+/,'').replace(/[^a-z0-9]/g,'');
+  const paidCounterpart=x=>{
+    if(!x || !x.valorPendente || x.tipo!=='saida')return false;
+    const name=invoiceKey(x);
+    if(!name || !norm(x.descricao).startsWith('fatura '))return false;
+    const due=referenceDate(x);
+    return paidRows.some(p=>{
+      if(p.tipo!==x.tipo || referenceDate(p)!==due || norm(p.pessoa)!==norm(x.pessoa))return false;
+      const other=invoiceKey(p);
+      // Diferença histórica de digitação: RECARGAY / RECARGAPAY.
+      return name===other || (name==='recargay' && other==='recargapay') ||
+        (name==='recargapay' && other==='recargay');
+    });
+  };
   const actual=actualSource.filter(x=>
-    sameWorkspace(x) && effectiveStatus(x)!=='pago'
+    sameWorkspace(x) && effectiveStatus(x)!=='pago' && !paidCounterpart(x)
   );
 
   // Mescla e elimina duplicidades de mesma série/cartão/data.
@@ -9778,7 +9795,7 @@ function renderAlerts(){
     const date=x.vencimento||x.dataLancamento;
     return {...x,_date:date,_days:date?daysBetween(today(),date):9999,_month:(date||'').slice(0,7)};
   }).filter(x=>{
-    if(!x._date)return false;
+    if(!x._date || paidCounterpart(x))return false;
     if(x.virtualCardAlert){
       const card=accountCards().find(c=>String(c.id)===String(x.cardId||''));
       if(card && finoraCardInvoicePaidR737(card,x._date))return false;
@@ -21763,8 +21780,13 @@ window.FINORA_RELEASE='1.0.13';
       if((x.recorrente!=='mensal'&&x.parcelado!=='sim')||x.generatedReminder)return false;
       const id=String(x.id||''), series=String(x.seriesRootId||'');
       const parent=String(x.parentRecurringId||'');
-      if(parent && parent!==id)return false;
+      // R7.69: raízes importadas podem apontar para UUID legado inexistente.
+      // Não confundir com filho real: somente recuperar se ambos os vínculos
+      // não apontarem para outro registro presente na coleção.
+      if(parent && parent!==id && rows.some(r=>r!==x && String(r.id||'')===parent))return false;
       if(!series||series===id)return true;
+      if(parent && !rows.some(r=>r!==x && String(r.id||'')===parent) &&
+         !rows.some(r=>r!==x && String(r.id||'')===series))return true;
       // Recupera somente raízes legadas cujo parent aponta para si e cuja
       // série não possui outra raiz real. Não promove filhos comuns.
       return parent===id && !rows.some(r=>r!==x && String(r.id||'')===series);
