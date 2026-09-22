@@ -9315,7 +9315,7 @@ function recurringDateAtOffset(x, offset){
 }
 
 function ensureRecurringNextMonths(){
-  const roots=data.filter(x=>x.recorrente==='mensal' && !x.generatedReminder && !x.materializedOccurrence);
+  const roots=data.filter(x=>x.recorrente==='mensal' && !x.generatedReminder && !x.parentRecurringId && !x.seriesRootId /* legacy roots */ || x.recorrente==='mensal' && !x.generatedReminder && !x.parentRecurringId && String(x.seriesRootId||'')===String(x.id||''));
   const nowMonth=currentMonth();
   let changed=false;
 
@@ -9613,8 +9613,10 @@ function renderAlerts(){
     sameWorkspace(x) &&
     x.recorrente==='mensal' &&
     !x.generatedReminder &&
-    !x.materializedOccurrence &&
-    !x.parentRecurringId
+    (!x.parentRecurringId || String(x.parentRecurringId)===String(x.id)) &&
+    (!x.seriesRootId || String(x.seriesRootId)===String(x.id) ||
+      (String(x.parentRecurringId)===String(x.id) &&
+       !(Array.isArray(data)?data:[]).some(r=>r!==x && String(r.id||'')===String(x.seriesRootId))))
   );
 
   const projectionYears=selectedYear?[selectedYear]:years;
@@ -21726,23 +21728,21 @@ window.FINORA_RELEASE='1.0.13';
   }
 
   function recurrenceTemplate(root){
-    const saved=root.recurrenceTemplate||{};
-    return {
-      pessoa:saved.pessoa??root.pessoa??'',
-      expenseOwner:saved.expenseOwner??root.expenseOwner??'',
-      descricao:saved.descricao??root.descricao??'',
-      categoria:saved.categoria??root.categoria??'',
-      essentialType:saved.essentialType??root.essentialType??'',
-      beneficiario:saved.beneficiario??root.beneficiario??'',
-      cardId:saved.cardId??root.cardId??'',
-      forma:saved.forma??root.forma??'',
-      paymentAccount:saved.paymentAccount??root.paymentAccount??'',
-      observacao:saved.observacao??root.observacao??'',
-      valorRecorrente:saved.valorRecorrente??root.valorRecorrente??'mesmo',
-      recRule:saved.recRule??root.recRule??'fixo',
-      parcelasBase:saved.parcelasBase??root.parcelas??'',
-      parcelado:saved.parcelado??root.parcelado??''
-    };
+    const saved=(root.recurrenceTemplate && typeof root.recurrenceTemplate==='object')?root.recurrenceTemplate:{};
+    // Um template legado pode pertencer a outra despesa. Nesse caso, os dados
+    // efetivos do lançamento são a fonte de verdade, sem contaminar a série.
+    const mismatched=String(saved.descricao||'').trim() &&
+      String(saved.descricao||'').trim()!==String(root.descricao||'').trim();
+    const base=mismatched?{}:saved;
+    const fields=['pessoa','expenseOwner','descricao','categoria','essentialType',
+      'beneficiario','cardId','forma','paymentAccount','observacao',
+      'valorRecorrente','recRule','parcelado'];
+    const out={};
+    fields.forEach(k=>{out[k]=base[k]??root[k]??''});
+    out.valorRecorrente=out.valorRecorrente||'mesmo';
+    out.recRule=out.recRule||'fixo';
+    out.parcelasBase=base.parcelasBase??root.installmentStart??root.parcelas??'';
+    return out;
   }
 
   function recurringDate(root,offset){
@@ -21759,12 +21759,16 @@ window.FINORA_RELEASE='1.0.13';
 
   window.ensureRecurringNextMonths=function(){
     const rows=Array.isArray(data)?data:[];
-    const roots=rows.filter(x=>
-      (x.recorrente==='mensal'||x.parcelado==='sim') &&
-      !x.generatedReminder &&
-      !x.materializedOccurrence &&
-      !x.parentRecurringId
-    );
+    const roots=rows.filter(x=>{
+      if((x.recorrente!=='mensal'&&x.parcelado!=='sim')||x.generatedReminder)return false;
+      const id=String(x.id||''), series=String(x.seriesRootId||'');
+      const parent=String(x.parentRecurringId||'');
+      if(parent && parent!==id)return false;
+      if(!series||series===id)return true;
+      // Recupera somente raízes legadas cujo parent aponta para si e cuja
+      // série não possui outra raiz real. Não promove filhos comuns.
+      return parent===id && !rows.some(r=>r!==x && String(r.id||'')===series);
+    });
     const nowMonth=typeof currentMonth==='function'?currentMonth():new Date().toISOString().slice(0,7);
     let changed=false;
 
@@ -21803,7 +21807,7 @@ window.FINORA_RELEASE='1.0.13';
         if(existing){
           // Para lembretes ainda não liquidados, restaura a configuração-base
           // da série sem sobrescrever valor/status já efetivamente lançados.
-          if(existing.generatedReminder && existing.status!=='pago'){
+          if(existing.generatedReminder && !existing.materializedOccurrence && existing.status!=='pago'){
             const keepValue=existing.valor;
             const keepPending=existing.valorPendente;
             Object.assign(existing,{
